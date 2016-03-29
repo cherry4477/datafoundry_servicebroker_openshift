@@ -1,0 +1,65 @@
+{
+	"ImportPath": "github.com/asiainfoLDP/datafoundry_servicebroker_marathon",
+	"GoVersion": "go1.5",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/coreos/etcd/client",
+			"Comment": "v2.3.0-alpha.1-44-gf8c9989",
+			"Rev": "f8c998906c9e496ac30ebf6d1222f9b75385676d"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
+			"Comment": "v2.3.0-alpha.1-44-gf8c9989",
+			"Rev": "f8c998906c9e496ac30ebf6d1222f9b75385676d"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.3.0-alpha.1-44-gf8c9989",
+			"Rev": "f8c998906c9e496ac30ebf6d1222f9b75385676d"
+		},
+		{
+			"ImportPath": "github.com/donovanhide/eventsource",
+			"Rev": "c3f57f280ec708df24886d9e62f2fd178d69d8e8"
+		},
+		{
+			"ImportPath": "github.com/gambol99/go-marathon",
+			"Comment": "v0.0.1-12-gde3f7b2",
+			"Rev": "de3f7b297e825ac61224ad3a3c0b88ba814a23cb"
+		},
+		{
+			"ImportPath": "github.com/google/go-querystring/query",
+			"Rev": "6bb77fe6f42b85397288d4f6f67ac72f8f400ee7"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "1c83b3eabd45b6d76072b66b746c20815fb2872d"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "26a6070f849969ba72b72256e9f14cf519751690"
+		},
+		{
+			"ImportPath": "github.com/pivotal-cf/brokerapi",
+			"Rev": "4e5eff796f401f6188371ecc37311e579113483d"
+		},
+		{
+			"ImportPath": "github.com/pivotal-cf/brokerapi/auth",
+			"Rev": "4e5eff796f401f6188371ecc37311e579113483d"
+		},
+		{
+			"ImportPath": "github.com/pivotal-golang/lager",
+			"Rev": "95b2ada4cdf781bdcf07e5207879e034ac8c5314"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "187fa0f8af224437e08ecb3f208c4d1a94859a61"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "6acef71eb69611914f7a30939ea9f6e194c78172"
+		}
+	]
+}
