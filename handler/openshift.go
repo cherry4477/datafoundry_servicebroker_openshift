@@ -6,19 +6,26 @@ import (
 	//marathon "github.com/gambol99/go-marathon"
 	//"github.com/pivotal-cf/brokerapi"
 	"time"
-	"strings"
+	//"strings"
 	"bytes"
 	"bufio"
+	"crypto/tls"
 	"net/http"
-	"net/url"
-	"encoding/base64"
+	//"net/url"
+	//"encoding/base64"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
+	
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
+	
+	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
 )
 
 type OpenshiftClient struct {
+	host    string
 	authUrl string
-	apiUrl  string
+	oapiUrl string
+	kapiUrl string
 	
 	username    string
 	password    string
@@ -28,8 +35,10 @@ type OpenshiftClient struct {
 func newOpenshiftClient(host, username, password string) *OpenshiftClient {
 	host = "https://" + host
 	oc := &OpenshiftClient{
+		host:    host,
 		authUrl: host + "/oauth/authorize?response_type=token&client_id=openshift-challenging-client",
-		apiUrl:  host + "/oapi/v1",
+		oapiUrl: host + "/oapi/v1",
+		kapiUrl: host + "/api/v1",
 		
 		username: username,
 		password: password,
@@ -40,7 +49,54 @@ func newOpenshiftClient(host, username, password string) *OpenshiftClient {
 	return oc
 }
 
-func newRequest (method string, url string, headers map[string]string, body []byte) (*http.Request, error) {
+func (oc *OpenshiftClient) updateBearerToken () {
+	for {
+		clientConfig := &kclient.Config{}
+		clientConfig.Host = oc.host
+		clientConfig.Insecure = true
+		//clientConfig.Version =
+		
+		token, err := tokencmd.RequestToken(clientConfig, nil, oc.username, oc.password)
+		if err != nil {
+			println("RequestToken error: ", err.Error())
+			
+			time.Sleep(15 * time.Second)
+		} else {
+			//clientConfig.BearerToken = token
+			oc.bearerToken = token
+			
+			println("RequestToken token: ", token)
+			
+			oc.t()
+			
+			time.Sleep(3 * time.Hour)
+		}
+	}
+}
+
+func (oc *OpenshiftClient) t() {
+	status, _, err := oc.Watch("/watch/servicebrokers/sb-marathon")
+	if err != nil {
+		println("Watch error: ", err.Error())
+	}
+	
+	select {
+	case s := <- status:
+		if s.Info != nil {
+			println("s.Info = ", string(s.Info))
+		}
+		if s.Err != nil {
+			println("s.Err = ", s.Err.Error())
+		}
+	}
+}
+
+func (oc *OpenshiftClient) doRequest (method string, url string, headers map[string]string, body []byte) (*http.Response, error) {
+	token := oc.bearerToken
+	if token == "" {
+		return nil, errors.New("token is blank")
+	}
+	
 	var req *http.Request
 	var err error
 	if len(body) == 0 {
@@ -48,6 +104,7 @@ func newRequest (method string, url string, headers map[string]string, body []by
 	} else {
 		req, err = http.NewRequest(method, url, bytes.NewReader(body))
 	}
+	
 	if err != nil {
 		return nil, err
 	}
@@ -55,94 +112,15 @@ func newRequest (method string, url string, headers map[string]string, body []by
 	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
-	
-	return req, nil
-}
-
-func (oc *OpenshiftClient) updateBearerToken () {
-	client := &http.Client{
-		Timeout: time.Duration(10) * time.Second,
-	}
-	
-	sleepForAWhile := func() {
-		time.Sleep(15 * time.Second)
-	}
-	
-	for {
-		req, err := newRequest("GET", oc.authUrl, nil, nil)
-		if err != nil {
-			println("111, error: ", err.Error())
-			
-			sleepForAWhile()
-			continue
-		}
-		req.Header.Set("X-CSRF-Token", "1")
-		req.Header.Set("Authorization", "Basic " + base64.StdEncoding.EncodeToString([]byte(oc.username + ":" + oc.password)))
-		println("111, Authorization: ", req.Header.Get("Authorization"))
-		
-		res, err := client.Do(req)
-		if err != nil {
-			println("222, error: ", err.Error())
-			
-			sleepForAWhile()
-			continue
-		}
-		
-		if res.StatusCode == http.StatusFound {
-			u, err := url.Parse(res.Header.Get("Location"))
-			if err != nil {
-				println("333, error: ", err.Error())
-				
-				sleepForAWhile()
-				continue
-			}
-
-			if errorCode := u.Query().Get("error"); len(errorCode) > 0 {
-				//errorDescription := u.Query().Get("error_description")
-				println("444, error_description: ", u.Query().Get("error_description"))
-				
-				sleepForAWhile()
-				continue
-			}
-
-			fragmentValues, err := url.ParseQuery(u.Fragment)
-			if err != nil {
-				println("555, error: ", err.Error())
-				
-				sleepForAWhile()
-				continue
-			}
-
-			if accessToken := fragmentValues.Get("access_token"); len(accessToken) == 0 {
-				println("666, len(accessToken) == 0")
-				
-				sleepForAWhile()
-				continue
-			} else {
-				oc.bearerToken = accessToken
-				
-				println("new token: ", oc.bearerToken)
-			}
-		}
-		
-		time.Sleep(3 * time.Hour)
-	}
-}
-
-func (oc *OpenshiftClient) doRequest (method string, uri string, headers map[string]string, body []byte) (*http.Response, error) {
-	token := oc.bearerToken
-	if token == "" {
-		return nil, errors.New("token is blank")
-	}
-	
-	req, err := newRequest("GET", oc.host + uri, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	
 	req.Header.Add("Authorization", "Bearer " + token)
 	
+	println("Authorization = ", req.Header.Get("Authorization"))
+	
+	transCfg := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	client := &http.Client{
+		Transport: transCfg,
 		Timeout: time.Duration(10) * time.Second,
 	}
 	return client.Do(req)
@@ -154,7 +132,7 @@ type WatchStatus struct {
 }
 
 func (oc *OpenshiftClient) Watch (uri string) (<-chan WatchStatus, chan<- struct{}, error) {
-	res, err := oc.doRequest("GET", uri, nil, nil)
+	res, err := oc.doRequest("GET", oc.oapiUrl + uri, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -190,10 +168,6 @@ func (oc *OpenshiftClient) Watch (uri string) (<-chan WatchStatus, chan<- struct
 	}()
 	
 	return statuses, canceled, nil
-}
-
-func (oc *OpenshiftClient) request (method string, headers map[string]string, body string) (*http.Response, error) {
-	return nil, nil
 }
 
 func (oc *OpenshiftClient) Get (uri string) (string, error) {

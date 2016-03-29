@@ -25,6 +25,7 @@ _testmain.go
 
 #############
 
+docker-compose*
 datafoundry_servicebroker*
 dev*
 
