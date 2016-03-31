@@ -11,7 +11,17 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	//"strings"
+	"bytes"
+	
+	"k8s.io/kubernetes/pkg/util/yaml"
+	kapi "k8s.io/kubernetes/pkg/api/v1"
+	routeapi "github.com/openshift/origin/route/api/v1"
 )
+
+func init() {
+	register("etcd_sample_Sample", &Etcd_sampleHandler{})
+
+}
 
 type Etcd_sampleHandler struct{}
 
@@ -60,7 +70,41 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycreden
 
 }
 
-func init() {
-	register("etcd_sample_Sample", &Etcd_sampleHandler{})
+//===============================================================
+// 
+//===============================================================
 
+func Yaml2Json(yamlData []byte) ([]byte, error) {
+	var err error
+	decoder := yaml.NewYAMLToJSONDecoder(bytes.NewBuffer(yamlData))
+	_ = decoder
+	
+	rc := &kapi.ReplicationController{}
+	err = decoder.Decode(rc)
+	
+	pod1 := &kapi.Pod{}
+	err = decoder.Decode(pod1)
+	
+	svc1 := &kapi.Service{}
+	err = decoder.Decode(svc1)
+	
+	pod2 := &kapi.Pod{}
+	err = decoder.Decode(pod2)
+	
+	svc2 := &kapi.Service{}
+	err = decoder.Decode(svc2)
+	
+	pod3 := &kapi.Pod{}
+	err = decoder.Decode(pod3)
+	
+	svc3 := &kapi.Service{}
+	err = decoder.Decode(svc3)
+	
+	service := &kapi.Service{}
+	err = decoder.Decode(service)
+	
+	route := &routeapi.Route{}
+	err = decoder.Decode(route)	
+	
+	return nil, err
 }

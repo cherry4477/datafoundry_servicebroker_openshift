@@ -9,6 +9,8 @@ import (
 	//"strings"
 	"bytes"
 	"bufio"
+	//"io"
+	"io/ioutil"
 	"crypto/tls"
 	"net/http"
 	//"net/url"
@@ -75,7 +77,14 @@ func (oc *OpenshiftClient) updateBearerToken () {
 }
 
 func (oc *OpenshiftClient) t() {
-	status, _, err := oc.Watch("/watch/servicebrokers/sb-marathon")
+	// ...
+	
+	bytes, err := oc.Get(oc.oapiUrl + "/servicebrokers/sb-marathon")
+	println("GET /servicebrokers/sb-marathon \n", string(bytes))
+	
+	// ...
+	
+	status, _, err := oc.Watch(oc.oapiUrl + "/watch/servicebrokers/sb-marathon")
 	if err != nil {
 		println("Watch error: ", err.Error())
 	}
@@ -131,14 +140,14 @@ type WatchStatus struct {
 	Err  error
 }
 
-func (oc *OpenshiftClient) Watch (uri string) (<-chan WatchStatus, chan<- struct{}, error) {
-	res, err := oc.doRequest("GET", oc.oapiUrl + uri, nil, nil)
+func (oc *OpenshiftClient) Watch (url string) (<-chan WatchStatus, chan<- struct{}, error) {
+	res, err := oc.doRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	if res.Body == nil {
-		return nil, nil, errors.New("response.body is nil")
-	}
+	//if res.Body == nil {
+	//	return nil, nil, errors.New("response.body is nil")
+	//}
 	
 	statuses := make(chan WatchStatus, 5)
 	canceled := make(chan struct{}, 1)
@@ -170,19 +179,58 @@ func (oc *OpenshiftClient) Watch (uri string) (<-chan WatchStatus, chan<- struct
 	return statuses, canceled, nil
 }
 
-func (oc *OpenshiftClient) Get (uri string) (string, error) {
-	return "", nil
+func (oc *OpenshiftClient) Get (url string) ([]byte, error) {
+	res, err := oc.doRequest("GET", url, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	//if res.Body == nil {
+	//	return nil, nil
+	//}
+	defer res.Body.Close()
+	
+	return ioutil.ReadAll(res.Body)
 }
 
-func (oc *OpenshiftClient) Post (uri string, body string) (string, error) {
-	return "", nil
+func (oc *OpenshiftClient) Delete (url string) ([]byte, error) {
+	res, err := oc.doRequest("DELETE", url, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	//if res.Body == nil {
+	//	return nil, nil
+	//}
+	defer res.Body.Close()
+	
+	return ioutil.ReadAll(res.Body)
 }
 
-func (oc *OpenshiftClient) Update (uri string, body string) (string, error) {
-	return "", nil
+func (oc *OpenshiftClient) Post (url string, body []byte) ([]byte, error) {
+	res, err := oc.doRequest("POST", url, nil, body)
+	if err != nil {
+		return nil, err
+	}
+	//if res.Body == nil {
+	//	return nil, nil
+	//}
+	defer res.Body.Close()
+	
+	return ioutil.ReadAll(res.Body)
 }
 
-func (oc *OpenshiftClient) Delete (uri string) (string, error) {
-	return "", nil
+func (oc *OpenshiftClient) Update (url string, body []byte) ([]byte, error) {
+	res, err := oc.doRequest("PUT", url, nil, body)
+	if err != nil {
+		return nil, err
+	}
+	//if res.Body == nil {
+	//	return nil, nil
+	//}
+	defer res.Body.Close()
+	
+	return ioutil.ReadAll(res.Body)
 }
 
+//===============================================================
+// 
+//===============================================================
