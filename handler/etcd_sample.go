@@ -11,11 +11,15 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	//"strings"
-	"bytes"
+	//"bytes"
+	//"text/template"
+	//"io"
+	"io/ioutil"
+	"os"
 	
-	"k8s.io/kubernetes/pkg/util/yaml"
-	kapi "k8s.io/kubernetes/pkg/api/v1"
-	routeapi "github.com/openshift/origin/route/api/v1"
+	//"k8s.io/kubernetes/pkg/util/yaml"
+	//kapi "k8s.io/kubernetes/pkg/api/v1"
+	//routeapi "github.com/openshift/origin/route/api/v1"
 )
 
 func init() {
@@ -28,10 +32,27 @@ type Etcd_sampleHandler struct{}
 func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
 	//初始化到openshift的链接
 	
+	jsons, err := EtcdYaml2Json(map[string]string{
+			"instanceid": instanceID,
+		})
+	if err != nil {
+		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, err
+	}
 	
+	prefix := "/namespaces/" + details.OrganizationGUID
+	theOC.KRequest("POST", prefix + "/services", jsons[0])
+	theOC.ORequest("POST", prefix + "/routes", jsons[1])
+	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[2])
+	theOC.KRequest("POST", prefix + "/services", jsons[3])
+	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[4])
+	theOC.KRequest("POST", prefix + "/services", jsons[5])
+	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[6])
+	theOC.KRequest("POST", prefix + "/services", jsons[7])
+	
+	// ...
 	
 	applicationName := "app"
-	DashboardURL := "http://dashboard"
+	DashboardURL := "http://"
 
 	//赋值隐藏属性
 	myServiceInfo := ServiceInfo{
@@ -39,7 +60,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 		Database: applicationName, //用来存储marathon的实例名字
 	}
 
-	provsiondetail := brokerapi.ProvisionedServiceSpec{DashboardURL: DashboardURL, IsAsync: false}
+	provsiondetail := brokerapi.ProvisionedServiceSpec{
+		DashboardURL: DashboardURL,
+		IsAsync:      false,
+	}
 
 	return provsiondetail, myServiceInfo, nil
 
@@ -74,7 +98,8 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycreden
 // 
 //===============================================================
 
-func Yaml2Json(yamlData []byte) ([]byte, error) {
+/*
+func Yaml2Json1(yamlData []byte) ([]byte, error) {
 	var err error
 	decoder := yaml.NewYAMLToJSONDecoder(bytes.NewBuffer(yamlData))
 	_ = decoder
@@ -107,4 +132,36 @@ func Yaml2Json(yamlData []byte) ([]byte, error) {
 	err = decoder.Decode(route)	
 	
 	return nil, err
+}
+*/
+
+/*
+var etcdTemplate = template.Must(template.ParseFiles("openshift_etcd.yaml"))
+
+func Yaml2Json2(replaces map[string]string) ([]byte, error) {
+	var err error
+	
+	var out bytes.Buffer
+	err = etcdTemplate.Execute(&out, replaces)
+	
+	return nil, err
+}
+*/
+
+var etcdTemplateData []byte = nil
+
+// maybe the replace order is important, so using slice other than map would be better
+func EtcdYaml2Json(replaces map[string]string) ([][]byte, error) {
+	if etcdTemplateData == nil {
+		f, err := os.Open("openshift_etcd.yaml")
+		if err != nil {
+			return nil, err
+		}
+		etcdTemplateData, err = ioutil.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	return Yaml2Json(etcdTemplateData, replaces)
 }

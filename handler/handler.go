@@ -109,9 +109,9 @@ func getenv(env string) string {
 	return env_value
 }
 
-var oc *OpenshiftClient
+var theOC *OpenshiftClient
 func init() {
-	oc = newOpenshiftClient(
+	theOC = newOpenshiftClient(
 		getenv("OPENSHIFTADDR"), 
 		getenv("OPENSHIFTUSER"), 
 		getenv("OPENSHIFTPASS"),

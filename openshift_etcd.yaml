@@ -1,240 +1,7 @@
 apiVersion: v1
-kind: ReplicationController
-metadata:
-  labels:
-    servicebroker: INSTANSEID
-  name: servicebroker-etcd0-INSTANSEID
-spec:
-  replicas: 1
-  selector:
-    servicebroker_etcd_node: INSTANSEID-etcd0
-  template:
-    metadata:
-      labels:
-        servicebroker_app: INSTANSEID-etcd
-        servicebroker_etcd_node: INSTANSEID-etcd0
-    spec:
-      containers:
-      - command:
-      - /etcd
-      - -name
-      - etcd0
-      - -initial-advertise-peer-urls
-      - http://etcd0:2380
-      - -listen-peer-urls
-      - http://0.0.0.0:2380
-      - -listen-client-urls
-      - http://0.0.0.0:2379
-      - -advertise-client-urls
-      - http://etcd0-etcd-servicebroker.app.asiainfodata.com:80
-      - -initial-cluster-token 
-      - etcd-servicebroker 
-      - -initial-cluster
-      - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-      - -initial-cluster-state
-      - new
-      image: index.alauda.cn/asiainfoldp/etcd_test
-      name: etcd0
-      ports:
-      - containerPort: 2379
-        name: client
-        protocol: TCP
-      - containerPort: 2380
-        name: server
-        protocol: TCP
-    restartPolicy: Never
-
-
----
-
-
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: etcd
-    etcd_node: etcd0
-  name: etcd0
-spec:
-  containers:
-  - command:
-    - /etcd
-    - -name
-    - etcd0
-    - -initial-advertise-peer-urls
-    - http://etcd0:2380
-    - -listen-peer-urls
-    - http://0.0.0.0:2380
-    - -listen-client-urls
-    - http://0.0.0.0:2379
-    - -advertise-client-urls
-    - http://etcd0-etcd-servicebroker.app.asiainfodata.com:80
-    - -initial-cluster-token 
-    - etcd-servicebroker 
-    - -initial-cluster
-    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-    - -initial-cluster-state
-    - new
-    image: index.alauda.cn/asiainfoldp/etcd_test
-    name: etcd0
-    ports:
-    - containerPort: 2379
-      name: client
-      protocol: TCP
-    - containerPort: 2380
-      name: server
-      protocol: TCP
-  restartPolicy: Never
-
----
-
-apiVersion: v1
 kind: Service
 metadata:
-  labels:
-    etcd_node: etcd0
-  name: etcd0
-spec:
-  ports:
-  - name: client
-    port: 2379
-    protocol: TCP
-    targetPort: 2379
-  - name: server
-    port: 2380
-    protocol: TCP
-    targetPort: 2380
-  selector:
-    etcd_node: etcd0
-
----
-
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: etcd
-    etcd_node: etcd1
-  name: etcd1
-spec:
-  containers:
-  - command:
-    - /etcd
-    - -name
-    - etcd1
-    - -initial-advertise-peer-urls
-    - http://etcd1:2380
-    - -listen-peer-urls
-    - http://0.0.0.0:2380
-    - -listen-client-urls
-    - http://0.0.0.0:2379
-    - -advertise-client-urls
-    - http://etcd1-etcd-servicebroker.app.asiainfodata.com:80
-    - -initial-cluster-token 
-    - etcd-servicebroker 
-    - -initial-cluster
-    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-    - -initial-cluster-state
-    - new
-    image: index.alauda.cn/asiainfoldp/etcd_test
-    name: etcd1
-    ports:
-    - containerPort: 2379
-      name: client
-      protocol: TCP
-    - containerPort: 2380
-      name: server
-      protocol: TCP
-  restartPolicy: Never
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    etcd_node: etcd1
-  name: etcd1
-spec:
-  ports:
-  - name: client
-    port: 2379
-    protocol: TCP
-    targetPort: 2379
-  - name: server
-    port: 2380
-    protocol: TCP
-    targetPort: 2380
-  selector:
-    etcd_node: etcd1
-
----
-
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: etcd
-    etcd_node: etcd2
-  name: etcd2
-spec:
-  containers:
-  - command:
-    - /etcd
-    - -name
-    - etcd2
-    - -initial-advertise-peer-urls
-    - http://etcd2:2380
-    - -listen-peer-urls
-    - http://0.0.0.0:2380
-    - -listen-client-urls
-    - http://0.0.0.0:2379
-    - -advertise-client-urls
-    - http://etcd2-etcd-servicebroker.app.asiainfodata.com:80
-    - -initial-cluster-token 
-    - etcd-servicebroker 
-    - -initial-cluster
-    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-    - -initial-cluster-state
-    - new
-    image: index.alauda.cn/asiainfoldp/etcd_test
-    name: etcd2
-    ports:
-    - containerPort: 2379
-      name: client
-      protocol: TCP
-    - containerPort: 2380
-      name: server
-      protocol: TCP
-  restartPolicy: Never
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    etcd_node: etcd2
-  name: etcd2
-spec:
-  ports:
-  - name: client
-    port: 2379
-    protocol: TCP
-    targetPort: 2379
-  - name: server
-    port: 2380
-    protocol: TCP
-    targetPort: 2380
-  selector:
-    etcd_node: etcd2
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: servicebroker-etcd-INSTANSEID
+  name: sb-instanceid-etcd
 spec:
   ports:
   - name: etcd-client-port
@@ -242,22 +9,215 @@ spec:
     protocol: TCP
     targetPort: 2379
   selector:
-    app: etcd
+    servicebroker: instanceid-etcd
 
 ---
+
+#Route to client
 apiVersion: v1
 kind: Route
 metadata:
-  creationTimestamp: null
-  labels:
-    etcd_node: etcd0
-  name: servicebroker-etcd-INSTANSEID
+  name: sb-instanceid-etcd
 spec:
-  host: servicebroker-etcd-INSTANSEID.app.asiainfodata.com
+  host: sb-instanceid-etcd.app.asiainfodata.com
   port:
-    targetPort: client
+    targetPort: etcd-client-port
   to:
     kind: Service
-    name: servicebroker-etcd-INSTANSEID
-status:
-  ingress: null
+    name: sb-instanceid-etcd
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd0
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd0
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd0
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - /etcd
+        - -name
+        - etcd0
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd0:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - -initial-cluster-token 
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd0=http://sb-instanceid-etcd0:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd2=http://sb-instanceid-etcd2:2380
+        - -initial-cluster-state
+        - new
+        image: quay.io/coreos/etcd:latest
+        imagePullPolicy: IfNotPresent
+        name: etcd0
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd0
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd0
+
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd1
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd1
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd1
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - /etcd
+        - -name
+        - etcd1
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd1:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - -initial-cluster-token 
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd0=http://sb-instanceid-etcd0:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd2=http://sb-instanceid-etcd2:2380
+        - -initial-cluster-state
+        - new
+        image: quay.io/coreos/etcd:latest
+        imagePullPolicy: IfNotPresent
+        name: etcd1
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd1
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd1
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd2
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd2
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd2
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - /etcd
+        - -name
+        - etcd2
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd2:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - -initial-cluster-token 
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd0=http://sb-instanceid-etcd0:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd2=http://sb-instanceid-etcd2:2380
+        - -initial-cluster-state
+        - new
+        image: quay.io/coreos/etcd:latest
+        imagePullPolicy: IfNotPresent
+        name: etcd2
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd2
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd2

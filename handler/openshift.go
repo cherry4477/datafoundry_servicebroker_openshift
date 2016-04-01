@@ -21,11 +21,14 @@ import (
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	
 	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
+	
+	//"k8s.io/kubernetes/pkg/util/yaml"
+	"github.com/ghodss/yaml"
 )
 
 type OpenshiftClient struct {
 	host    string
-	authUrl string
+	//authUrl string
 	oapiUrl string
 	kapiUrl string
 	
@@ -38,7 +41,7 @@ func newOpenshiftClient(host, username, password string) *OpenshiftClient {
 	host = "https://" + host
 	oc := &OpenshiftClient{
 		host:    host,
-		authUrl: host + "/oauth/authorize?response_type=token&client_id=openshift-challenging-client",
+		//authUrl: host + "/oauth/authorize?response_type=token&client_id=openshift-challenging-client",
 		oapiUrl: host + "/oapi/v1",
 		kapiUrl: host + "/api/v1",
 		
@@ -79,12 +82,12 @@ func (oc *OpenshiftClient) updateBearerToken () {
 func (oc *OpenshiftClient) t() {
 	// ...
 	
-	bytes, err := oc.Get(oc.oapiUrl + "/servicebrokers/sb-marathon")
+	bytes, err := oc.ORequest("GET", "/servicebrokers/sb-marathon", nil)
 	println("GET /servicebrokers/sb-marathon \n", string(bytes))
 	
 	// ...
 	
-	status, _, err := oc.Watch(oc.oapiUrl + "/watch/servicebrokers/sb-marathon")
+	status, _, err := oc.OWatch("/watch/servicebrokers/sb-marathon")
 	if err != nil {
 		println("Watch error: ", err.Error())
 	}
@@ -100,7 +103,7 @@ func (oc *OpenshiftClient) t() {
 	}
 }
 
-func (oc *OpenshiftClient) doRequest (method string, url string, headers map[string]string, body []byte) (*http.Response, error) {
+func (oc *OpenshiftClient) request (method string, url string, body []byte, timeout time.Duration) (*http.Response, error) {
 	token := oc.bearerToken
 	if token == "" {
 		return nil, errors.New("token is blank")
@@ -118,19 +121,18 @@ func (oc *OpenshiftClient) doRequest (method string, url string, headers map[str
 		return nil, err
 	}
 	
-	for k, v := range headers {
-		req.Header.Add(k, v)
-	}
-	req.Header.Add("Authorization", "Bearer " + token)
-	
-	println("Authorization = ", req.Header.Get("Authorization"))
+	//for k, v := range headers {
+	//	req.Header.Add(k, v)
+	//}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer " + token)
 	
 	transCfg := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{
 		Transport: transCfg,
-		Timeout: time.Duration(10) * time.Second,
+		Timeout: timeout,
 	}
 	return client.Do(req)
 }
@@ -140,8 +142,8 @@ type WatchStatus struct {
 	Err  error
 }
 
-func (oc *OpenshiftClient) Watch (url string) (<-chan WatchStatus, chan<- struct{}, error) {
-	res, err := oc.doRequest("GET", url, nil, nil)
+func (oc *OpenshiftClient) doWatch (url string) (<-chan WatchStatus, chan<- struct{}, error) {
+	res, err := oc.request("GET", url, nil, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -179,58 +181,99 @@ func (oc *OpenshiftClient) Watch (url string) (<-chan WatchStatus, chan<- struct
 	return statuses, canceled, nil
 }
 
-func (oc *OpenshiftClient) Get (url string) ([]byte, error) {
-	res, err := oc.doRequest("GET", url, nil, nil)
+func (oc *OpenshiftClient) OWatch (uri string) (<-chan WatchStatus, chan<- struct{}, error) {
+	return oc.doWatch(oc.oapiUrl + uri)
+}
+
+func (oc *OpenshiftClient) KWatch (uri string) (<-chan WatchStatus, chan<- struct{}, error) {
+	return oc.doWatch(oc.kapiUrl + uri)
+}
+
+const GeneralRequestTimeout = time.Duration(10) * time.Second
+
+func (oc *OpenshiftClient) doRequest (method, url string, body []byte) ([]byte, error) {
+	res, err := oc.request(method, url, body, GeneralRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
-	//if res.Body == nil {
-	//	return nil, nil
-	//}
 	defer res.Body.Close()
 	
 	return ioutil.ReadAll(res.Body)
 }
 
-func (oc *OpenshiftClient) Delete (url string) ([]byte, error) {
-	res, err := oc.doRequest("DELETE", url, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	//if res.Body == nil {
-	//	return nil, nil
-	//}
-	defer res.Body.Close()
-	
-	return ioutil.ReadAll(res.Body)
+func (oc *OpenshiftClient) ORequest (method, uri string, body []byte) ([]byte, error) {
+	return oc.doRequest(method, oc.oapiUrl + uri, body)
 }
 
-func (oc *OpenshiftClient) Post (url string, body []byte) ([]byte, error) {
-	res, err := oc.doRequest("POST", url, nil, body)
-	if err != nil {
-		return nil, err
-	}
-	//if res.Body == nil {
-	//	return nil, nil
-	//}
-	defer res.Body.Close()
-	
-	return ioutil.ReadAll(res.Body)
-}
-
-func (oc *OpenshiftClient) Update (url string, body []byte) ([]byte, error) {
-	res, err := oc.doRequest("PUT", url, nil, body)
-	if err != nil {
-		return nil, err
-	}
-	//if res.Body == nil {
-	//	return nil, nil
-	//}
-	defer res.Body.Close()
-	
-	return ioutil.ReadAll(res.Body)
+func (oc *OpenshiftClient) KRequest (method, uri string, body []byte) ([]byte, error) {
+	return oc.doRequest(method, oc.kapiUrl + uri, body)
 }
 
 //===============================================================
 // 
 //===============================================================
+
+// maybe the replace order is important, so using slice other than map would be better
+/*
+func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, error) {
+	var err error
+	
+	for old, rep := range replaces {
+		etcdTemplateData = bytes.Replace(etcdTemplateData, []byte(old), []byte(rep), -1)
+	}
+	
+	templates := bytes.Split(etcdTemplateData, []byte("---"))
+	for i := range templates {
+		templates[i] = bytes.TrimSpace(templates[i])
+		println("\ntemplates[", i, "] = ", string(templates[i]))
+	}
+	
+	return templates, err
+}
+*/
+
+/*
+func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, error) {
+	var err error
+	decoder := yaml.NewYAMLToJSONDecoder(bytes.NewBuffer(yamlData))
+	_ = decoder
+	
+	
+	for {
+		var t interface{}
+		err = decoder.Decode(&t)
+		m, ok := v.(map[string]interface{})
+		if ok {
+			
+		}
+	}
+}
+*/
+
+func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, error) {
+	for old, rep := range replaces {
+		yamlTemplates = bytes.Replace(yamlTemplates, []byte(old), []byte(rep), -1)
+	}
+	
+	jsons := [][]byte{}
+	templates := bytes.Split(yamlTemplates, []byte("---"))
+	for i := range templates {
+		//templates[i] = bytes.TrimSpace(templates[i])
+		println("\ntemplates[", i, "] = ", string(templates[i]))
+		
+		json, err := yaml.YAMLToJSON(templates[i])
+		if err != nil {
+			return jsons, err
+		}
+		
+		jsons = append(jsons, json)
+		println("\njson[", i, "] = ", string(jsons[i]))
+	}
+	
+	return jsons, nil
+}
+
+
+
+
+
