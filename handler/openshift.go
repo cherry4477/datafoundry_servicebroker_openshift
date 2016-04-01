@@ -15,6 +15,7 @@ import (
 	"net/http"
 	//"net/url"
 	//"encoding/base64"
+	"encoding/json"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	
@@ -22,8 +23,9 @@ import (
 	
 	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
 	
-	//"k8s.io/kubernetes/pkg/util/yaml"
-	"github.com/ghodss/yaml"
+	kapi "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/yaml"
+	//"github.com/ghodss/yaml"
 )
 
 type OpenshiftClient struct {
@@ -209,6 +211,108 @@ func (oc *OpenshiftClient) KRequest (method, uri string, body []byte) ([]byte, e
 	return oc.doRequest(method, oc.kapiUrl + uri, body)
 }
 
+func (oc *OpenshiftClient) OGet (uri string, into interface{}) error {
+	data, err := oc.ORequest("GET", uri, nil)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) ODelete (uri string, options *kapi.DeleteOptions, into interface{}) error {
+	body_data, err := json.Marshal(options)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.ORequest("DELETE", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) OPost (uri string, body interface{}, into interface{}) error {
+	body_data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.ORequest("POST", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) OPut (uri string, body interface{}, into interface{}) error {
+	body_data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.ORequest("PUT", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) KGet (uri string, into interface{}) error {
+	data, err := oc.KRequest("GET", uri, nil)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) KDelete (uri string, options *kapi.DeleteOptions, into interface{}) error {
+	body_data, err := json.Marshal(options)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.KRequest("DELETE", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) KPost (uri string, body interface{}, into interface{}) error {
+	body_data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.KRequest("POST", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
+func (oc *OpenshiftClient) KPut (uri string, body interface{}, into interface{}) error {
+	body_data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	
+	data, err := oc.KRequest("PUT", uri, body_data)
+	if err != nil {
+		return err
+	}
+	
+	return json.Unmarshal(data, into)
+}
+
 //===============================================================
 // 
 //===============================================================
@@ -250,6 +354,7 @@ func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, erro
 }
 */
 
+/*
 func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, error) {
 	for old, rep := range replaces {
 		yamlTemplates = bytes.Replace(yamlTemplates, []byte(old), []byte(rep), -1)
@@ -272,8 +377,31 @@ func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, erro
 	
 	return jsons, nil
 }
+*/
 
 
 
+type YamlDecoder struct {
+	decoder *yaml.YAMLToJSONDecoder
+	err     error
+}
+
+func NewYamlDecoder(yamlData []byte) *YamlDecoder {
+	return &YamlDecoder{
+			decoder: yaml.NewYAMLToJSONDecoder(bytes.NewBuffer(yamlData)),
+		}
+}
+
+func (d *YamlDecoder) Error() error {
+	return d.err
+}
+
+func (d *YamlDecoder) Decode(into interface{}) *YamlDecoder {
+	if d.err == nil {
+		d.err = d.decoder.Decode(into)
+	}
+	
+	return d
+}
 
 

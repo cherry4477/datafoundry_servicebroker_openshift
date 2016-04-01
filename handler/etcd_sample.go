@@ -11,15 +11,15 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	//"strings"
-	//"bytes"
+	"bytes"
 	//"text/template"
 	//"io"
 	"io/ioutil"
 	"os"
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
-	//kapi "k8s.io/kubernetes/pkg/api/v1"
-	//routeapi "github.com/openshift/origin/route/api/v1"
+	kapi "k8s.io/kubernetes/pkg/api/v1"
+	routeapi "github.com/openshift/origin/route/api/v1"
 )
 
 func init() {
@@ -32,13 +32,13 @@ type Etcd_sampleHandler struct{}
 func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
 	//初始化到openshift的链接
 	
-	jsons, err := EtcdYaml2Json(map[string]string{
-			"instanceid": instanceID,
-		})
+	res, err := loadEtcdTemplateResources(instanceID)
 	if err != nil {
 		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, err
 	}
+	_ = res
 	
+	/*
 	prefix := "/namespaces/" + details.OrganizationGUID
 	theOC.KRequest("POST", prefix + "/services", jsons[0])
 	theOC.ORequest("POST", prefix + "/routes", jsons[1])
@@ -48,6 +48,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	theOC.KRequest("POST", prefix + "/services", jsons[5])
 	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[6])
 	theOC.KRequest("POST", prefix + "/services", jsons[7])
+	*/
 	
 	// ...
 	
@@ -98,11 +99,52 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycreden
 // 
 //===============================================================
 
+type etcdTemplateResources struct {
+	service  kapi.Service
+	route    routeapi.Route
+	etcdrc0  kapi.ReplicationController
+	etcdsrv0 kapi.Service
+	etcdrc1  kapi.ReplicationController
+	etcdsrv1 kapi.Service
+	etcdrc2  kapi.ReplicationController
+	etcdsrv2 kapi.Service
+}
+
+var etcdTemplateData []byte = nil
+
+func loadEtcdTemplateResources(instanceID string) (*etcdTemplateResources, error) {
+	if etcdTemplateData == nil {
+		f, err := os.Open("openshift_etcd.yaml")
+		if err != nil {
+			return nil, err
+		}
+		etcdTemplateData, err = ioutil.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	yamlTemplates := bytes.Replace(etcdTemplateData, []byte("instanceid"), []byte(instanceID), -1)
+	
+	var res etcdTemplateResources
+	decoder := NewYamlDecoder(yamlTemplates)
+	decoder.
+		Decode(res.service).
+		Decode(res.route).
+		Decode(res.etcdrc0).
+		Decode(res.etcdsrv0).
+		Decode(res.etcdrc1).
+		Decode(res.etcdsrv1).
+		Decode(res.etcdrc2).
+		Decode(res.etcdsrv2)
+	
+	return &res, decoder.err
+}
+
 /*
-func Yaml2Json1(yamlData []byte) ([]byte, error) {
+func Yaml2Json1(yamlData []byte) error {
 	var err error
 	decoder := yaml.NewYAMLToJSONDecoder(bytes.NewBuffer(yamlData))
-	_ = decoder
 	
 	rc := &kapi.ReplicationController{}
 	err = decoder.Decode(rc)
@@ -148,6 +190,7 @@ func Yaml2Json2(replaces map[string]string) ([]byte, error) {
 }
 */
 
+/*
 var etcdTemplateData []byte = nil
 
 // maybe the replace order is important, so using slice other than map would be better
@@ -165,3 +208,4 @@ func EtcdYaml2Json(replaces map[string]string) ([][]byte, error) {
 	
 	return Yaml2Json(etcdTemplateData, replaces)
 }
+*/
