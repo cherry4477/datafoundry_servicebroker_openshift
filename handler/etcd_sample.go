@@ -27,28 +27,51 @@ func init() {
 
 }
 
+func (oc *OpenshiftClient) t() {
+	new(Etcd_sampleHandler).DoProvision(
+		"test1", 
+		brokerapi.ProvisionDetails{
+			OrganizationGUID: "ttt",
+		},
+		true)
+}
+
 type Etcd_sampleHandler struct{}
 
 func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
 	//初始化到openshift的链接
 	
-	res, err := loadEtcdTemplateResources(instanceID)
+	
+	
+	var input, output etcdTemplateResources
+	err := loadEtcdTemplateResources(instanceID, &input)
 	if err != nil {
 		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, err
 	}
-	_ = res
 	
-	/*
+	osr := NewOpenshiftREST(theOC)
+	
 	prefix := "/namespaces/" + details.OrganizationGUID
-	theOC.KRequest("POST", prefix + "/services", jsons[0])
-	theOC.ORequest("POST", prefix + "/routes", jsons[1])
-	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[2])
-	theOC.KRequest("POST", prefix + "/services", jsons[3])
-	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[4])
-	theOC.KRequest("POST", prefix + "/services", jsons[5])
-	theOC.KRequest("POST", prefix + "/replicationcontrollers", jsons[6])
-	theOC.KRequest("POST", prefix + "/services", jsons[7])
-	*/
+	osr.
+		KPost(prefix + "/services", &input.service, &output.service).
+		OPost(prefix + "/routes", &input.route, &output.route).
+		KPost(prefix + "/replicationcontrollers", &input.etcdrc0, &output.etcdrc0).
+		KPost(prefix + "/services", &input.etcdsrv0, &output.etcdsrv0).
+		KPost(prefix + "/replicationcontrollers", &input.etcdrc1, &output.etcdrc1).
+		KPost(prefix + "/services", &input.etcdsrv1, &output.etcdsrv1).
+		KPost(prefix + "/replicationcontrollers", &input.etcdrc2, &output.etcdrc2).
+		KPost(prefix + "/services", &input.etcdsrv2, &output.etcdsrv2)
+	
+	if osr.err != nil {
+		println("osr.err = ", osr.err.Error())
+		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, osr.err
+	}
+	
+println()
+println("output.route.Spec.Host = ", output.route.Spec.Host)
+println("output.route.Spec.Port = ", output.route.Spec.Port.TargetPort.IntVal)
+println("output.route.Spec.Path = ", output.route.Spec.Path)
+println()
 	
 	// ...
 	
@@ -63,7 +86,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 	provsiondetail := brokerapi.ProvisionedServiceSpec{
 		DashboardURL: DashboardURL,
-		IsAsync:      false,
+		IsAsync:      false, // true
 	}
 
 	return provsiondetail, myServiceInfo, nil
@@ -112,33 +135,38 @@ type etcdTemplateResources struct {
 
 var etcdTemplateData []byte = nil
 
-func loadEtcdTemplateResources(instanceID string) (*etcdTemplateResources, error) {
+func loadEtcdTemplateResources(instanceID string, res *etcdTemplateResources) error {
 	if etcdTemplateData == nil {
 		f, err := os.Open("openshift_etcd.yaml")
 		if err != nil {
-			return nil, err
+			return err
 		}
 		etcdTemplateData, err = ioutil.ReadAll(f)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	
 	yamlTemplates := bytes.Replace(etcdTemplateData, []byte("instanceid"), []byte(instanceID), -1)
 	
-	var res etcdTemplateResources
+	
+println("========= new yamlTemplates ===========")
+println(string(yamlTemplates))
+println()
+
+	
 	decoder := NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(res.service).
-		Decode(res.route).
-		Decode(res.etcdrc0).
-		Decode(res.etcdsrv0).
-		Decode(res.etcdrc1).
-		Decode(res.etcdsrv1).
-		Decode(res.etcdrc2).
-		Decode(res.etcdsrv2)
+		Decode(&res.service).
+		Decode(&res.route).
+		Decode(&res.etcdrc0).
+		Decode(&res.etcdsrv0).
+		Decode(&res.etcdrc1).
+		Decode(&res.etcdsrv1).
+		Decode(&res.etcdrc2).
+		Decode(&res.etcdsrv2)
 	
-	return &res, decoder.err
+	return decoder.err
 }
 
 /*

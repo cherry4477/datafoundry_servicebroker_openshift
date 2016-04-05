@@ -81,30 +81,6 @@ func (oc *OpenshiftClient) updateBearerToken () {
 	}
 }
 
-func (oc *OpenshiftClient) t() {
-	// ...
-	
-	bytes, err := oc.ORequest("GET", "/servicebrokers/sb-marathon", nil)
-	println("GET /servicebrokers/sb-marathon \n", string(bytes))
-	
-	// ...
-	
-	status, _, err := oc.OWatch("/watch/servicebrokers/sb-marathon")
-	if err != nil {
-		println("Watch error: ", err.Error())
-	}
-	
-	select {
-	case s := <- status:
-		if s.Info != nil {
-			println("s.Info = ", string(s.Info))
-		}
-		if s.Err != nil {
-			println("s.Err = ", s.Err.Error())
-		}
-	}
-}
-
 func (oc *OpenshiftClient) request (method string, url string, body []byte, timeout time.Duration) (*http.Response, error) {
 	token := oc.bearerToken
 	if token == "" {
@@ -193,6 +169,7 @@ func (oc *OpenshiftClient) KWatch (uri string) (<-chan WatchStatus, chan<- struc
 
 const GeneralRequestTimeout = time.Duration(10) * time.Second
 
+/*
 func (oc *OpenshiftClient) doRequest (method, url string, body []byte) ([]byte, error) {
 	res, err := oc.request(method, url, body, GeneralRequestTimeout)
 	if err != nil {
@@ -210,107 +187,234 @@ func (oc *OpenshiftClient) ORequest (method, uri string, body []byte) ([]byte, e
 func (oc *OpenshiftClient) KRequest (method, uri string, body []byte) ([]byte, error) {
 	return oc.doRequest(method, oc.kapiUrl + uri, body)
 }
+*/
 
-func (oc *OpenshiftClient) OGet (uri string, into interface{}) error {
-	data, err := oc.ORequest("GET", uri, nil)
-	if err != nil {
-		return err
-	}
-	
-	return json.Unmarshal(data, into)
+type OpenshiftREST struct {
+	oc  *OpenshiftClient
+	err error
 }
 
-func (oc *OpenshiftClient) ODelete (uri string, options *kapi.DeleteOptions, into interface{}) error {
+func NewOpenshiftREST(oc *OpenshiftClient) *OpenshiftREST {
+	return &OpenshiftREST{oc: oc}
+}
+
+func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{}, into interface{}) *OpenshiftREST {
+	if osr.err != nil {
+		return osr
+	}
+	
+	var body []byte
+	if bodyParams != nil {
+		body, osr.err = json.Marshal(bodyParams)
+		if osr.err != nil {
+			return osr
+		}
+	}
+	
+	//res, osr.err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
+	res, err := osr.oc.request(method, url, body, GeneralRequestTimeout)
+	osr.err = err
+	if err != nil {
+		return osr
+	}
+	defer res.Body.Close()
+	
+	var data []byte
+	data, osr.err = ioutil.ReadAll(res.Body)
+	if osr.err != nil {
+		return osr
+	}
+	
+	osr.err = json.Unmarshal(data, into)
+	return osr
+}
+
+func (osr *OpenshiftREST) OGet (uri string, into interface{}) *OpenshiftREST {
+	return osr.doRequest("GET", osr.oc.oapiUrl + uri, nil, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
+	data, err := osr.oc.ORequest("GET", uri, nil)
+	if err != nil {
+		osr.err = err
+		return osr
+	}
+	
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
+}
+
+func (osr *OpenshiftREST) ODelete (uri string, options *kapi.DeleteOptions, into interface{}) *OpenshiftREST {
+	return osr.doRequest("DELETE", osr.oc.oapiUrl + uri, options, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(options)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.ORequest("DELETE", uri, body_data)
+	data, err := osr.oc.ORequest("DELETE", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) OPost (uri string, body interface{}, into interface{}) error {
+func (osr *OpenshiftREST) OPost (uri string, body interface{}, into interface{}) *OpenshiftREST {
+	return osr.doRequest("POST", osr.oc.oapiUrl + uri, body, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(body)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.ORequest("POST", uri, body_data)
+	data, err := osr.oc.ORequest("POST", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) OPut (uri string, body interface{}, into interface{}) error {
+func (osr *OpenshiftREST) OPut (uri string, body interface{}, into interface{}) *OpenshiftREST {
+	return osr.doRequest("PUT", osr.oc.oapiUrl + uri, body, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(body)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.ORequest("PUT", uri, body_data)
+	data, err := osr.oc.ORequest("PUT", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) KGet (uri string, into interface{}) error {
-	data, err := oc.KRequest("GET", uri, nil)
-	if err != nil {
-		return err
+func (osr *OpenshiftREST) KGet (uri string, into interface{}) *OpenshiftREST {
+	return osr.doRequest("GET", osr.oc.kapiUrl + uri, nil, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	data, err := osr.oc.KRequest("GET", uri, nil)
+	if err != nil {
+		osr.err = err
+		return osr
+	}
+	
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) KDelete (uri string, options *kapi.DeleteOptions, into interface{}) error {
+func (osr *OpenshiftREST) KDelete (uri string, options *kapi.DeleteOptions, into interface{}) *OpenshiftREST {
+	return osr.doRequest("DELETE", osr.oc.kapiUrl + uri, options, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(options)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.KRequest("DELETE", uri, body_data)
+	data, err := osr.oc.KRequest("DELETE", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) KPost (uri string, body interface{}, into interface{}) error {
+func (osr *OpenshiftREST) KPost (uri string, body interface{}, into interface{}) *OpenshiftREST {
+	return osr.doRequest("POST", osr.oc.kapiUrl + uri, body, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(body)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.KRequest("POST", uri, body_data)
+	data, err := osr.oc.KRequest("POST", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
-func (oc *OpenshiftClient) KPut (uri string, body interface{}, into interface{}) error {
+func (osr *OpenshiftREST) KPut (uri string, body interface{}, into interface{}) *OpenshiftREST {
+	return osr.doRequest("PUT", osr.oc.kapiUrl + uri, body, into)
+	
+	/*
+	if osr.err != nil {
+		return osr
+	}
+	
 	body_data, err := json.Marshal(body)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	data, err := oc.KRequest("PUT", uri, body_data)
+	data, err := osr.oc.KRequest("PUT", uri, body_data)
 	if err != nil {
-		return err
+		osr.err = err
+		return osr
 	}
 	
-	return json.Unmarshal(data, into)
+	osr.err = json.Unmarshal(data, into)
+	return osr
+	*/
 }
 
 //===============================================================
