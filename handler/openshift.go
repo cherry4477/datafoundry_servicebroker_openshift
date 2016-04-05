@@ -225,7 +225,10 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 		return osr
 	}
 	
-	osr.err = json.Unmarshal(data, into)
+	if into != nil {
+		osr.err = json.Unmarshal(data, into)
+	}
+	
 	return osr
 }
 

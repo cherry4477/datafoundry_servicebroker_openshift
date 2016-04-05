@@ -9,13 +9,15 @@ import (
 	//"golang.org/x/oauth2"
 	//"net/http"
 	"github.com/pivotal-cf/brokerapi"
-	//"time"
+	"time"
 	//"strings"
 	"bytes"
 	//"text/template"
 	//"io"
 	"io/ioutil"
 	"os"
+	
+	etcdclient "github.com/coreos/etcd/client"
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
@@ -41,10 +43,15 @@ type Etcd_sampleHandler struct{}
 func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
 	//初始化到openshift的链接
 	
+	/*
+		KPost(prefix + "/services", &input.service, &output.service).
+		OPost(prefix + "/routes", &input.route, &output.route).
+	*/
 	
+	rootPassword := ""
 	
-	var input, output etcdTemplateResources
-	err := loadEtcdTemplateResources(instanceID, &input)
+	var input, output etcdTemplateResources_HA
+	err := loadEtcdTemplateResources_HA(instanceID, rootPassword, &input)
 	if err != nil {
 		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, err
 	}
@@ -53,8 +60,6 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	
 	prefix := "/namespaces/" + details.OrganizationGUID
 	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
-		OPost(prefix + "/routes", &input.route, &output.route).
 		KPost(prefix + "/replicationcontrollers", &input.etcdrc0, &output.etcdrc0).
 		KPost(prefix + "/services", &input.etcdsrv0, &output.etcdsrv0).
 		KPost(prefix + "/replicationcontrollers", &input.etcdrc1, &output.etcdrc1).
@@ -67,11 +72,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 		return brokerapi.ProvisionedServiceSpec{}, ServiceInfo{}, osr.err
 	}
 	
-println()
-println("output.route.Spec.Host = ", output.route.Spec.Host)
-println("output.route.Spec.Port = ", output.route.Spec.Port.TargetPort.IntVal)
-println("output.route.Spec.Path = ", output.route.Spec.Path)
-println()
+	// output.route.Spec.Host
 	
 	// ...
 	
@@ -91,6 +92,28 @@ println()
 
 	return provsiondetail, myServiceInfo, nil
 
+
+
+/*
+	//赋值隐藏属性
+	myServiceInfo := ServiceInfo{
+		Url:            *runResult.Instances[0].InstanceId, //aws的实例id
+		Admin_user:     mongoAdminUser,
+		Admin_password: mongoAdminPassword,
+		Database:       "admin",
+		User:           newusername,
+		Password:       newpassword,
+	}
+
+	//为dashbord赋值 todo dashboard应该提供一个界面才对
+	//todo 没有公网地址
+	DashboardURL := "http://" + strings.Split(awsmongourl, ":")[0] + "/index.php?action=autologin.index&user=" + newusername + "&pass=" + newpassword
+
+	//表示是异步返回
+	provsiondetail := brokerapi.ProvisionedServiceSpec{DashboardURL: DashboardURL, IsAsync: true}
+
+	return provsiondetail, myServiceInfo, nil
+*/
 }
 
 func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {
@@ -122,35 +145,31 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycreden
 // 
 //===============================================================
 
-type etcdTemplateResources struct {
-	service  kapi.Service
-	route    routeapi.Route
-	etcdrc0  kapi.ReplicationController
-	etcdsrv0 kapi.Service
-	etcdrc1  kapi.ReplicationController
-	etcdsrv1 kapi.Service
-	etcdrc2  kapi.ReplicationController
-	etcdsrv2 kapi.Service
+type etcdTemplateResources_Boot struct {
+	service kapi.Service
+	route   routeapi.Route
+	etcdpod kapi.Pod
+	etcdsrv kapi.Service
 }
 
-var etcdTemplateData []byte = nil
+var EtcdTemplateData_Boot []byte = nil
 
-func loadEtcdTemplateResources(instanceID string, res *etcdTemplateResources) error {
-	if etcdTemplateData == nil {
-		f, err := os.Open("openshift_etcd.yaml")
+func loadEtcdTemplateResources_Boot(instanceID string, res *etcdTemplateResources_Boot) error {
+	if EtcdTemplateData_Boot == nil {
+		f, err := os.Open("etcd-outer-boot.yaml")
 		if err != nil {
 			return err
 		}
-		etcdTemplateData, err = ioutil.ReadAll(f)
+		EtcdTemplateData_Boot, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
 	}
 	
-	yamlTemplates := bytes.Replace(etcdTemplateData, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates := bytes.Replace(EtcdTemplateData_Boot, []byte("instanceid"), []byte(instanceID), -1)
 	
 	
-println("========= new yamlTemplates ===========")
+println("========= Boot yamlTemplates ===========")
 println(string(yamlTemplates))
 println()
 
@@ -159,6 +178,46 @@ println()
 	decoder.
 		Decode(&res.service).
 		Decode(&res.route).
+		Decode(&res.etcdpod).
+		Decode(&res.etcdsrv)
+	
+	return decoder.err
+}
+
+type etcdTemplateResources_HA struct {
+	etcdrc0  kapi.ReplicationController
+	etcdsrv0 kapi.Service
+	etcdrc1  kapi.ReplicationController
+	etcdsrv1 kapi.Service
+	etcdrc2  kapi.ReplicationController
+	etcdsrv2 kapi.Service
+}
+
+var EtcdTemplateData_HA []byte = nil
+
+func loadEtcdTemplateResources_HA(instanceID, rootPassword string, res *etcdTemplateResources_HA) error {
+	if EtcdTemplateData_HA == nil {
+		f, err := os.Open("etcd-outer-ha.yaml")
+		if err != nil {
+			return err
+		}
+		EtcdTemplateData_HA, err = ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+	}
+	
+	yamlTemplates := bytes.Replace(EtcdTemplateData_HA, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("rootPassword"), []byte(instanceID), -1)
+	
+	
+println("========= HA yamlTemplates ===========")
+println(string(yamlTemplates))
+println()
+
+	
+	decoder := NewYamlDecoder(yamlTemplates)
+	decoder.
 		Decode(&res.etcdrc0).
 		Decode(&res.etcdsrv0).
 		Decode(&res.etcdrc1).
@@ -237,3 +296,46 @@ func EtcdYaml2Json(replaces map[string]string) ([][]byte, error) {
 	return Yaml2Json(etcdTemplateData, replaces)
 }
 */
+
+//===============================================================
+// 
+//===============================================================
+
+/*
+provisioning steps:
+1. create first etcd pod/service/route (aka. a single node etcd cluster)
+   watch pod status to running
+2. modify etcd acl (add root, remove gust, add bind role)
+3. add 2nd and 3rd etcd nodes
+   watch pod status to running
+
+get last operation:
+1. if the status stored in common-etcd is no finished, check if a watch goroutine is running, if not, start one.append
+2. return the status stored in common-etcd
+
+bind:
+1. create a new user in bind role
+
+unbind:
+1. delete user
+
+deprovision
+...
+
+*/
+
+func newEtcdClient(etcdEndPoint, etcdUser, etcdPassword string) (etcdclient.KeysAPI, error) {
+	cfg := etcdclient.Config{
+		Endpoints: []string{etcdEndPoint},
+		Transport: etcdclient.DefaultTransport,
+		HeaderTimeoutPerRequest: time.Second,
+		Username:                etcdUser,
+		Password:                etcdPassword,
+	}
+	c, err := etcdclient.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return etcdclient.NewKeysAPI(c), nil
+}
+	

@@ -1,0 +1,89 @@
+#一个引导节点和三节点高可用节点的etcd集群，并暴露外部路由端口的编排
+
+#供客户端访问的service
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd
+spec:
+  ports:
+  - name: etcd-client-port
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  selector:
+    servicebroker: instanceid-etcd
+
+---
+
+#Route to client
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-etcd
+spec:
+  host: sb-instanceid-etcd.app.asiainfodata.com
+  port:
+    targetPort: etcd-client-port
+  to:
+    kind: Service
+    name: sb-instanceid-etcd
+
+---
+#引导pod
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    servicebroker_etcd_node: instanceid-etcd0
+    servicebroker: instanceid-etcd
+  name: sb-instanceid-etcd0
+spec:
+  containers:
+  - command:
+    - /etcd
+    - -name
+    - etcd0
+    - -initial-advertise-peer-urls
+    - http://sb-instanceid-etcd0:2380
+    - -listen-peer-urls
+    - http://0.0.0.0:2380
+    - -listen-client-urls
+    - http://0.0.0.0:2379
+    - -advertise-client-urls
+    - http://sb-instanceid-etcd.app.asiainfodata.com:80
+    - -initial-cluster-token 
+    - sb-instanceid-etcd
+    - -initial-cluster
+    - etcd0=http://sb-instanceid-etcd0:2380
+    - -initial-cluster-state
+    - new
+    image: quay.io/coreos/etcd:latest
+    imagePullPolicy: IfNotPresent
+    name: etcd0
+    ports:
+    - containerPort: 2379
+      name: client
+      protocol: TCP
+    - containerPort: 2380
+      name: server
+      protocol: TCP
+  restartPolicy: Never
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd0
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd0
