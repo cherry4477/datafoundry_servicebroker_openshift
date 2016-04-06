@@ -232,192 +232,40 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	return osr
 }
 
+// o 
+
 func (osr *OpenshiftREST) OGet (uri string, into interface{}) *OpenshiftREST {
 	return osr.doRequest("GET", osr.oc.oapiUrl + uri, nil, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	data, err := osr.oc.ORequest("GET", uri, nil)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
 
-func (osr *OpenshiftREST) ODelete (uri string, options *kapi.DeleteOptions, into interface{}) *OpenshiftREST {
-	return osr.doRequest("DELETE", osr.oc.oapiUrl + uri, options, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(options)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.ORequest("DELETE", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
+func (osr *OpenshiftREST) ODelete (uri string, into interface{}) *OpenshiftREST {
+	return osr.doRequest("DELETE", osr.oc.oapiUrl + uri, &kapi.DeleteOptions{}, into)
 }
 
 func (osr *OpenshiftREST) OPost (uri string, body interface{}, into interface{}) *OpenshiftREST {
 	return osr.doRequest("POST", osr.oc.oapiUrl + uri, body, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(body)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.ORequest("POST", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
 
 func (osr *OpenshiftREST) OPut (uri string, body interface{}, into interface{}) *OpenshiftREST {
 	return osr.doRequest("PUT", osr.oc.oapiUrl + uri, body, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(body)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.ORequest("PUT", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
+
+// k 
 
 func (osr *OpenshiftREST) KGet (uri string, into interface{}) *OpenshiftREST {
 	return osr.doRequest("GET", osr.oc.kapiUrl + uri, nil, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	data, err := osr.oc.KRequest("GET", uri, nil)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
 
-func (osr *OpenshiftREST) KDelete (uri string, options *kapi.DeleteOptions, into interface{}) *OpenshiftREST {
-	return osr.doRequest("DELETE", osr.oc.kapiUrl + uri, options, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(options)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.KRequest("DELETE", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
+func (osr *OpenshiftREST) KDelete (uri string, into interface{}) *OpenshiftREST {
+	return osr.doRequest("DELETE", osr.oc.kapiUrl + uri, &kapi.DeleteOptions{}, into)
 }
 
 func (osr *OpenshiftREST) KPost (uri string, body interface{}, into interface{}) *OpenshiftREST {
 	return osr.doRequest("POST", osr.oc.kapiUrl + uri, body, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(body)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.KRequest("POST", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
 
 func (osr *OpenshiftREST) KPut (uri string, body interface{}, into interface{}) *OpenshiftREST {
 	return osr.doRequest("PUT", osr.oc.kapiUrl + uri, body, into)
-	
-	/*
-	if osr.err != nil {
-		return osr
-	}
-	
-	body_data, err := json.Marshal(body)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	data, err := osr.oc.KRequest("PUT", uri, body_data)
-	if err != nil {
-		osr.err = err
-		return osr
-	}
-	
-	osr.err = json.Unmarshal(data, into)
-	return osr
-	*/
 }
 
 //===============================================================
