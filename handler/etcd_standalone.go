@@ -10,6 +10,7 @@ import (
 	//"net/http"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
+	"strconv"
 	//"strings"
 	"bytes"
 	"encoding/json"
@@ -94,8 +95,6 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.Admin_password = getguid()
-	serviceInfo.User = getguid()
 	serviceInfo.Password = getguid()
 	
 	startEtcdOrchestrationJob(&etcdOrchestrationJob{
@@ -149,7 +148,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 		return 1
 	}
 	
-	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_password)
+	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	
 	num_ok_rcs := 0
 	num_ok_rcs += ok (&ha_res.etcdrc1)
@@ -172,7 +171,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// todo: handle errors
 	
-	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_password)
+	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	destroyEtcdResources_HA (ha_res, myServiceInfo.Database)
 	
 	boot_res, _ := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
@@ -184,16 +183,81 @@ func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asy
 func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, Credentials, error) {
 	// output.route.Spec.Host
 	
+	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+	if err != nil {
+		logger.Error("get boot resources", err)
+		return brokerapi.Binding{}, Credentials{}, err
+	}
+	if len(boot_res.service.Spec.Ports) == 0 {
+		logger.Debug("no ports in boot service")
+		return brokerapi.Binding{}, Credentials{}, err
+	}
 	
+	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
+	host := boot_res.route.Spec.Host
 	
-	return brokerapi.Binding{}, Credentials{}, errors.New("not implemented")
+	etcd_client, err := newAuthrizedEtcdClient ([]string{}, "root", myServiceInfo.Password)
+	if err != nil {
+		logger.Error("create etcd authrized client", err)
+		return brokerapi.Binding{}, Credentials{}, err
+	}
+
+	newusername := getguid()
+	newpassword := getguid()
+	
+	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
+	
+	err = etcd_userapi.AddUser(context.Background(), newusername, newpassword)
+	if err != nil {
+		logger.Error("create new etcd user", err)
+		return brokerapi.Binding{}, Credentials{}, err
+	}
+	
+	_, err = etcd_userapi.GrantUser(context.Background(), newusername, []string{EtcdBindRole})
+	if err != nil {
+		logger.Error("grant new etcd user", err)
+		
+		err2 := etcd_userapi.RemoveUser(context.Background(), newusername)
+		if err2 != nil {
+			logger.Error("remove new etcd user", err2)
+		}
+		
+		return brokerapi.Binding{}, Credentials{}, err
+	}
+	
+	mycredentials := Credentials{
+		Uri:      "/",
+		Hostname: host,
+		Port:     port,
+		Username: newusername,
+		Password: newpassword,
+	}
+
+	myBinding := brokerapi.Binding{Credentials: mycredentials}
+
+	return myBinding, mycredentials, nil
 }
 
 func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycredentials *Credentials) error {
-	//
-
-	return errors.New("not implemented")
-
+	etcd_client, err := newAuthrizedEtcdClient ([]string{}, "root", myServiceInfo.Password)
+	if err != nil {
+		logger.Error("create etcd authrized client", err)
+		return err
+	}
+	
+	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
+	_, err = etcd_userapi.RevokeUser(context.Background(), mycredentials.Username, []string{EtcdBindRole})
+	if err != nil {
+		logger.Error("revoke role in unbinding", err)
+	}
+	
+	err = etcd_userapi.RemoveUser(context.Background(), mycredentials.Username)
+	if err != nil {
+		logger.Error("remove user", err)
+		return err
+	}
+	
+	return nil
 }
 
 //==============================================================
@@ -307,7 +371,7 @@ func (job *etcdOrchestrationJob) run() {
 	}
 	
 	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
-	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Admin_password)
+	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd root user", err)
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
@@ -346,9 +410,9 @@ func (job *etcdOrchestrationJob) run() {
 	
 	// create HA resources
 	
-	ha_res, err := createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Admin_password)
+	ha_res, err := createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	_ = ha_res
-	//ha_res, err = getEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Admin_password)
+	//ha_res, err = getEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	
 	// ...
 }
