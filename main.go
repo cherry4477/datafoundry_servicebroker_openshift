@@ -582,7 +582,6 @@ var mongoAdminPassword string
 
 func main() {
 	select{}
-	
 	//初始化参数，参数应该从环境变量中获取
 	var username, password string
 	//todo参数应该改为从环境变量中获取

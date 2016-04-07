@@ -19,7 +19,9 @@ import (
 	"os"
 	"sync"
 	
-	etcdclient "github.com/coreos/etcd/client"
+	"github.com/pivotal-golang/lager"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
@@ -43,14 +45,23 @@ func (oc *OpenshiftClient) t() {
 // 
 //==============================================================
 
-func init() {
-	register("etcd_sample_Sample", &Etcd_sampleHandler{})
+const EtcdServcieBrokerName = "etcd_sample_Sample"
 
+func init() {
+	register(EtcdServcieBrokerName, &Etcd_sampleHandler{})
+	
+	
+	logger = lager.NewLogger(EtcdServcieBrokerName)
+	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
 }
+
+var logger lager.Logger
 
 //==============================================================
 // 
 //==============================================================
+
+const EtcdBindRole = "binduser"
 
 const ServiceBrokerNamespace = "default"
 
@@ -83,13 +94,12 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.Admin_user = "root"
 	serviceInfo.Admin_password = getguid()
 	serviceInfo.User = getguid()
 	serviceInfo.Password = getguid()
 	
 	startEtcdOrchestrationJob(&etcdOrchestrationJob{
-		instanceId:     instanceIdInTempalte,
+		//instanceId:     instanceIdInTempalte,
 		isProvisioning: true,
 		serviceInfo:    &serviceInfo,
 		bootResources:  output,
@@ -204,9 +214,13 @@ func startEtcdOrchestrationJob (job *etcdOrchestrationJob) {
 	etcdOrchestrationJobsMutex.Lock()
 	defer etcdOrchestrationJobsMutex.Unlock()
 	
-	if etcdOrchestrationJobs[job.instanceId] == nil {
-		etcdOrchestrationJobs[job.instanceId] = job
-		go job.run()
+	if etcdOrchestrationJobs[job.serviceInfo.Url] == nil {
+		etcdOrchestrationJobs[job.serviceInfo.Url] = job
+		go func() {
+			//defer removeEtcdOrchestrationJob (job.serviceInfo.Url) // slowers
+			job.run()
+			removeEtcdOrchestrationJob (job.serviceInfo.Url) // faster
+		}()
 	}
 }
 
@@ -218,7 +232,7 @@ func removeEtcdOrchestrationJob (instanceId string) {
 }
 
 type etcdOrchestrationJob struct {
-	instanceId string
+	//instanceId string // use serviceInfo.
 	
 	isProvisioning bool // false for deprovisionings
 	
@@ -234,34 +248,47 @@ type watchPodStatus struct {
 	Object kapi.Pod `json:"object"`
 }
 
+
+//provisioning steps:
+//1. create first etcd pod/service/route (aka. a single node etcd cluster)
+//   watch pod status to running
+//2. modify etcd acl (add root, remove gust, add bind role)
+//3. create HA resources
+//4. watch HA pods, when all are running, delete boot pod
+//   (or add 2nd and 3rd etcd pod, so no need to delete boot pod)
+
 func (job *etcdOrchestrationJob) run() {
-	defer removeEtcdOrchestrationJob (job.serviceInfo.Url)
-	
 	serviceInfo := job.serviceInfo
 	pod := job.bootResources.etcdpod
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
 	statuses, _, err := theOC.KWatch (uri)
 	if err != nil {
+		logger.Error("start watching boot pod", err)
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
 	
 	var wps watchPodStatus
 	for {
+		// todo: add cancel mechanism
+		
 		status := <- statuses
 		
 		if status.Err != nil {
+			logger.Error("watch boot pod", err)
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
 		
 		if err := json.Unmarshal(status.Info, &wps); err != nil {
+			logger.Error("parse boot pod status", err)
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
 		
 		if wps.Object.Status.Phase != kapi.PodPending {
 			if wps.Object.Status.Phase != kapi.PodRunning {
+				logger.Debug("pod phase is neither pending nor running")
 				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 				return
 			}
@@ -270,8 +297,80 @@ func (job *etcdOrchestrationJob) run() {
 		}
 	}
 	
+	// etcd acl
+	
+	etcd_client, err := newUnauthrizedEtcdClient ([]string{})
+	if err != nil {
+		logger.Error("create etcd unauthrized client", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
+	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Admin_password)
+	if err != nil {
+		logger.Error("create etcd root user", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	etcd_authapi := etcd.NewAuthAPI(etcd_client)
+	err = etcd_authapi.Enable(context.Background())
+	if err != nil {
+		logger.Error("enable etcd auth", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	etcd_roleapi := etcd.NewAuthRoleAPI(etcd_client)
+	_, err = etcd_roleapi.RevokeRoleKV(context.Background(), "guest", []string{"/*"}, etcd.ReadWritePermission)
+	if err != nil {
+		logger.Error("revoke guest role permission", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	err = etcd_roleapi.AddRole(context.Background(), EtcdBindRole)
+	if err != nil {
+		logger.Error("add etcd binduser role", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	_, err = etcd_roleapi.GrantRoleKV(context.Background(), EtcdBindRole, []string{"/*"}, etcd.ReadWritePermission)
+	if err != nil {
+		logger.Error("grant ectd binduser role", err)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
 	// create HA resources
 	
+	ha_res, err := createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Admin_password)
+	_ = ha_res
+	//ha_res, err = getEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Admin_password)
+	
+	// ...
+}
+
+func newUnauthrizedEtcdClient (etcdEndPoints []string) (etcd.Client, error) {
+	cfg := etcd.Config{
+		Endpoints: etcdEndPoints,
+		Transport: etcd.DefaultTransport,
+		HeaderTimeoutPerRequest: time.Second,
+	}
+	return etcd.New(cfg)
+}
+
+func newAuthrizedEtcdClient (etcdEndPoints []string, etcdUser, etcdPassword string) (etcd.Client, error) {
+	cfg := etcd.Config{
+		Endpoints: etcdEndPoints,
+		Transport: etcd.DefaultTransport,
+		HeaderTimeoutPerRequest: time.Second,
+		Username:                etcdUser,
+		Password:                etcdPassword,
+	}
+	return etcd.New(cfg)
 }
 
 //===============================================================
@@ -494,20 +593,5 @@ func destroyEtcdResources_HA (haRes *etcdResources_HA, serviceBrokerNamespace st
 //===============================================================
 // 
 //===============================================================
-
-func newEtcdClient(etcdEndPoint, etcdUser, etcdPassword string) (etcdclient.KeysAPI, error) {
-	cfg := etcdclient.Config{
-		Endpoints: []string{etcdEndPoint},
-		Transport: etcdclient.DefaultTransport,
-		HeaderTimeoutPerRequest: time.Second,
-		Username:                etcdUser,
-		Password:                etcdPassword,
-	}
-	c, err := etcdclient.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return etcdclient.NewKeysAPI(c), nil
-}
 
 
