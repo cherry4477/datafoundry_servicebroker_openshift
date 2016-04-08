@@ -224,10 +224,7 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	}
 	
 	if into != nil {
-	println("into data = ", string(data), "\n")
-	/*
-	{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"Service \"sb-DBEFE04D-5BAE-4EB9-A4A3-1C75748F9059-etcd\" is invalid: metadata.name: Invalid value: \"sb-DBEFE04D-5BAE-4EB9-A4A3-1C75748F9059-etcd\": must be a DNS 952 label (at most 24 characters, matching regex [a-z]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\"","reason":"Invalid","details":{"name":"sb-DBEFE04D-5BAE-4EB9-A4A3-1C75748F9059-etcd","kind":"Service","causes":[{"reason":"FieldValueInvalid","message":"Invalid value: \"sb-DBEFE04D-5BAE-4EB9-A4A3-1C75748F9059-etcd\": must be a DNS 952 label (at most 24 characters, matching regex [a-z]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\"","field":"metadata.name"}]},"code":422
-	*/
+		//println("into data = ", string(data), "\n")
 	
 		osr.err = json.Unmarshal(data, into)
 	}

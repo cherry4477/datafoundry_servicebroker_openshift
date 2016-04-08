@@ -1,7 +1,7 @@
 FROM golang:1.6.0
 
-ENV BROKERPORT 8000
-EXPOSE 8000
+ENV BROKERPORT 8888
+EXPOSE 8888
 
 ENV TIME_ZONE=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TIME_ZONE /etc/localtime && echo $TIME_ZONE > /etc/timezone

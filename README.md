@@ -1,13 +1,10 @@
-# datafoundry_servicebroker_Marathon
+# datafoundry_servicebroker_openshift
 
-
+need golang 1.6 to build
 
 # install 
 
-git clone ...
+git build
 
-go build -o sbm
-
-./sbm
 
 
