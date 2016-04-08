@@ -223,10 +223,14 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 		return osr
 	}
 	
-	if into != nil {
-		//println("into data = ", string(data), "\n")
-	
-		osr.err = json.Unmarshal(data, into)
+	if res.StatusCode < 200 || res.StatusCode >= 400 {
+		osr.err = errors.New(string(data))
+	} else {
+		if into != nil {
+			//println("into data = ", string(data), "\n")
+		
+			osr.err = json.Unmarshal(data, into)
+		}
 	}
 	
 	return osr
