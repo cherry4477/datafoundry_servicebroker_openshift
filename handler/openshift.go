@@ -14,7 +14,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	//"net/url"
-	//"encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
@@ -34,12 +34,13 @@ type OpenshiftClient struct {
 	oapiUrl string
 	kapiUrl string
 	
+	namespace   string
 	username    string
 	password    string
 	bearerToken string
 }
 
-func newOpenshiftClient(host, username, password string) *OpenshiftClient {
+func newOpenshiftClient(host, username, password, defaultNamespace string) *OpenshiftClient {
 	host = "https://" + host
 	oc := &OpenshiftClient{
 		host:    host,
@@ -47,8 +48,9 @@ func newOpenshiftClient(host, username, password string) *OpenshiftClient {
 		oapiUrl: host + "/oapi/v1",
 		kapiUrl: host + "/api/v1",
 		
-		username: username,
-		password: password,
+		namespace: defaultNamespace,
+		username:  username,
+		password:  password,
 	}
 	
 	go oc.updateBearerToken()
@@ -362,5 +364,15 @@ func (d *YamlDecoder) Decode(into interface{}) *YamlDecoder {
 	
 	return d
 }
+
+func NewElevenLengthID() string {
+	t := time.Now().UnixNano()
+	bs := make([]byte, 8)
+	for i := uint(0); i < 8; i ++ {
+		bs[i] = byte((t >> i) & 0xff)
+	}
+	return string(base64.StdEncoding.EncodeToString(bs))
+}
+
 
 

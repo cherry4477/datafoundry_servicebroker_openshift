@@ -14,7 +14,6 @@ import (
 	//"strings"
 	"bytes"
 	"encoding/json"
-	"encoding/base64"
 	//"text/template"
 	//"io"
 	"io/ioutil"
@@ -49,18 +48,9 @@ var logger lager.Logger
 // 
 //==============================================================
 
-func newElevenLengthID() string {
-	t := time.Now().UnixNano()
-	bs := make([]byte, 8)
-	for i := uint(0); i < 8; i ++ {
-		bs[i] = byte((t >> i) & 0xff)
-	}
-	return string(base64.StdEncoding.EncodeToString(bs))
-}
-
 const EtcdBindRole = "binduser"
 
-const ServiceBrokerNamespace = "default"
+//const ServiceBrokerNamespace = "default" // use theOC.namespace instead
 
 type Etcd_sampleHandler struct{}
 
@@ -76,8 +66,9 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceSpec.IsAsync = true
 	
 	//instanceIdInTempalte   := instanceID // todo: ok?
-	instanceIdInTempalte   := newElevenLengthID()
-	serviceBrokerNamespace := ServiceBrokerNamespace // 
+	instanceIdInTempalte   := NewElevenLengthID()
+	//serviceBrokerNamespace := ServiceBrokerNamespace
+	serviceBrokerNamespace := theOC.namespace
 	
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	

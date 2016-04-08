@@ -115,5 +115,6 @@ func init() {
 		getenv("OPENSHIFTADDR"), 
 		getenv("OPENSHIFTUSER"), 
 		getenv("OPENSHIFTPASS"),
+		getenv("SBNAMESPACE"),
 	)
 }
