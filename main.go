@@ -47,6 +47,50 @@ type myCredentials struct {
 }
 
 func (myBroker *myServiceBroker) Services() []brokerapi.Service {
+	/*
+	//free := true
+	paid := false
+	return []brokerapi.Service{
+		brokerapi.Service{
+			ID              : "5E397661-1385-464A-8DB7-9C4DF8CC0662",
+			Name            : "etcd_openshift",
+			Description     : "etcd service",
+			Bindable        : true,
+			Tags            : []string{"etcd"},
+			PlanUpdatable   : false,
+			Plans           : []brokerapi.ServicePlan{
+				brokerapi.ServicePlan{
+					ID          : "204F8288-F8D9-4806-8661-EB48D94504B3",
+					Name        : "standalone",
+					Description : "each user has a standalone etcd cluster",
+					Free        : &paid,
+					Metadata    : &brokerapi.ServicePlanMetadata{
+						DisplayName : "Big Bunny",
+						Bullets     : []string{"20 GB of Disk","20 connections"},
+						Costs       : []brokerapi.ServiceCost{
+							brokerapi.ServiceCost{
+								Amount : map[string]float64{"usd":99.0,"eur":49.0},
+								Unit   : "MONTHLY",
+							},
+						},
+					},
+				},
+			},
+			Metadata        : &brokerapi.ServiceMetadata{
+				DisplayName         : "etcd",
+				ImageUrl            : "https://coreos.com/assets/images/media/etcd2-0.png",
+				LongDescription     : "Managed, highly available etcd clusters in the cloud",
+				ProviderDisplayName : "Asiainfo BDX LDP",
+				DocumentationUrl    : "https://coreos.com/etcd/docs/latest",
+				SupportUrl          : "https://coreos.com/",
+			},
+			DashboardClient : &brokerapi.ServiceDashboardClient{},
+		},
+	}
+	*/
+	
+
+
 	//初始化一系列所需要的结构体，好累啊
 	myServices := []brokerapi.Service{}
 	myService := brokerapi.Service{}
@@ -203,7 +247,7 @@ func (myBroker *myServiceBroker) Provision(
 	//存储隐藏信息_info
 	tmpval, _ = json.Marshal(myServiceInfo)
 	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/_info", string(tmpval))
-
+	
 	//创建绑定目录
 	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/binding", "", &client.SetOptions{Dir: true})
 
@@ -270,9 +314,9 @@ func (myBroker *myServiceBroker) Deprovision(instanceID string, details brokerap
 	}
 
 	var servcie_id, plan_id string
-
 	//从etcd中取得参数。
 	for i := 0; i < len(resp.Node.Nodes); i++ {
+
 		if !resp.Node.Nodes[i].Dir {
 			switch strings.ToLower(resp.Node.Nodes[i].Key) {
 			case strings.ToLower(resp.Node.Key) + "/service_id":
@@ -573,7 +617,7 @@ func getenv(env string) string {
 //定义日志和etcd的全局变量，以及其他变量
 var logger lager.Logger
 var etcdapi client.KeysAPI
-var servcieBrokerName string = "zookeeper_etcd_kafka"
+var servcieBrokerName string = "openshift" // also used in init-etcd.sh 
 var etcdEndPoint, etcdUser, etcdPassword string
 var serviceBrokerPort string
 var mongoUrl string
@@ -581,7 +625,6 @@ var mongoAdminUser string
 var mongoAdminPassword string
 
 func main() {
-	select{}
 	//初始化参数，参数应该从环境变量中获取
 	var username, password string
 	//todo参数应该改为从环境变量中获取

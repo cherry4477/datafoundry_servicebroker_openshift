@@ -33,27 +33,13 @@ import (
 // 
 //==============================================================
 
-func (oc *OpenshiftClient) t() {
-	new(Etcd_sampleHandler).DoProvision(
-		"test1", 
-		brokerapi.ProvisionDetails{
-			OrganizationGUID: "ttt",
-		},
-		true)
-}
-
-//==============================================================
-// 
-//==============================================================
-
-const EtcdServcieBrokerName = "etcd_sample_Sample"
+const EtcdServcieBrokerName_Standalone = "etcd_openshift_standalone"
 
 func init() {
-	register(EtcdServcieBrokerName, &Etcd_sampleHandler{})
+	register(EtcdServcieBrokerName_Standalone, &Etcd_sampleHandler{})
 	
-	
-	logger = lager.NewLogger(EtcdServcieBrokerName)
-	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
+	logger = lager.NewLogger(EtcdServcieBrokerName_Standalone)
+	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 }
 
 var logger lager.Logger
@@ -74,9 +60,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
 	serviceInfo := ServiceInfo{}
 	
-	if asyncAllowed == false {
-		return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
-	}
+	//if asyncAllowed == false {
+	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
+	//}
+	serviceSpec.IsAsync = true
 	
 	instanceIdInTempalte   := instanceID // todo: ok?
 	serviceBrokerNamespace := ServiceBrokerNamespace // 
@@ -86,7 +73,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	output, err := createEtcdResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
 
 	if err != nil {
-		println("etcd prosision error: ", err.Error())
+		logger.Error("createEtcdResources_Boot", err)
 		
 		destroyEtcdResources_Boot(output, serviceBrokerNamespace)
 		
@@ -189,7 +176,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 		return brokerapi.Binding{}, Credentials{}, err
 	}
 	if len(boot_res.service.Spec.Ports) == 0 {
-		logger.Debug("no ports in boot service")
+		logger.Error("", errors.New("no ports in boot service"))
 		return brokerapi.Binding{}, Credentials{}, err
 	}
 	
@@ -249,6 +236,7 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycreden
 	_, err = etcd_userapi.RevokeUser(context.Background(), mycredentials.Username, []string{EtcdBindRole})
 	if err != nil {
 		logger.Error("revoke role in unbinding", err)
+		// return err
 	}
 	
 	err = etcd_userapi.RemoveUser(context.Background(), mycredentials.Username)
@@ -325,27 +313,30 @@ func (job *etcdOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
 	pod := job.bootResources.etcdpod
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
-	statuses, _, err := theOC.KWatch (uri)
+	statuses, cancel, err := theOC.KWatch (uri)
 	if err != nil {
 		logger.Error("start watching boot pod", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
 	
-	var wps watchPodStatus
 	for {
-		// todo: add cancel mechanism
-		
 		status := <- statuses
 		
 		if status.Err != nil {
-			logger.Error("watch boot pod", err)
+			logger.Error("watch boot pod error", status.Err)
+			close(cancel)
+			job.isProvisioning = true
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
 		
+		var wps watchPodStatus
 		if err := json.Unmarshal(status.Info, &wps); err != nil {
 			logger.Error("parse boot pod status", err)
+			close(cancel)
+			job.isProvisioning = true
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
@@ -353,10 +344,13 @@ func (job *etcdOrchestrationJob) run() {
 		if wps.Object.Status.Phase != kapi.PodPending {
 			if wps.Object.Status.Phase != kapi.PodRunning {
 				logger.Debug("pod phase is neither pending nor running")
+				close(cancel)
+				job.isProvisioning = true
 				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 				return
 			}
 			
+			close(cancel)
 			break
 		}
 	}
@@ -366,6 +360,7 @@ func (job *etcdOrchestrationJob) run() {
 	etcd_client, err := newUnauthrizedEtcdClient ([]string{})
 	if err != nil {
 		logger.Error("create etcd unauthrized client", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -374,6 +369,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd root user", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -382,6 +378,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_authapi.Enable(context.Background())
 	if err != nil {
 		logger.Error("enable etcd auth", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -390,6 +387,7 @@ func (job *etcdOrchestrationJob) run() {
 	_, err = etcd_roleapi.RevokeRoleKV(context.Background(), "guest", []string{"/*"}, etcd.ReadWritePermission)
 	if err != nil {
 		logger.Error("revoke guest role permission", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -397,6 +395,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_roleapi.AddRole(context.Background(), EtcdBindRole)
 	if err != nil {
 		logger.Error("add etcd binduser role", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -404,6 +403,7 @@ func (job *etcdOrchestrationJob) run() {
 	_, err = etcd_roleapi.GrantRoleKV(context.Background(), EtcdBindRole, []string{"/*"}, etcd.ReadWritePermission)
 	if err != nil {
 		logger.Error("grant ectd binduser role", err)
+		job.isProvisioning = true
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -455,6 +455,8 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 		}
 	}
 	
+	// todo: max length of res names in kubernetes is 24
+	
 	yamlTemplates := bytes.Replace(EtcdTemplateData_Boot, []byte("instanceid"), []byte(instanceID), -1)
 	
 	
@@ -486,6 +488,8 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 			return err
 		}
 	}
+	
+	// todo: max length of res names in kubernetes is 24
 	
 	yamlTemplates := bytes.Replace(EtcdTemplateData_HA, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
