@@ -682,6 +682,5 @@ func main() {
 	fmt.Println("START SERVICE BROKER", servcieBrokerName)
 	brokerAPI := brokerapi.New(serviceBroker, logger, credentials)
 	http.Handle("/", brokerAPI)
-	http.ListenAndServe(":"+serviceBrokerPort, nil)
-
+	fmt.Println(http.ListenAndServe(":"+serviceBrokerPort, nil))
 }

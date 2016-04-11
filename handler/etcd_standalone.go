@@ -11,7 +11,7 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
-	//"strings"
+	"strings"
 	"bytes"
 	"encoding/json"
 	//"text/template"
@@ -66,7 +66,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceSpec.IsAsync = true
 	
 	//instanceIdInTempalte   := instanceID // todo: ok?
-	instanceIdInTempalte   := NewElevenLengthID()
+	instanceIdInTempalte   := strings.ToLower(NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := theOC.namespace
 	
@@ -320,18 +320,18 @@ func (job *etcdOrchestrationJob) run() {
 	statuses, cancel, err := theOC.KWatch (uri)
 	if err != nil {
 		logger.Error("start watching boot pod", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
 	
 	for {
-		status := <- statuses
+		status, _ := <- statuses
 		
 		if status.Err != nil {
 			logger.Error("watch boot pod error", status.Err)
 			close(cancel)
-			job.isProvisioning = true
+			job.isProvisioning = false
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
@@ -340,7 +340,7 @@ func (job *etcdOrchestrationJob) run() {
 		if err := json.Unmarshal(status.Info, &wps); err != nil {
 			logger.Error("parse boot pod status", err)
 			close(cancel)
-			job.isProvisioning = true
+			job.isProvisioning = false
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
@@ -349,22 +349,25 @@ func (job *etcdOrchestrationJob) run() {
 			if wps.Object.Status.Phase != kapi.PodRunning {
 				logger.Debug("pod phase is neither pending nor running")
 				close(cancel)
-				job.isProvisioning = true
+				job.isProvisioning = false
 				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 				return
 			}
 			
+			// running now, to create HA resources
 			close(cancel)
 			break
 		}
 	}
+	
+	time.Sleep(7 * time.Second)
 	
 	// etcd acl
 	
 	etcd_client, err := newUnauthrizedEtcdClient ([]string{})
 	if err != nil {
 		logger.Error("create etcd unauthrized client", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -373,7 +376,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd root user", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -382,7 +385,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_authapi.Enable(context.Background())
 	if err != nil {
 		logger.Error("enable etcd auth", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -391,7 +394,7 @@ func (job *etcdOrchestrationJob) run() {
 	_, err = etcd_roleapi.RevokeRoleKV(context.Background(), "guest", []string{"/*"}, etcd.ReadWritePermission)
 	if err != nil {
 		logger.Error("revoke guest role permission", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -399,7 +402,7 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_roleapi.AddRole(context.Background(), EtcdBindRole)
 	if err != nil {
 		logger.Error("add etcd binduser role", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -407,7 +410,7 @@ func (job *etcdOrchestrationJob) run() {
 	_, err = etcd_roleapi.GrantRoleKV(context.Background(), EtcdBindRole, []string{"/*"}, etcd.ReadWritePermission)
 	if err != nil {
 		logger.Error("grant ectd binduser role", err)
-		job.isProvisioning = true
+		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
@@ -418,7 +421,7 @@ func (job *etcdOrchestrationJob) run() {
 	_ = ha_res
 	//ha_res, err = getEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	
-	// ...
+	// todo: delete boot pod/service?
 }
 
 func newUnauthrizedEtcdClient (etcdEndPoints []string) (etcd.Client, error) {

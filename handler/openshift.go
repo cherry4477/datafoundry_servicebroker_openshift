@@ -15,6 +15,7 @@ import (
 	"net/http"
 	//"net/url"
 	"encoding/base64"
+	"encoding/base32"
 	"encoding/json"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
@@ -371,8 +372,20 @@ func NewElevenLengthID() string {
 	for i := uint(0); i < 8; i ++ {
 		bs[i] = byte((t >> i) & 0xff)
 	}
-	return string(base64.StdEncoding.EncodeToString(bs))
+	return string(base64.RawURLEncoding.EncodeToString(bs))
 }
 
+var base32Encoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567")
+func NewThirteenLengthID() string {
+	t := time.Now().UnixNano()
+	bs := make([]byte, 8)
+	for i := uint(0); i < 8; i ++ {
+		bs[i] = byte((t >> i) & 0xff)
+	}
+	
+	dest := make([]byte, 16)
+	base32Encoding.Encode(dest, bs)
+	return string(dest[:13])
+}
 
 
