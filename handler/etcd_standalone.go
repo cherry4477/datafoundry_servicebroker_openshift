@@ -70,7 +70,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := theOC.namespace
 	
+	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
 	
 	// boot etcd
 	
@@ -362,9 +365,11 @@ func (job *etcdOrchestrationJob) run() {
 	
 	time.Sleep(7 * time.Second)
 	
+	host := job.bootResources.route.Spec.Host
+	
 	// etcd acl
 	
-	etcd_client, err := newUnauthrizedEtcdClient ([]string{})
+	etcd_client, err := newUnauthrizedEtcdClient ([]string{host})
 	if err != nil {
 		logger.Error("create etcd unauthrized client", err)
 		job.isProvisioning = false
