@@ -2,12 +2,13 @@ package handler
 
 import (
 	"fmt"
-	"errors"
+	//"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
+	"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
@@ -80,8 +81,6 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	output, err := createEtcdResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
 
 	if err != nil {
-		logger.Error("createEtcdResources_Boot", err)
-		
 		destroyEtcdResources_Boot(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
@@ -179,13 +178,12 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	
 	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
-		logger.Error("get boot resources", err)
 		return brokerapi.Binding{}, Credentials{}, err
 	}
-	if len(boot_res.service.Spec.Ports) == 0 {
-		logger.Error("", errors.New("no ports in boot service"))
-		return brokerapi.Binding{}, Credentials{}, err
-	}
+	//if len(boot_res.service.Spec.Ports) == 0 {
+	//	logger.Error("", errors.New("no ports in boot service"))
+	//	return brokerapi.Binding{}, Credentials{}, Error
+	//}
 	
 	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
 	host := boot_res.route.Spec.Host
@@ -330,6 +328,11 @@ func (job *etcdOrchestrationJob) run() {
 	
 	for {
 		status, _ := <- statuses
+		if status.Err != nil {
+			logger.Error("watch etcd pod error", status.Err)
+		} else {
+			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
+		}
 		
 		if status.Err != nil {
 			logger.Error("watch boot pod error", status.Err)
@@ -349,6 +352,8 @@ func (job *etcdOrchestrationJob) run() {
 		}
 		
 		if wps.Object.Status.Phase != kapi.PodPending {
+			println("watch pod phase: ", wps.Object.Status.Phase)
+			
 			if wps.Object.Status.Phase != kapi.PodRunning {
 				logger.Debug("pod phase is neither pending nor running")
 				close(cancel)
@@ -365,11 +370,15 @@ func (job *etcdOrchestrationJob) run() {
 	
 	time.Sleep(7 * time.Second)
 	
+	port := strconv.Itoa(job.bootResources.service.Spec.Ports[0].Port)
 	host := job.bootResources.route.Spec.Host
+	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	println("etcd addr: ", etcd_addr)
+	etcd_addrs := []string{etcd_addr}
 	
 	// etcd acl
 	
-	etcd_client, err := newUnauthrizedEtcdClient ([]string{host})
+	etcd_client, err := newUnauthrizedEtcdClient (etcd_addrs)
 	if err != nil {
 		logger.Error("create etcd unauthrized client", err)
 		job.isProvisioning = false
@@ -381,6 +390,14 @@ func (job *etcdOrchestrationJob) run() {
 	err = etcd_userapi.AddUser(context.Background(), "root", serviceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd root user", err)
+		job.isProvisioning = false
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		return
+	}
+	
+	etcd_client, err = newAuthrizedEtcdClient (etcd_addrs, "root", serviceInfo.Password)
+	if err != nil {
+		logger.Error("create etcd authrized client", err)
 		job.isProvisioning = false
 		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 		return
@@ -433,7 +450,7 @@ func newUnauthrizedEtcdClient (etcdEndPoints []string) (etcd.Client, error) {
 	cfg := etcd.Config{
 		Endpoints: etcdEndPoints,
 		Transport: etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: time.Second,
+		HeaderTimeoutPerRequest: 15 * time.Second,
 	}
 	return etcd.New(cfg)
 }
@@ -442,7 +459,7 @@ func newAuthrizedEtcdClient (etcdEndPoints []string, etcdUser, etcdPassword stri
 	cfg := etcd.Config{
 		Endpoints: etcdEndPoints,
 		Transport: etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: time.Second,
+		HeaderTimeoutPerRequest: 15 * time.Second,
 		Username:                etcdUser,
 		Password:                etcdPassword,
 	}
@@ -484,7 +501,7 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 		Decode(&res.etcdpod).
 		Decode(&res.etcdsrv)
 	
-	return decoder.err
+	return decoder.Err
 }
 
 var EtcdTemplateData_HA []byte = nil
@@ -521,7 +538,7 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 		Decode(&res.etcdrc3).
 		Decode(&res.etcdsrv3)
 	
-	return decoder.err
+	return decoder.Err
 }
 
 type etcdResources_Boot struct {
@@ -558,7 +575,11 @@ func createEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcd
 		KPost(prefix + "/pods", &input.etcdpod, &output.etcdpod).
 		KPost(prefix + "/services", &input.etcdsrv, &output.etcdsrv)
 	
-	return &output, osr.err
+	if osr.Err != nil {
+		logger.Error("createEtcdResources_Boot", osr.Err)
+	}
+	
+	return &output, osr.Err
 }
 	
 func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdResources_Boot, error) {
@@ -579,29 +600,43 @@ func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdRes
 		KGet(prefix + "/pods/" + input.etcdpod.Name, &output.etcdpod).
 		KGet(prefix + "/services/" + input.etcdsrv.Name, &output.etcdsrv)
 	
-	return &output, osr.err
+	if osr.Err != nil {
+		logger.Error("getEtcdResources_Boot", osr.Err)
+	}
+	
+	return &output, osr.Err
 }
 
 func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamespace string) {
 	// todo: handle errors in processing
 	
 	kdel := func(typeName, resName string) {
+		println("to delete ", typeName, "/", resName)
+		
 		if resName != "" {
 			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			NewOpenshiftREST(theOC).KDelete(uri, nil)
+			osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
+			if osr.Err != nil {
+				logger.Error("delete: " + uri, osr.Err)
+			}
 		}
 	}
 	odel := func(typeName, resName string) {
+		println("to delete ", typeName, "/", resName)
+		
 		if resName != "" {
 			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			NewOpenshiftREST(theOC).ODelete(uri, nil)
+			osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
+			if osr.Err != nil {
+				logger.Error("delete: " + uri, osr.Err)
+			}
 		}
 	}
 	
-	kdel ("services", bootRes.etcdsrv.Name)
-	kdel ("pods", bootRes.etcdpod.Name)
 	odel ("routes", bootRes.route.Name)
 	kdel ("services", bootRes.service.Name)
+	kdel ("services", bootRes.etcdsrv.Name)
+	kdel ("pods", bootRes.etcdpod.Name)
 }
 	
 func createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*etcdResources_HA, error) {
@@ -624,7 +659,11 @@ func createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword st
 		KPost(prefix + "/replicationcontrollers", &input.etcdrc3, &output.etcdrc3).
 		KPost(prefix + "/services", &input.etcdsrv3, &output.etcdsrv3)
 	
-	return &output, osr.err
+	if osr.Err != nil {
+		logger.Error("createEtcdResources_HA", osr.Err)
+	}
+	
+	return &output, osr.Err
 }
 	
 func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*etcdResources_HA, error) {
@@ -640,23 +679,33 @@ func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword strin
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/replicationcontrollers" + input.etcdrc1.Name, &output.etcdrc1).
-		KGet(prefix + "/services" + input.etcdsrv1.Name, &output.etcdsrv1.Name).
-		KGet(prefix + "/replicationcontrollers" + input.etcdrc2.Name, &output.etcdrc2).
-		KGet(prefix + "/services" + input.etcdsrv2.Name, &output.etcdsrv2).
-		KGet(prefix + "/replicationcontrollers" + input.etcdrc3.Name, &output.etcdrc3).
-		KGet(prefix + "/services" + input.etcdsrv3.Name, &output.etcdsrv3)
+		KGet(prefix + "/services/" + input.etcdsrv1.Name, &output.etcdsrv1).
+		KGet(prefix + "/replicationcontrollers/" + input.etcdrc1.Name, &output.etcdrc1).
+		KGet(prefix + "/services/" + input.etcdsrv2.Name, &output.etcdsrv2).
+		KGet(prefix + "/replicationcontrollers/" + input.etcdrc2.Name, &output.etcdrc2).
+		KGet(prefix + "/services/" + input.etcdsrv3.Name, &output.etcdsrv3).
+		KGet(prefix + "/replicationcontrollers/" + input.etcdrc3.Name, &output.etcdrc3)
 	
-	return &output, osr.err
+	if osr.Err != nil {
+		logger.Error("getEtcdResources_HA", osr.Err)
+	}
+	
+	return &output, osr.Err
 }
 
 func destroyEtcdResources_HA (haRes *etcdResources_HA, serviceBrokerNamespace string) {
 	// todo: handle errors in processing
 	
 	kdel := func(typeName, resName string) {
+		println("to delete ", typeName, "/", resName)
+		
 		if resName != "" {
 			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			NewOpenshiftREST(theOC).KDelete(uri, nil)
+			osr := NewOpenshiftREST(theOC)
+			osr.KDelete(uri, nil)
+			if osr.Err != nil {
+				logger.Error("delete: " + uri, osr.Err)
+			}
 		}
 	}
 	

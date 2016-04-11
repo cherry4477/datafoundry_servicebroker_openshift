@@ -168,7 +168,7 @@ func (oc *OpenshiftClient) KWatch (uri string) (<-chan WatchStatus, chan<- struc
 	return oc.doWatch(oc.kapiUrl + "/watch" + uri)
 }
 
-const GeneralRequestTimeout = time.Duration(10) * time.Second
+const GeneralRequestTimeout = time.Duration(30) * time.Second
 
 /*
 func (oc *OpenshiftClient) doRequest (method, url string, body []byte) ([]byte, error) {
@@ -192,7 +192,7 @@ func (oc *OpenshiftClient) KRequest (method, uri string, body []byte) ([]byte, e
 
 type OpenshiftREST struct {
 	oc  *OpenshiftClient
-	err error
+	Err error
 }
 
 func NewOpenshiftREST(oc *OpenshiftClient) *OpenshiftREST {
@@ -200,39 +200,39 @@ func NewOpenshiftREST(oc *OpenshiftClient) *OpenshiftREST {
 }
 
 func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{}, into interface{}) *OpenshiftREST {
-	if osr.err != nil {
+	if osr.Err != nil {
 		return osr
 	}
 	
 	var body []byte
 	if bodyParams != nil {
-		body, osr.err = json.Marshal(bodyParams)
-		if osr.err != nil {
+		body, osr.Err = json.Marshal(bodyParams)
+		if osr.Err != nil {
 			return osr
 		}
 	}
 	
-	//res, osr.err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
+	//res, osr.Err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
 	res, err := osr.oc.request(method, url, body, GeneralRequestTimeout)
-	osr.err = err
-	if err != nil {
+	osr.Err = err
+	if osr.Err != nil {
 		return osr
 	}
 	defer res.Body.Close()
 	
 	var data []byte
-	data, osr.err = ioutil.ReadAll(res.Body)
-	if osr.err != nil {
+	data, osr.Err = ioutil.ReadAll(res.Body)
+	if osr.Err != nil {
 		return osr
 	}
 	
 	if res.StatusCode < 200 || res.StatusCode >= 400 {
-		osr.err = errors.New(string(data))
+		osr.Err = errors.New(string(data))
 	} else {
 		if into != nil {
 			//println("into data = ", string(data), "\n")
 		
-			osr.err = json.Unmarshal(data, into)
+			osr.Err = json.Unmarshal(data, into)
 		}
 	}
 	
@@ -345,7 +345,7 @@ func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, erro
 
 type YamlDecoder struct {
 	decoder *yaml.YAMLToJSONDecoder
-	err     error
+	Err     error
 }
 
 func NewYamlDecoder(yamlData []byte) *YamlDecoder {
@@ -354,13 +354,9 @@ func NewYamlDecoder(yamlData []byte) *YamlDecoder {
 		}
 }
 
-func (d *YamlDecoder) Error() error {
-	return d.err
-}
-
 func (d *YamlDecoder) Decode(into interface{}) *YamlDecoder {
-	if d.err == nil {
-		d.err = d.decoder.Decode(into)
+	if d.Err == nil {
+		d.Err = d.decoder.Decode(into)
 	}
 	
 	return d
