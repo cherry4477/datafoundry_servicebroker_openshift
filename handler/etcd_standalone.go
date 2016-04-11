@@ -328,11 +328,6 @@ func (job *etcdOrchestrationJob) run() {
 	
 	for {
 		status, _ := <- statuses
-		if status.Err != nil {
-			logger.Error("watch etcd pod error", status.Err)
-		} else {
-			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
-		}
 		
 		if status.Err != nil {
 			logger.Error("watch boot pod error", status.Err)
@@ -340,6 +335,8 @@ func (job *etcdOrchestrationJob) run() {
 			job.isProvisioning = false
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
+		} else {
+			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
 		}
 		
 		var wps watchPodStatus
@@ -608,35 +605,10 @@ func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdRes
 }
 
 func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamespace string) {
-	// todo: handle errors in processing
-	
-	kdel := func(typeName, resName string) {
-		println("to delete ", typeName, "/", resName)
-		
-		if resName != "" {
-			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
-			if osr.Err != nil {
-				logger.Error("delete: " + uri, osr.Err)
-			}
-		}
-	}
-	odel := func(typeName, resName string) {
-		println("to delete ", typeName, "/", resName)
-		
-		if resName != "" {
-			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
-			if osr.Err != nil {
-				logger.Error("delete: " + uri, osr.Err)
-			}
-		}
-	}
-	
-	odel ("routes", bootRes.route.Name)
-	kdel ("services", bootRes.service.Name)
-	kdel ("services", bootRes.etcdsrv.Name)
-	kdel ("pods", bootRes.etcdpod.Name)
+	odel ("routes", bootRes.route.Name, serviceBrokerNamespace)
+	kdel ("services", bootRes.service.Name, serviceBrokerNamespace)
+	kdel ("services", bootRes.etcdsrv.Name, serviceBrokerNamespace)
+	kdel ("pods", bootRes.etcdpod.Name, serviceBrokerNamespace)
 }
 	
 func createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*etcdResources_HA, error) {
@@ -694,33 +666,112 @@ func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword strin
 }
 
 func destroyEtcdResources_HA (haRes *etcdResources_HA, serviceBrokerNamespace string) {
-	// todo: handle errors in processing
+	kdel ("services", haRes.etcdsrv1.Name, serviceBrokerNamespace)
+	kdel_rc (&haRes.etcdrc1, serviceBrokerNamespace)
 	
-	kdel := func(typeName, resName string) {
-		println("to delete ", typeName, "/", resName)
-		
-		if resName != "" {
-			uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-			osr := NewOpenshiftREST(theOC)
-			osr.KDelete(uri, nil)
-			if osr.Err != nil {
-				logger.Error("delete: " + uri, osr.Err)
-			}
-		}
-	}
+	kdel ("services", haRes.etcdsrv2.Name, serviceBrokerNamespace)
+	kdel_rc (&haRes.etcdrc2, serviceBrokerNamespace)
 	
-	kdel ("services", haRes.etcdsrv1.Name)
-	kdel ("replicationcontrollers", haRes.etcdrc1.Name)
-	
-	kdel ("services", haRes.etcdsrv2.Name)
-	kdel ("replicationcontrollers", haRes.etcdrc2.Name)
-	
-	kdel ("services", haRes.etcdsrv3.Name)
-	kdel ("replicationcontrollers", haRes.etcdrc3.Name)
+	kdel ("services", haRes.etcdsrv3.Name, serviceBrokerNamespace)
+	kdel_rc (&haRes.etcdrc3, serviceBrokerNamespace)
 }
 
 //===============================================================
 // 
 //===============================================================
+	// todo: handle errors in processing
+	
+func kdel (typeName, resName string, serviceBrokerNamespace string) {
+	println("to delete ", typeName, "/", resName)
+	
+	if resName != "" {
+		uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
+		osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
+		if osr.Err != nil {
+			logger.Error("delete: " + uri, osr.Err)
+		}
+	}
+}
 
+func odel (typeName, resName string, serviceBrokerNamespace string) {
+	println("to delete ", typeName, "/", resName)
+	
+	if resName != "" {
+		uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
+		osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
+		if osr.Err != nil {
+			logger.Error("delete: " + uri, osr.Err)
+		}
+	}
+}
 
+type watchReplicationControllerStatus struct {
+	// The type of watch update contained in the message
+	Type string `json:"type"`
+	// Pod details
+	Object kapi.ReplicationController `json:"object"`
+}
+
+func kdel_rc (rc *kapi.ReplicationController, serviceBrokerNamespace string) error {
+	if rc == nil || rc.Name == "" {
+		return nil
+	}
+	
+	println("to delete pods on replicationcontroller", rc.Name)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc.Name
+	
+	// modfiy rc replicas to 0
+	
+	zero := 0
+	rc.Spec.Replicas = &zero
+	osr := NewOpenshiftREST(theOC).KPut(uri, rc, nil)
+	if osr.Err != nil {
+		logger.Error("modify HA rc", osr.Err)
+		return osr.Err
+	}
+	
+	// start watching rc status
+	
+	statuses, cancel, err := theOC.KWatch (uri)
+	if err != nil {
+		logger.Error("start watching HA rc", err)
+		return err
+	}
+	
+	go func() {
+		for {
+			status, _ := <- statuses
+			
+			if status.Err != nil {
+				logger.Error("watch HA etcd rc error", status.Err)
+				close(cancel)
+				return
+			} else {
+				//logger.Debug("watch etcd HA rc, status.Info: " + string(status.Info))
+			}
+			
+			var wrcs watchReplicationControllerStatus
+			if err := json.Unmarshal(status.Info, &wrcs); err != nil {
+				logger.Error("parse boot HA rc status", err)
+				close(cancel)
+				return
+			}
+			
+			if wrcs.Object.Status.Replicas <= 0 {
+				break
+			}
+		}
+		
+		// delete rc
+		
+		//kdel("replicationcontrollers", rc.Name, serviceBrokerNamespace)
+		println("to delete ", "replicationcontrollers", "/", rc.Name)
+		osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
+		if osr.Err != nil {
+			logger.Error("delete: " + uri, osr.Err)
+		}
+	}()
+	
+	return nil
+}

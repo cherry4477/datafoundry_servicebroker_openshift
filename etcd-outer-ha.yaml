@@ -24,7 +24,7 @@ spec:
         - http://sb-instanceid-etcd1:2380
         - sb-instanceid-etcd
         - test1234
-        image: 172.30.40.148:5000/datafoundry-servicebroker/etcd-openshift-orchestration:latest
+        image: 172.30.40.148:5000/service-brokers/etcd-openshift-orchestration:latest
         imagePullPolicy: Always
         name: etcd1
         ports:
@@ -78,7 +78,7 @@ spec:
         - http://sb-instanceid-etcd2:2380
         - sb-instanceid-etcd
         - test1234
-        image: 172.30.40.148:5000/datafoundry-servicebroker/etcd-openshift-orchestration:latest
+        image: 172.30.40.148:5000/service-brokers/etcd-openshift-orchestration:latest
         imagePullPolicy: Always
         name: etcd3
         ports:
@@ -133,7 +133,7 @@ spec:
         - http://sb-instanceid-etcd3:2380
         - sb-instanceid-etcd
         - test1234
-        image: 172.30.40.148:5000/datafoundry-servicebroker/etcd-openshift-orchestration:latest
+        image: 172.30.40.148:5000/service-brokers/etcd-openshift-orchestration:latest
         imagePullPolicy: Always
         name: etcd3
         ports:
