@@ -113,12 +113,12 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 		if job.cancelled || job.isProvisioning {
 			return brokerapi.LastOperation{
 				State:       brokerapi.InProgress,
-				Description: "In progress.",
+				Description: "In progress .",
 			}, nil
 		} else {
 			return brokerapi.LastOperation{
 				State:       brokerapi.Failed,
-				Description: "Failed!",
+				Description: "Failed !",
 			}, nil
 		}
 	}
@@ -138,7 +138,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
 	
 	ok := func(rc *kapi.ReplicationController) int {
-		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || *rc.Spec.Replicas <= rc.Status.Replicas {
+		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return 0
 		}
 		return 1
@@ -150,6 +150,8 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 	num_ok_rcs += ok (&ha_res.etcdrc1)
 	num_ok_rcs += ok (&ha_res.etcdrc2)
 	num_ok_rcs += ok (&ha_res.etcdrc3)
+	
+	//println("num_ok_rcs = ", num_ok_rcs)
 	
 	if num_ok_rcs < 3 {
 		return brokerapi.LastOperation{
@@ -200,14 +202,18 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 		return brokerapi.Binding{}, Credentials{}, err
 	}
 	//if len(boot_res.service.Spec.Ports) == 0 {
-	//	logger.Error("", errors.New("no ports in boot service"))
-	//	return brokerapi.Binding{}, Credentials{}, Error
+	//	err := errors.New("no ports in boot service")
+	//	logger.Error("", err)
+	//	return brokerapi.Binding{}, Credentials{}, err
 	//}
 	
 	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
 	host := boot_res.route.Spec.Host
+	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	println("etcd addr: ", etcd_addr)
+	etcd_addrs := []string{etcd_addr}
 	
-	etcd_client, err := newAuthrizedEtcdClient ([]string{}, "root", myServiceInfo.Password)
+	etcd_client, err := newAuthrizedEtcdClient (etcd_addrs, "root", myServiceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd authrized client", err)
 		return brokerapi.Binding{}, Credentials{}, err
@@ -250,7 +256,23 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 }
 
 func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycredentials *Credentials) error {
-	etcd_client, err := newAuthrizedEtcdClient ([]string{}, "root", myServiceInfo.Password)
+	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+	if err != nil {
+		return err
+	}
+	//if len(boot_res.service.Spec.Ports) == 0 {
+	//     err := errors.New("no ports in boot service")
+	//	logger.Error("", err)
+	//	return err
+	//}
+	
+	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
+	host := boot_res.route.Spec.Host
+	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	println("etcd addr: ", etcd_addr)
+	etcd_addrs := []string{etcd_addr}
+	
+	etcd_client, err := newAuthrizedEtcdClient (etcd_addrs, "root", myServiceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd authrized client", err)
 		return err
@@ -360,7 +382,7 @@ func (job *etcdOrchestrationJob) run() {
 		case <- job.cancelChan:
 			close(cancel)
 			return
-		status, _ = <- statuses
+		case status, _ = <- statuses:
 			break
 		}
 		
@@ -652,8 +674,8 @@ func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamesp
 	
 	go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", bootRes.etcdsrv.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.etcdpod.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "services", bootRes.etcdsrv.Name)}()
 }
 	
 func (job *etcdOrchestrationJob) createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) error {
