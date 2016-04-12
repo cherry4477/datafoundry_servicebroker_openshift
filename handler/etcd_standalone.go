@@ -91,7 +91,9 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceInfo.Password = getguid()
 	
 	startEtcdOrchestrationJob(&etcdOrchestrationJob{
-		//instanceId:     instanceIdInTempalte,
+		cancelled:  false,
+		cancelChan: make(chan struct{}),
+		
 		isProvisioning: true,
 		serviceInfo:    &serviceInfo,
 		bootResources:  output,
@@ -105,9 +107,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
+	
 	job := getEtcdOrchestrationJob (myServiceInfo.Url)
 	if job != nil {
-		if job.isProvisioning {
+		if job.cancelled || job.isProvisioning {
 			return brokerapi.LastOperation{
 				State:       brokerapi.InProgress,
 				Description: "In progress.",
@@ -162,13 +165,29 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 }
 
 func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	// todo: handle errors
-	
-	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
-	destroyEtcdResources_HA (ha_res, myServiceInfo.Database)
-	
-	boot_res, _ := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-	destroyEtcdResources_Boot (boot_res, myServiceInfo.Database)
+	go func() {
+		for {
+			job := getEtcdOrchestrationJob (myServiceInfo.Url)
+			if job == nil {
+				break
+			}
+			
+			println("wait pod to end")
+			
+			job.cancel()
+			time.Sleep(7 * time.Second)
+		}
+		
+		// ...
+		
+		println("to destroy resources")
+		
+		ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		destroyEtcdResources_HA (ha_res, myServiceInfo.Database)
+		
+		boot_res, _ := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+		destroyEtcdResources_Boot (boot_res, myServiceInfo.Database)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
@@ -274,28 +293,37 @@ func startEtcdOrchestrationJob (job *etcdOrchestrationJob) {
 	if etcdOrchestrationJobs[job.serviceInfo.Url] == nil {
 		etcdOrchestrationJobs[job.serviceInfo.Url] = job
 		go func() {
-			//defer removeEtcdOrchestrationJob (job.serviceInfo.Url) // slowers
 			job.run()
-			removeEtcdOrchestrationJob (job.serviceInfo.Url) // faster
+			
+			etcdOrchestrationJobsMutex.Lock()
+			delete(etcdOrchestrationJobs, job.serviceInfo.Url)
+			etcdOrchestrationJobsMutex.Unlock()
 		}()
 	}
 }
 
-func removeEtcdOrchestrationJob (instanceId string) {
-	etcdOrchestrationJobsMutex.Lock()
-	defer etcdOrchestrationJobsMutex.Unlock()
-	
-	delete(etcdOrchestrationJobs, instanceId)
-}
-
 type etcdOrchestrationJob struct {
 	//instanceId string // use serviceInfo.
+	
+	cancelled bool
+	cancelChan chan struct{}
+	cancelMetex sync.Mutex
 	
 	isProvisioning bool // false for deprovisionings
 	
 	serviceInfo   *ServiceInfo
 	bootResources *etcdResources_Boot
 	haResources   *etcdResources_HA
+}
+
+func (job *etcdOrchestrationJob) cancel() {
+	job.cancelMetex.Lock()
+	defer job.cancelMetex.Unlock()
+	
+	if ! job.cancelled {
+		job.cancelled = true
+		close (job.cancelChan)
+	}
 }
 
 type watchPodStatus struct {
@@ -327,11 +355,19 @@ func (job *etcdOrchestrationJob) run() {
 	}
 	
 	for {
-		status, _ := <- statuses
+		var status WatchStatus
+		select {
+		case <- job.cancelChan:
+			close(cancel)
+			return
+		status, _ = <- statuses
+			break
+		}
 		
 		if status.Err != nil {
-			logger.Error("watch boot pod error", status.Err)
 			close(cancel)
+			
+			logger.Error("watch boot pod error", status.Err)
 			job.isProvisioning = false
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
@@ -341,8 +377,9 @@ func (job *etcdOrchestrationJob) run() {
 		
 		var wps watchPodStatus
 		if err := json.Unmarshal(status.Info, &wps); err != nil {
-			logger.Error("parse boot pod status", err)
 			close(cancel)
+			
+			logger.Error("parse boot pod status", err)
 			job.isProvisioning = false
 			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 			return
@@ -352,8 +389,9 @@ func (job *etcdOrchestrationJob) run() {
 			println("watch pod phase: ", wps.Object.Status.Phase)
 			
 			if wps.Object.Status.Phase != kapi.PodRunning {
-				logger.Debug("pod phase is neither pending nor running")
 				close(cancel)
+				
+				logger.Debug("pod phase is neither pending nor running")
 				job.isProvisioning = false
 				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
 				return
@@ -365,7 +403,11 @@ func (job *etcdOrchestrationJob) run() {
 		}
 	}
 	
+	if job.cancelled { return }
+	
 	time.Sleep(7 * time.Second)
+	
+	if job.cancelled { return }
 	
 	port := strconv.Itoa(job.bootResources.service.Spec.Ports[0].Port)
 	host := job.bootResources.route.Spec.Host
@@ -434,11 +476,11 @@ func (job *etcdOrchestrationJob) run() {
 		return
 	}
 	
+	if job.cancelled { return }
+	
 	// create HA resources
 	
-	ha_res, err := createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
-	_ = ha_res
-	//ha_res, err = getEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	err = job.createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	
 	// todo: delete boot pod/service?
 }
@@ -486,9 +528,9 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 	yamlTemplates := bytes.Replace(EtcdTemplateData_Boot, []byte("instanceid"), []byte(instanceID), -1)
 	
 	
-	println("========= Boot yamlTemplates ===========")
-	println(string(yamlTemplates))
-	println()
+	//println("========= Boot yamlTemplates ===========")
+	//println(string(yamlTemplates))
+	//println()
 
 	
 	decoder := NewYamlDecoder(yamlTemplates)
@@ -521,9 +563,9 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
 	
 	
-	println("========= HA yamlTemplates ===========")
-	println(string(yamlTemplates))
-	println()
+	//println("========= HA yamlTemplates ===========")
+	//println(string(yamlTemplates))
+	//println()
 
 	
 	decoder := NewYamlDecoder(yamlTemplates)
@@ -565,6 +607,7 @@ func createEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcd
 	
 	osr := NewOpenshiftREST(theOC)
 	
+	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
 		KPost(prefix + "/services", &input.service, &output.service).
@@ -605,21 +648,24 @@ func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdRes
 }
 
 func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamespace string) {
-	odel ("routes", bootRes.route.Name, serviceBrokerNamespace)
-	kdel ("services", bootRes.service.Name, serviceBrokerNamespace)
-	kdel ("services", bootRes.etcdsrv.Name, serviceBrokerNamespace)
-	kdel ("pods", bootRes.etcdpod.Name, serviceBrokerNamespace)
+	// todo: add to retry queue on fail
+	
+	go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "services", bootRes.etcdsrv.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.etcdpod.Name)}()
 }
 	
-func createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*etcdResources_HA, error) {
-	var output etcdResources_HA
-	
+func (job *etcdOrchestrationJob) createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) error {
 	var input etcdResources_HA
 	err := loadEtcdResources_HA(instanceId, rootPassword, &input)
 	if err != nil {
-		return &output, err
+		return err
 	}
 	
+	var output etcdResources_HA
+	
+	/*
 	osr := NewOpenshiftREST(theOC)
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
@@ -635,7 +681,30 @@ func createEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword st
 		logger.Error("createEtcdResources_HA", osr.Err)
 	}
 	
-	return &output, osr.Err
+	return osr.Err
+	*/
+	go func() {
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.etcdrc1, &output.etcdrc1); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.etcdsrv1, &output.etcdsrv1); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.etcdrc2, &output.etcdrc2); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.etcdsrv2, &output.etcdsrv2); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.etcdrc3, &output.etcdrc3); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.etcdsrv3, &output.etcdsrv3); err != nil {
+			return
+		}
+	}()
+	
+	return nil
 }
 	
 func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*etcdResources_HA, error) {
@@ -666,55 +735,140 @@ func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword strin
 }
 
 func destroyEtcdResources_HA (haRes *etcdResources_HA, serviceBrokerNamespace string) {
-	kdel ("services", haRes.etcdsrv1.Name, serviceBrokerNamespace)
-	kdel_rc (&haRes.etcdrc1, serviceBrokerNamespace)
+	// todo: add to retry queue on fail
 	
-	kdel ("services", haRes.etcdsrv2.Name, serviceBrokerNamespace)
-	kdel_rc (&haRes.etcdrc2, serviceBrokerNamespace)
+	go func() {kdel (serviceBrokerNamespace, "services", haRes.etcdsrv1.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &haRes.etcdrc1)}()
 	
-	kdel ("services", haRes.etcdsrv3.Name, serviceBrokerNamespace)
-	kdel_rc (&haRes.etcdrc3, serviceBrokerNamespace)
+	go func() {kdel (serviceBrokerNamespace, "services", haRes.etcdsrv2.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &haRes.etcdrc2)}()
+	
+	go func() {kdel (serviceBrokerNamespace, "services", haRes.etcdsrv3.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &haRes.etcdrc3)}()
 }
 
 //===============================================================
 // 
 //===============================================================
-	// todo: handle errors in processing
-	
-func kdel (typeName, resName string, serviceBrokerNamespace string) {
-	println("to delete ", typeName, "/", resName)
-	
-	if resName != "" {
-		uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-		osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
-		if osr.Err != nil {
-			logger.Error("delete: " + uri, osr.Err)
-		}
-	}
-}
 
-func odel (typeName, resName string, serviceBrokerNamespace string) {
-	println("to delete ", typeName, "/", resName)
+func (job *etcdOrchestrationJob) kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+	println("to create ", typeName)
 	
-	if resName != "" {
-		uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
-		osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
-		if osr.Err != nil {
-			logger.Error("delete: " + uri, osr.Err)
-		}
-	}
-}
-
-type watchReplicationControllerStatus struct {
-	// The type of watch update contained in the message
-	Type string `json:"type"`
-	// Pod details
-	Object kapi.ReplicationController `json:"object"`
-}
-
-func kdel_rc (rc *kapi.ReplicationController, serviceBrokerNamespace string) error {
-	if rc == nil || rc.Name == "" {
+	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
+	i, n := 0, 5
+RETRY:
+	if job.cancelled {
 		return nil
+	}
+	
+	osr := NewOpenshiftREST(theOC).KPost(uri, body, into)
+	if osr.Err == nil {
+		logger.Info("create " + typeName + " succeeded")
+	} else {
+		i++
+		if i < n {
+			logger.Error(fmt.Sprintf("%d> create (%s) error", i, typeName), osr.Err)
+			goto RETRY
+		} else {
+			logger.Error(fmt.Sprintf("create (%s) failed", typeName), osr.Err)
+			return osr.Err
+		}
+	}
+	
+	return nil
+}
+
+func (job *etcdOrchestrationJob) opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+	println("to create ", typeName)
+	
+	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
+	i, n := 0, 5
+RETRY:
+	if job.cancelled {
+		return nil
+	}
+	
+	osr := NewOpenshiftREST(theOC).OPost(uri, body, into)
+	if osr.Err == nil {
+		logger.Info("create " + typeName + " succeeded")
+	} else {
+		i++
+		if i < n {
+			logger.Error(fmt.Sprintf("%d> create (%s) error", i, typeName), osr.Err)
+			goto RETRY
+		} else {
+			logger.Error(fmt.Sprintf("create (%s) failed", typeName), osr.Err)
+			return osr.Err
+		}
+	}
+	
+	return nil
+}
+	
+func kdel (serviceBrokerNamespace, typeName, resName string) error {
+	if resName == "" {
+		return nil
+	}
+	
+	println("to delete ", typeName, "/", resName)
+	
+	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
+	i, n := 0, 5
+RETRY:
+	osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
+	if osr.Err == nil {
+		logger.Info("delete " + uri + " succeeded")
+	} else {
+		i++
+		if i < n {
+			logger.Error(fmt.Sprintf("%d> delete (%s) error", i, uri), osr.Err)
+			goto RETRY
+		} else {
+			logger.Error(fmt.Sprintf("delete (%s) failed", uri), osr.Err)
+			return osr.Err
+		}
+	}
+	
+	return nil
+}
+
+func odel (serviceBrokerNamespace, typeName, resName string) error {
+	if resName == "" {
+		return nil
+	}
+	
+	println("to delete ", typeName, "/", resName)	
+
+	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
+	i, n := 0, 5
+RETRY:
+	osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
+	if osr.Err == nil {
+		logger.Info("delete " + uri + " succeeded")
+	} else {
+		i++
+		if i < n {
+			logger.Error(fmt.Sprintf("%d> delete (%s) error", i, uri), osr.Err)
+			goto RETRY
+		} else {
+			logger.Error(fmt.Sprintf("delete (%s) failed", uri), osr.Err)
+			return osr.Err
+		}
+	}
+	
+	return nil
+}
+
+func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
+	kdel (serviceBrokerNamespace, "replicationcontrollers", rc.Name)
+}
+
+/*
+func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
+	// looks pods will be auto deleted when rc is deleted.
+	
+	if rc == nil || rc.Name == "" {
+		return
 	}
 	
 	println("to delete pods on replicationcontroller", rc.Name)
@@ -728,7 +882,7 @@ func kdel_rc (rc *kapi.ReplicationController, serviceBrokerNamespace string) err
 	osr := NewOpenshiftREST(theOC).KPut(uri, rc, nil)
 	if osr.Err != nil {
 		logger.Error("modify HA rc", osr.Err)
-		return osr.Err
+		return
 	}
 	
 	// start watching rc status
@@ -736,7 +890,7 @@ func kdel_rc (rc *kapi.ReplicationController, serviceBrokerNamespace string) err
 	statuses, cancel, err := theOC.KWatch (uri)
 	if err != nil {
 		logger.Error("start watching HA rc", err)
-		return err
+		return
 	}
 	
 	go func() {
@@ -773,5 +927,13 @@ func kdel_rc (rc *kapi.ReplicationController, serviceBrokerNamespace string) err
 		}
 	}()
 	
-	return nil
+	return
 }
+
+type watchReplicationControllerStatus struct {
+	// The type of watch update contained in the message
+	Type string `json:"type"`
+	// Pod details
+	Object kapi.ReplicationController `json:"object"`
+}
+*/
