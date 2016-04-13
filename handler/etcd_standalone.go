@@ -81,7 +81,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	output, err := createEtcdResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
 
 	if err != nil {
-		destroyEtcdResources_Boot(output, serviceBrokerNamespace)
+		destroyEtcdResources_Boot(output, serviceBrokerNamespace, true)
 		
 		return serviceSpec, serviceInfo, err
 	}
@@ -188,7 +188,7 @@ func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asy
 		destroyEtcdResources_HA (ha_res, myServiceInfo.Database)
 		
 		boot_res, _ := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-		destroyEtcdResources_Boot (boot_res, myServiceInfo.Database)
+		destroyEtcdResources_Boot (boot_res, myServiceInfo.Database, true)
 	}()
 	
 	return brokerapi.IsAsync(false), nil
@@ -372,7 +372,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("start watching boot pod", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -391,7 +391,7 @@ func (job *etcdOrchestrationJob) run() {
 			
 			logger.Error("watch boot pod error", status.Err)
 			job.isProvisioning = false
-			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 			return
 		} else {
 			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
@@ -403,7 +403,7 @@ func (job *etcdOrchestrationJob) run() {
 			
 			logger.Error("parse boot pod status", err)
 			job.isProvisioning = false
-			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+			destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 			return
 		}
 		
@@ -415,7 +415,7 @@ func (job *etcdOrchestrationJob) run() {
 				
 				logger.Debug("pod phase is neither pending nor running")
 				job.isProvisioning = false
-				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+				destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 				return
 			}
 			
@@ -443,7 +443,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("create etcd unauthrized client", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -452,7 +452,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("create etcd root user", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -460,7 +460,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("create etcd authrized client", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -469,7 +469,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("enable etcd auth", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -478,7 +478,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("revoke guest role permission", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -486,7 +486,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("add etcd binduser role", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -494,7 +494,7 @@ func (job *etcdOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("grant ectd binduser role", err)
 		job.isProvisioning = false
-		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database)
+		destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
@@ -504,7 +504,12 @@ func (job *etcdOrchestrationJob) run() {
 	
 	err = job.createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	
-	// todo: delete boot pod/service?
+	// delete boot pod
+	println("to delete boot pod ...")
+	
+	time.Sleep(60 * time.Second)
+	if job.cancelled { return }
+	destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, false)
 }
 
 func newUnauthrizedEtcdClient (etcdEndPoints []string) (etcd.Client, error) {
@@ -669,11 +674,14 @@ func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdRes
 	return &output, osr.Err
 }
 
-func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamespace string) {
+func destroyEtcdResources_Boot (bootRes *etcdResources_Boot, serviceBrokerNamespace string, all bool) {
 	// todo: add to retry queue on fail
 	
-	go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
+	if all {
+		go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
+		go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
+	}
+	
 	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.etcdpod.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", bootRes.etcdsrv.Name)}()
 }
