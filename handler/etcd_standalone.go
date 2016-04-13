@@ -243,7 +243,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	}
 	
 	mycredentials := Credentials{
-		Uri:      "/",
+		Uri:      "http://" + net.JoinHostPort(host, port),
 		Hostname: host,
 		Port:     port,
 		Username: newusername,
