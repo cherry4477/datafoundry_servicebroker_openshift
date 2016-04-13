@@ -243,6 +243,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	}
 	
 	// etcd bug: need to change password to make the user applied
+	// todo: may this bug is already fixed now.
 	_, err = etcd_userapi.ChangePassword(context.Background(), newusername, newpassword)
 	if err != nil {
 		logger.Error("change new user password", err)
