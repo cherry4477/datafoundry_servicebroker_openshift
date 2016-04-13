@@ -505,11 +505,11 @@ func (job *etcdOrchestrationJob) run() {
 	err = job.createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	
 	// delete boot pod
-	println("to delete boot pod ...")
-	
-	time.Sleep(60 * time.Second)
-	if job.cancelled { return }
-	destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, false)
+	//println("to delete boot pod ...")
+	//
+	//time.Sleep(60 * time.Second)
+	//if job.cancelled { return }
+	//destroyEtcdResources_Boot (job.bootResources, serviceInfo.Database, false)
 }
 
 func newUnauthrizedEtcdClient (etcdEndPoints []string) (etcd.Client, error) {
@@ -889,11 +889,12 @@ RETRY:
 	return nil
 }
 
+/*
 func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	kdel (serviceBrokerNamespace, "replicationcontrollers", rc.Name)
 }
+*/
 
-/*
 func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	// looks pods will be auto deleted when rc is deleted.
 	
@@ -947,14 +948,9 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 			}
 		}
 		
-		// delete rc
+		// ...
 		
-		//kdel("replicationcontrollers", rc.Name, serviceBrokerNamespace)
-		println("to delete ", "replicationcontrollers", "/", rc.Name)
-		osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
-		if osr.Err != nil {
-			logger.Error("delete: " + uri, osr.Err)
-		}
+		kdel(serviceBrokerNamespace, "replicationcontrollers", rc.Name)
 	}()
 	
 	return
@@ -966,4 +962,3 @@ type watchReplicationControllerStatus struct {
 	// Pod details
 	Object kapi.ReplicationController `json:"object"`
 }
-*/
