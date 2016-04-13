@@ -219,7 +219,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 		return brokerapi.Binding{}, Credentials{}, err
 	}
 
-	newusername := getguid()
+	newusername := NewElevenLengthID() // getguid()[:16]
 	newpassword := getguid()
 	
 	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
@@ -239,6 +239,13 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 			logger.Error("remove new etcd user", err2)
 		}
 		
+		return brokerapi.Binding{}, Credentials{}, err
+	}
+	
+	// etcd bug: need to change password to make the user applied
+	_, err = etcd_userapi.ChangePassword(context.Background(), newusername, newpassword)
+	if err != nil {
+		logger.Error("change new user password", err)
 		return brokerapi.Binding{}, Credentials{}, err
 	}
 	

@@ -1,4 +1,5 @@
 FROM golang:1.6.0
+#FROM index.alauda.cn/library/golang:1.6.0
 
 ENV BROKERPORT 8888
 EXPOSE 8888
