@@ -4,3 +4,8 @@ cd zookeeper-3.4.6
 cp conf/zoo_sample.cfg conf/zoo.cfg
 ./bin/zkServer.sh start
 cd ..
+
+
+etcd-outer-boot
+>  etcd-client-port
+  > port: 80 -> 2379

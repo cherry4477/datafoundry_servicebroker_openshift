@@ -1,4 +1,4 @@
-package handler
+package etcd
 
 import (
 	"fmt"
@@ -28,6 +28,8 @@ import (
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	routeapi "github.com/openshift/origin/route/api/v1"
+	
+	oshandlder "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
 
 //==============================================================
@@ -37,7 +39,7 @@ import (
 const EtcdServcieBrokerName_Standalone = "etcd_openshift_standalone"
 
 func init() {
-	register(EtcdServcieBrokerName_Standalone, &Etcd_sampleHandler{})
+	oshandlder.Register(EtcdServcieBrokerName_Standalone, &Etcd_sampleHandler{})
 	
 	logger = lager.NewLogger(EtcdServcieBrokerName_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
@@ -51,15 +53,15 @@ var logger lager.Logger
 
 const EtcdBindRole = "binduser"
 
-//const ServiceBrokerNamespace = "default" // use theOC.namespace instead
+//const ServiceBrokerNamespace = "default" // use oshandlder.OC().Namespace instead
 
 type Etcd_sampleHandler struct{}
 
-func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
+func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
-	serviceInfo := ServiceInfo{}
+	serviceInfo := oshandlder.ServiceInfo{}
 	
 	//if asyncAllowed == false {
 	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
@@ -67,9 +69,9 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceSpec.IsAsync = true
 	
 	//instanceIdInTempalte   := instanceID // todo: ok?
-	instanceIdInTempalte   := strings.ToLower(NewThirteenLengthID())
+	instanceIdInTempalte   := strings.ToLower(oshandlder.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
-	serviceBrokerNamespace := theOC.namespace
+	serviceBrokerNamespace := oshandlder.OC().Namespace()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
@@ -88,7 +90,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.Password = getguid()
+	serviceInfo.Password = oshandlder.GenGUID()
 	
 	startEtcdOrchestrationJob(&etcdOrchestrationJob{
 		cancelled:  false,
@@ -105,7 +107,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
 	
 	job := getEtcdOrchestrationJob (myServiceInfo.Url)
@@ -166,7 +168,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *ServiceInfo) (
 	}
 }
 
-func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
 		for {
 			job := getEtcdOrchestrationJob (myServiceInfo.Url)
@@ -194,12 +196,12 @@ func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *ServiceInfo, asy
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, Credentials, error) {
+func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
 	// output.route.Spec.Host
 	
 	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
-		return brokerapi.Binding{}, Credentials{}, err
+		return brokerapi.Binding{}, oshandlder.Credentials{}, err
 	}
 	//if len(boot_res.service.Spec.Ports) == 0 {
 	//	err := errors.New("no ports in boot service")
@@ -216,18 +218,18 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	etcd_client, err := newAuthrizedEtcdClient (etcd_addrs, "root", myServiceInfo.Password)
 	if err != nil {
 		logger.Error("create etcd authrized client", err)
-		return brokerapi.Binding{}, Credentials{}, err
+		return brokerapi.Binding{}, oshandlder.Credentials{}, err
 	}
 
-	newusername := NewElevenLengthID() // getguid()[:16]
-	newpassword := getguid()
+	newusername := oshandlder.NewElevenLengthID() // oshandlder.GenGUID()[:16]
+	newpassword := oshandlder.GenGUID()
 	
 	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
 	
 	err = etcd_userapi.AddUser(context.Background(), newusername, newpassword)
 	if err != nil {
 		logger.Error("create new etcd user", err)
-		return brokerapi.Binding{}, Credentials{}, err
+		return brokerapi.Binding{}, oshandlder.Credentials{}, err
 	}
 	
 	_, err = etcd_userapi.GrantUser(context.Background(), newusername, []string{EtcdBindRole})
@@ -239,7 +241,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 			logger.Error("remove new etcd user", err2)
 		}
 		
-		return brokerapi.Binding{}, Credentials{}, err
+		return brokerapi.Binding{}, oshandlder.Credentials{}, err
 	}
 	
 	// etcd bug: need to change password to make the user applied
@@ -247,10 +249,10 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	_, err = etcd_userapi.ChangePassword(context.Background(), newusername, newpassword)
 	if err != nil {
 		logger.Error("change new user password", err)
-		return brokerapi.Binding{}, Credentials{}, err
+		return brokerapi.Binding{}, oshandlder.Credentials{}, err
 	}
 	
-	mycredentials := Credentials{
+	mycredentials := oshandlder.Credentials{
 		Uri:      "http://" + net.JoinHostPort(host, port),
 		Hostname: host,
 		Port:     port,
@@ -263,7 +265,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *ServiceInfo, bindingID 
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *ServiceInfo, mycredentials *Credentials) error {
+func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
 	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
 		return err
@@ -341,7 +343,7 @@ type etcdOrchestrationJob struct {
 	
 	isProvisioning bool // false for deprovisionings
 	
-	serviceInfo   *ServiceInfo
+	serviceInfo   *oshandlder.ServiceInfo
 	bootResources *etcdResources_Boot
 	haResources   *etcdResources_HA
 }
@@ -376,7 +378,7 @@ func (job *etcdOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
 	pod := job.bootResources.etcdpod
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
-	statuses, cancel, err := theOC.KWatch (uri)
+	statuses, cancel, err := oshandlder.OC().KWatch (uri)
 	if err != nil {
 		logger.Error("start watching boot pod", err)
 		job.isProvisioning = false
@@ -385,7 +387,7 @@ func (job *etcdOrchestrationJob) run() {
 	}
 	
 	for {
-		var status WatchStatus
+		var status oshandlder.WatchStatus
 		select {
 		case <- job.cancelChan:
 			close(cancel)
@@ -568,7 +570,7 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 	//println()
 
 	
-	decoder := NewYamlDecoder(yamlTemplates)
+	decoder := oshandlder.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.service).
 		Decode(&res.route).
@@ -579,6 +581,7 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 }
 
 var EtcdTemplateData_HA []byte = nil
+const etcdImagePlaceholder = "etcd-image-place-holder"
 
 func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA) error {
 	if EtcdTemplateData_HA == nil {
@@ -589,6 +592,12 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 		EtcdTemplateData_HA, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
+		}
+		
+		etcd_image := oshandlder.EtcdImage()
+		etcd_image = strings.TrimSpace(etcd_image)
+		if len(etcd_image) > 0 {
+			EtcdTemplateData_HA = bytes.Replace(EtcdTemplateData_HA, []byte(etcdImagePlaceholder), []byte(etcd_image), -1)
 		}
 	}
 	
@@ -603,7 +612,7 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 	//println()
 
 	
-	decoder := NewYamlDecoder(yamlTemplates)
+	decoder := oshandlder.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.etcdrc1).
 		Decode(&res.etcdsrv1).
@@ -640,7 +649,7 @@ func createEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcd
 	
 	var output etcdResources_Boot
 	
-	osr := NewOpenshiftREST(theOC)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
 	
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
@@ -666,7 +675,7 @@ func getEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdRes
 		return &output, err
 	}
 	
-	osr := NewOpenshiftREST(theOC)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -704,7 +713,7 @@ func (job *etcdOrchestrationJob) createEtcdResources_HA (instanceId, serviceBrok
 	var output etcdResources_HA
 	
 	/*
-	osr := NewOpenshiftREST(theOC)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -754,7 +763,7 @@ func getEtcdResources_HA (instanceId, serviceBrokerNamespace, rootPassword strin
 		return &output, err
 	}
 	
-	osr := NewOpenshiftREST(theOC)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -799,7 +808,7 @@ RETRY:
 		return nil
 	}
 	
-	osr := NewOpenshiftREST(theOC).KPost(uri, body, into)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
 	} else {
@@ -826,7 +835,7 @@ RETRY:
 		return nil
 	}
 	
-	osr := NewOpenshiftREST(theOC).OPost(uri, body, into)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).OPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
 	} else {
@@ -853,7 +862,7 @@ func kdel (serviceBrokerNamespace, typeName, resName string) error {
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
 RETRY:
-	osr := NewOpenshiftREST(theOC).KDelete(uri, nil)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KDelete(uri, nil)
 	if osr.Err == nil {
 		logger.Info("delete " + uri + " succeeded")
 	} else {
@@ -880,7 +889,7 @@ func odel (serviceBrokerNamespace, typeName, resName string) error {
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
 RETRY:
-	osr := NewOpenshiftREST(theOC).ODelete(uri, nil)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).ODelete(uri, nil)
 	if osr.Err == nil {
 		logger.Info("delete " + uri + " succeeded")
 	} else {
@@ -918,7 +927,7 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	
 	zero := 0
 	rc.Spec.Replicas = &zero
-	osr := NewOpenshiftREST(theOC).KPut(uri, rc, nil)
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KPut(uri, rc, nil)
 	if osr.Err != nil {
 		logger.Error("modify HA rc", osr.Err)
 		return
@@ -926,7 +935,7 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	
 	// start watching rc status
 	
-	statuses, cancel, err := theOC.KWatch (uri)
+	statuses, cancel, err := oshandlder.OC().KWatch (uri)
 	if err != nil {
 		logger.Error("start watching HA rc", err)
 		return

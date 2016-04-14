@@ -41,6 +41,10 @@ type OpenshiftClient struct {
 	bearerToken string
 }
 
+func (oc *OpenshiftClient) Namespace() string {
+	return oc.namespace
+}
+
 func newOpenshiftClient(host, username, password, defaultNamespace string) *OpenshiftClient {
 	host = "https://" + host
 	oc := &OpenshiftClient{

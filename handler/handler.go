@@ -45,7 +45,7 @@ type Handler struct {
 
 var handlers = make(map[string]HandlerDriver)
 
-func register(name string, handler HandlerDriver) {
+func Register(name string, handler HandlerDriver) {
 	if handler == nil {
 		panic("handler: Register handler is nil")
 	}
@@ -89,7 +89,7 @@ func getmd5string(s string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func getguid() string {
+func GenGUID() string {
 	b := make([]byte, 48)
 
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
@@ -109,7 +109,17 @@ func getenv(env string) string {
 	return env_value
 }
 
+func OC() *OpenshiftClient {
+	return theOC
+}
+
+func EtcdImage() string {
+	return etcdImage
+}
+
 var theOC *OpenshiftClient
+var etcdImage string
+
 func init() {
 	theOC = newOpenshiftClient(
 		getenv("OPENSHIFTADDR"), 
@@ -117,4 +127,8 @@ func init() {
 		getenv("OPENSHIFTPASS"),
 		getenv("SBNAMESPACE"),
 	)
+	
+	etcdImage = os.Getenv("ETCDIMAGE") // getenv("SBNAMESPACE")
 }
+
+

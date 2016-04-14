@@ -21,6 +21,9 @@ import (
 	"golang.org/x/net/context"
 	
 	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
+	
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd"
+	//_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
 )
 
 type myServiceBroker struct {
