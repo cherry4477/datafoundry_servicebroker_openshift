@@ -209,9 +209,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo,
 	//	return brokerapi.Binding{}, Credentials{}, err
 	//}
 	
-	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
-	host := boot_res.route.Spec.Host
-	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	etcd_addr, host, port := boot_res.endpoint()
 	println("etcd addr: ", etcd_addr)
 	etcd_addrs := []string{etcd_addr}
 	
@@ -253,7 +251,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo,
 	}
 	
 	mycredentials := oshandlder.Credentials{
-		Uri:      "http://" + net.JoinHostPort(host, port),
+		Uri:      etcd_addr,
 		Hostname: host,
 		Port:     port,
 		Username: newusername,
@@ -276,9 +274,7 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInf
 	//	return err
 	//}
 	
-	port := strconv.Itoa(boot_res.service.Spec.Ports[0].Port)
-	host := boot_res.route.Spec.Host
-	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	etcd_addr, _, _ := boot_res.endpoint()
 	println("etcd addr: ", etcd_addr)
 	etcd_addrs := []string{etcd_addr}
 	
@@ -441,9 +437,7 @@ func (job *etcdOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-	port := strconv.Itoa(job.bootResources.service.Spec.Ports[0].Port)
-	host := job.bootResources.route.Spec.Host
-	etcd_addr := "http://" + net.JoinHostPort(host, port)
+	etcd_addr, _, _ := job.bootResources.endpoint()
 	println("etcd addr: ", etcd_addr)
 	etcd_addrs := []string{etcd_addr}
 	
@@ -558,6 +552,15 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 		if err != nil {
 			return err
 		}
+		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			EtcdTemplateData_Boot = bytes.Replace(
+				EtcdTemplateData_Boot, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
+				-1)
+		}
 	}
 	
 	// todo: max length of res names in kubernetes is 24
@@ -581,7 +584,6 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 }
 
 var EtcdTemplateData_HA []byte = nil
-const etcdImagePlaceholder = "etcd-image-place-holder"
 
 func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA) error {
 	if EtcdTemplateData_HA == nil {
@@ -597,13 +599,28 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 		etcd_image := oshandlder.EtcdImage()
 		etcd_image = strings.TrimSpace(etcd_image)
 		if len(etcd_image) > 0 {
-			EtcdTemplateData_HA = bytes.Replace(EtcdTemplateData_HA, []byte(etcdImagePlaceholder), []byte(etcd_image), -1)
+			EtcdTemplateData_HA = bytes.Replace(
+				EtcdTemplateData_HA, 
+				[]byte("http://etcd-image-place-holder/etcd-openshift-orchestration"), 
+				[]byte(etcd_image), 
+				-1)
+		}
+		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			EtcdTemplateData_HA = bytes.Replace(
+				EtcdTemplateData_HA, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
+				-1)
 		}
 	}
 	
 	// todo: max length of res names in kubernetes is 24
 	
-	yamlTemplates := bytes.Replace(EtcdTemplateData_HA, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates := EtcdTemplateData_HA
+	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
 	
 	
@@ -638,6 +655,12 @@ type etcdResources_HA struct {
 	etcdsrv2 kapi.Service
 	etcdrc3  kapi.ReplicationController
 	etcdsrv3 kapi.Service
+}
+
+func (bootRes *etcdResources_Boot) endpoint() (string, string, string) {
+	port := strconv.Itoa(bootRes.service.Spec.Ports[0].Port)
+	host := bootRes.route.Spec.Host
+	return "http://" + net.JoinHostPort(host, port), host, port
 }
 	
 func createEtcdResources_Boot (instanceId, serviceBrokerNamespace string) (*etcdResources_Boot, error) {

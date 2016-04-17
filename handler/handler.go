@@ -117,18 +117,24 @@ func EtcdImage() string {
 	return etcdImage
 }
 
+func EndPointSuffix() string {
+	return endpointSuffix
+}
+
 var theOC *OpenshiftClient
 var etcdImage string
+var endpointSuffix string
 
 func init() {
-	theOC = newOpenshiftClient(
+	theOC = newOpenshiftClient (
 		getenv("OPENSHIFTADDR"), 
 		getenv("OPENSHIFTUSER"), 
 		getenv("OPENSHIFTPASS"),
 		getenv("SBNAMESPACE"),
 	)
 	
-	etcdImage = os.Getenv("ETCDIMAGE") // getenv("SBNAMESPACE")
+	etcdImage = getenv("ETCDIMAGE")
+	endpointSuffix = getenv("ENDPOINTSUFFIX")
 }
 
 

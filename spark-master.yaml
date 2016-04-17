@@ -1,0 +1,66 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: sb-instanceid-spark-master
+spec:
+  replicas: 1
+  selector:
+    servicebroker: sb-instanceid-spark-master
+  template:
+    metadata:
+      labels:
+        servicebroker: sb-instanceid-spark-master
+    spec:
+      containers:
+        - name: sb-instanceid-spark-master
+          env: 
+            - name: SPARK_MASTER
+              value: sb-instanceid-sm
+            - name: SPARK_SECRET
+              value: test1234
+          image: index.alauda.cn/asiainfoldp/spark
+          command: ["/start-master"]
+          ports:
+            - containerPort: 7077
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: sb-instanceid-sm
+spec:
+  ports:
+    - port: 7077
+      targetPort: 7077
+  selector:
+    servicebroker: sb-instanceid-spark-master
+
+---
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-spark-webui
+spec:
+  host: sb-instanceid-spark-master-webui-servicebroker.app.asiainfodata.com
+  to:
+    kind: Service
+    name: sb-instanceid-smw
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: sb-instanceid-smw
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    servicebroker: sb-instanceid-spark-master

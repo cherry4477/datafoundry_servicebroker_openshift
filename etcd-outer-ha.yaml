@@ -19,12 +19,12 @@ spec:
       - command:
         - sh 
         - /usr/bin/etcd-join.sh
-        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
         - etcd1
         - http://sb-instanceid-etcd1:2380
         - sb-instanceid-etcd
         - test1234
-        image: etcd-image-place-holder
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd1
         ports:
@@ -73,12 +73,12 @@ spec:
       - command:
         - sh 
         - /usr/bin/etcd-join.sh
-        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
         - etcd2
         - http://sb-instanceid-etcd2:2380
         - sb-instanceid-etcd
         - test1234
-        image: etcd-image-place-holder
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd3
         ports:
@@ -128,12 +128,12 @@ spec:
       - command:
         - sh 
         - /usr/bin/etcd-join.sh
-        - http://sb-instanceid-etcd.app.asiainfodata.com:80
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
         - etcd3
         - http://sb-instanceid-etcd3:2380
         - sb-instanceid-etcd
         - test1234
-        image: etcd-image-place-holder
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd3
         ports:

@@ -22,7 +22,7 @@ kind: Route
 metadata:
   name: sb-instanceid-etcd
 spec:
-  host: sb-instanceid-etcd.app.asiainfodata.com
+  host: sb-instanceid-etcd.endpoint-postfix-place-holder
   port:
     targetPort: etcd-client-port
   to:
@@ -51,7 +51,7 @@ spec:
     - -listen-client-urls
     - http://0.0.0.0:2379
     - -advertise-client-urls
-    - http://sb-instanceid-etcd.app.asiainfodata.com:80
+    - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
     - -initial-cluster-token 
     - sb-instanceid-etcd
     - -initial-cluster

@@ -1,0 +1,28 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: sb-instanceid-spark-worker
+spec:
+  replicas: 3
+  selector:
+    servicebroker: sb-instanceid-spark-worker
+  template:
+    metadata:
+      labels:
+        servicebroker: sb-instanceid-spark-worker
+    spec:
+      containers:
+        - name: sb-instanceid-spark-worker
+          env: 
+            - name: SPARK_MASTER
+              value: sb-instanceid-sm
+            - name: SPARK_SECRET
+              value: test1234
+          image: index.alauda.cn/asiainfoldp/spark
+          command: ["/start-worker"]
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              cpu: 100m
+
