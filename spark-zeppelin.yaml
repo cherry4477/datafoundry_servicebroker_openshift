@@ -1,21 +1,21 @@
 kind: ReplicationController
 apiVersion: v1
 metadata:
-  name: sb-instanceid-zppln
+  name: sb-instanceid-sparkzp
 spec:
   replicas: 1
   selector:
-    servicebroker: sb-instanceid-zppln
+    servicebroker: sb-instanceid-spark-zepplin
   template:
     metadata:
       labels:
-        servicebroker: sb-instanceid-zppln
+        servicebroker: sb-instanceid-spark-zepplin
     spec:
       containers:
-        - name: sb-instanceid-zppln
+        - name: sb-instanceid-sparkzp
           env: 
             - name: SPARK_MASTER
-              value: sb-instanceid-sm
+              value: sb-instanceid-sparkms
             - name: SPARK_SECRET
               value: test1234
           image: index.alauda.cn/asiainfoldp/zepplin
@@ -30,24 +30,24 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: sb-instanceid-zppln
+  name: sb-instanceid-sparkzp
 spec:
   ports:
     - port: 8080
       targetPort: 8080
   selector:
-    servicebroker: sb-instanceid-zppln
+    servicebroker: sb-instanceid-spark-zepplin
 
 ---
 
 apiVersion: v1
 kind: Route
 metadata:
-  name: sb-instanceid-zppln
+  name: sb-instanceid-sparkzp
 spec:
-  host: sb-instanceid-zppln-servicebroker.endpoint-postfix-place-holder
+  host: sb-instanceid-spark-zeppelin-servicebroker.endpoint-postfix-place-holder
   to:
     kind: Service
-    name: sb-instanceid-zppln
+    name: sb-instanceid-sparkzp
 
 

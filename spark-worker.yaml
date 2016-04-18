@@ -1,9 +1,9 @@
 kind: ReplicationController
 apiVersion: v1
 metadata:
-  name: sb-instanceid-spark-worker
+  name: sb-instanceid-sparkwk
 spec:
-  replicas: 3
+  replicas: num-workers-place-holder
   selector:
     servicebroker: sb-instanceid-spark-worker
   template:
@@ -12,10 +12,10 @@ spec:
         servicebroker: sb-instanceid-spark-worker
     spec:
       containers:
-        - name: sb-instanceid-spark-worker
+        - name: sb-instanceid-sparkwk
           env: 
             - name: SPARK_MASTER
-              value: sb-instanceid-sm
+              value: sb-instanceid-sparkms
             - name: SPARK_SECRET
               value: test1234
           image: index.alauda.cn/asiainfoldp/spark

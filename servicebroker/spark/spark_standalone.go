@@ -55,6 +55,64 @@ var logger lager.Logger
 type Spark_freeHandler struct{}
 
 func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
+	return newSparkHandler(1).DoProvision(instanceID, details, asyncAllowed)
+}
+
+func (handler *Spark_freeHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+	return newSparkHandler(1).DoLastOperation(myServiceInfo)
+}
+
+func (handler *Spark_freeHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	return newSparkHandler(1).DoDeprovision(myServiceInfo, asyncAllowed)
+}
+
+func (handler *Spark_freeHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+	return newSparkHandler(1).DoBind(myServiceInfo, bindingID, details)
+}
+
+func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+	return newSparkHandler(1).DoUnbind(myServiceInfo, mycredentials)
+}
+
+//...
+
+type Spark_haHandler struct{}
+
+func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
+	return newSparkHandler(3).DoProvision(instanceID, details, asyncAllowed)
+}
+
+func (handler *Spark_haHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+	return newSparkHandler(3).DoLastOperation(myServiceInfo)
+}
+
+func (handler *Spark_haHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	return newSparkHandler(3).DoDeprovision(myServiceInfo, asyncAllowed)
+}
+
+func (handler *Spark_haHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+	return newSparkHandler(3).DoBind(myServiceInfo, bindingID, details)
+}
+
+func (handler *Spark_haHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+	return newSparkHandler(3).DoUnbind(myServiceInfo, mycredentials)
+}
+
+//==============================================================
+// 
+//==============================================================
+
+type Spark_Handler struct{
+	numWorkers int
+}
+
+func newSparkHandler(numWorkers int) *Spark_Handler {
+	return &Spark_Handler{
+			numWorkers: numWorkers,
+		}
+}
+
+func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -97,6 +155,7 @@ func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokera
 		
 		isProvisioning:    true,
 		serviceInfo:       &serviceInfo,
+		planNumWorkers:    handler.numWorkers,
 		masterResources:   output,
 		slavesResources:   nil,
 		zeppelinResources: nil,
@@ -107,77 +166,103 @@ func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokera
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Spark_freeHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Spark_Handler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
+	job := getSparkOrchestrationJob (myServiceInfo.Url)
+	if job != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress .",
+		}, nil
+	}
 	
-	return brokerapi.LastOperation{
-		State:       brokerapi.InProgress,
-		Description: "In progress.",
-	}, nil
+	// assume in provisioning
+	
+	// the job may be finished or interrupted or running in another instance.
+	
+	// check master route, if it doesn't exist, return failed
+	master_res, _ := getSparkResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	if master_res.webroute.Name == "" {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: "Failed!",
+		}, nil
+	}
+	
+	// check workers
+	
+	workers_res, _ := getSparkResources_Workers (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password, handler.numWorkers)
+	
+	if workers_res.workerrc.Name == "" || workers_res.workerrc.Spec.Replicas == nil || workers_res.workerrc.Status.Replicas < *workers_res.workerrc.Spec.Replicas {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
+		}, nil
+	} else {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Succeeded,
+			Description: "Succeeded!",
+		}, nil
+	}
+	
+	// todo: check zeppelin
 }
 
-func (handler *Spark_freeHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-
+func (handler *Spark_Handler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	go func() {
+		job := getSparkOrchestrationJob (myServiceInfo.Url)
+		if job != nil {
+			job.cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == getSparkOrchestrationJob (myServiceInfo.Url) {
+					break
+				}
+			}
+		}
+		
+		// ...
+		
+		println("to destroy resources")
+		
+		zeppelin_res, _ := getSparkResources_Zeppelin (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		destroySparkResources_Zeppelin (zeppelin_res, myServiceInfo.Database)
+		
+		workers_res, _ := getSparkResources_Workers (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password, handler.numWorkers)
+		destroySparkResources_Workers (workers_res, myServiceInfo.Database)
+		
+		master_res, _ := getSparkResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		destroySparkResources_Master (master_res, myServiceInfo.Database)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Spark_freeHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+	// todo: handle errors
 	
+	master_res, _ := getSparkResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	
+	zeppelin_res, _ := getSparkResources_Zeppelin (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	
+	mycredentials := oshandlder.Credentials{
+		Uri:      "http://" + zeppelin_res.route.Spec.Host,
+		Hostname: master_res.webroute.Spec.Host,
+		Port:     "80",
+		Username: "",
+		Password: myServiceInfo.Password,
+	}
 
-	return brokerapi.Binding{}, oshandlder.Credentials{}, nil
+	myBinding := brokerapi.Binding{Credentials: mycredentials}
+
+	return myBinding, mycredentials, nil
 }
 
-func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
-
-	return nil
-}
-
-// todo: retry outer etcd set on failed.
-
-
-
-type Spark_haHandler struct{}
-
-func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
-	//初始化到openshift的链接
+func (handler *Spark_Handler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+	// do nothing
 	
-	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
-	serviceInfo := oshandlder.ServiceInfo{}
-	
-	//if asyncAllowed == false {
-	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
-	//}
-	serviceSpec.IsAsync = true
-	
-	
-	
-	return serviceSpec, serviceInfo, nil
-}
-
-func (handler *Spark_haHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
-	// try to get state from running job
-	
-	return brokerapi.LastOperation{
-		State:       brokerapi.InProgress,
-		Description: "In progress.",
-	}, nil
-}
-
-func (handler *Spark_haHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-
-	
-	return brokerapi.IsAsync(false), nil
-}
-
-func (handler *Spark_haHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
-	
-
-	return brokerapi.Binding{}, oshandlder.Credentials{}, nil
-}
-
-func (handler *Spark_haHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
-
 	return nil
 }
 
@@ -220,7 +305,9 @@ type sparkOrchestrationJob struct {
 	
 	isProvisioning bool // false for deprovisionings
 	
-	serviceInfo   *oshandlder.ServiceInfo
+	serviceInfo    *oshandlder.ServiceInfo
+	planNumWorkers int
+	
 	masterResources *sparkResources_Master
 	slavesResources   *sparkResources_Workers
 	zeppelinResources   *sparkResources_Zeppelin
@@ -376,7 +463,7 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 
 var SparkTemplateData_Workers []byte = nil
 
-func loadSparkResources_Workers(instanceID, sparkSecret string, res *sparkResources_Workers) error {
+func loadSparkResources_Workers(instanceID, sparkSecret string, numWorkers int, res *sparkResources_Workers) error {
 	if SparkTemplateData_Workers == nil {
 		f, err := os.Open("spark-worker.yaml")
 		if err != nil {
@@ -394,7 +481,7 @@ func loadSparkResources_Workers(instanceID, sparkSecret string, res *sparkResour
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
-	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("num-workers-place-holder"), []byte(strconv.Itoa(numWorkers)), -1)
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -531,7 +618,7 @@ func destroySparkResources_Master (masterRes *sparkResources_Master, serviceBrok
 	
 func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string) error {
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Workers(instanceId, sparkSecret, job.planNumWorkers, &input)
 	if err != nil {
 		return err
 	}
@@ -546,11 +633,11 @@ func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serv
 	return nil
 }
 	
-func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Workers, error) {
+func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string, numWorkers int) (*sparkResources_Workers, error) {
 	var output sparkResources_Workers
 	
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Workers(instanceId, sparkSecret, numWorkers, &input)
 	if err != nil {
 		return &output, err
 	}

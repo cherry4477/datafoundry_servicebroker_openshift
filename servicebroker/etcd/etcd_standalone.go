@@ -109,26 +109,19 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
-	
 	job := getEtcdOrchestrationJob (myServiceInfo.Url)
 	if job != nil {
-		if job.cancelled || job.isProvisioning {
-			return brokerapi.LastOperation{
-				State:       brokerapi.InProgress,
-				Description: "In progress .",
-			}, nil
-		} else {
-			return brokerapi.LastOperation{
-				State:       brokerapi.Failed,
-				Description: "Failed !",
-			}, nil
-		}
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress .",
+		}, nil
 	}
+	
+	// assume in provisioning
 	
 	// the job may be finished or interrupted or running in another instance.
 	
 	// check boot route, if it doesn't exist, return failed
-	// no need to check err here, for error mya be caused by boot-pod has already been removed.
 	boot_res, _ := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 	if boot_res.route.Name == "" {
 		return brokerapi.LastOperation{
@@ -170,16 +163,17 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandlder.Ser
 
 func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
-		for {
-			job := getEtcdOrchestrationJob (myServiceInfo.Url)
-			if job == nil {
-				break
-			}
-			
-			println("wait pod to end")
-			
+		job := getEtcdOrchestrationJob (myServiceInfo.Url)
+		if job != nil {
 			job.cancel()
-			time.Sleep(7 * time.Second)
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == getEtcdOrchestrationJob (myServiceInfo.Url) {
+					break
+				}
+			}
 		}
 		
 		// ...
@@ -340,6 +334,7 @@ type etcdOrchestrationJob struct {
 	isProvisioning bool // false for deprovisionings
 	
 	serviceInfo   *oshandlder.ServiceInfo
+	
 	bootResources *etcdResources_Boot
 	haResources   *etcdResources_HA
 }
@@ -349,6 +344,7 @@ func (job *etcdOrchestrationJob) cancel() {
 	defer job.cancelMetex.Unlock()
 	
 	if ! job.cancelled {
+		job.isProvisioning = false
 		job.cancelled = true
 		close (job.cancelChan)
 	}
