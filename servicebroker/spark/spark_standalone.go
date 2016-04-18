@@ -69,6 +69,7 @@ func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokera
 	instanceIdInTempalte   := strings.ToLower(oshandlder.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandlder.OC().Namespace()
+	sparkSecret := oshandlder.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
@@ -77,7 +78,7 @@ func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokera
 	
 	// master spark
 	
-	output, err := createSparkResources_Master(instanceIdInTempalte, serviceBrokerNamespace)
+	output, err := createSparkResources_Master(instanceIdInTempalte, serviceBrokerNamespace, sparkSecret)
 
 	if err != nil {
 		destroySparkResources_Master(output, serviceBrokerNamespace)
@@ -87,20 +88,21 @@ func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokera
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = oshandlder.NewElevenLengthID()
-	serviceInfo.Password = oshandlder.GenGUID()
+	//serviceInfo.User = oshandlder.NewElevenLengthID()
+	serviceInfo.Password = sparkSecret
 	
 	startSparkOrchestrationJob(&sparkOrchestrationJob{
 		cancelled:  false,
 		cancelChan: make(chan struct{}),
 		
-		isProvisioning: true,
-		serviceInfo:    &serviceInfo,
-		masterResources:  output,
-		slavesResources:    nil,
+		isProvisioning:    true,
+		serviceInfo:       &serviceInfo,
+		masterResources:   output,
+		slavesResources:   nil,
+		zeppelinResources: nil,
 	})
 	
-	serviceSpec.DashboardURL = "http://not-available-now"
+	serviceSpec.DashboardURL = output.webroute.Spec.Host
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -234,24 +236,93 @@ func (job *sparkOrchestrationJob) cancel() {
 	}
 }
 
-type watchPodStatus struct {
+type watchReplicationControllerStatus struct {
 	// The type of watch update contained in the message
 	Type string `json:"type"`
 	// Pod details
-	Object kapi.Pod `json:"object"`
+	Object kapi.ReplicationController `json:"object"`
 }
 
-
-//provisioning steps:
-//1. create first spark pod/service/route (aka. a single node spark cluster)
-//   watch pod status to running
-//2. modify spark acl (add root, remove gust, add bind role)
-//3. create HA resources
-//4. watch HA pods, when all are running, delete master pod
-//   (or add 2nd and 3rd spark pod, so no need to delete master pod)
-
 func (job *sparkOrchestrationJob) run() {
-
+	serviceInfo := job.serviceInfo
+	rc := job.masterResources.masterrc
+	uri := "/namespaces/" + serviceInfo.Database + "/replicationcontrollers/" + rc.Name
+	statuses, cancel, err := oshandlder.OC().KWatch (uri)
+	if err != nil {
+		logger.Error("start watching master rc", err)
+		job.isProvisioning = false
+		destroySparkResources_Master (job.masterResources, serviceInfo.Database)
+		return
+	}
+	
+	for {
+		var status oshandlder.WatchStatus
+		select {
+		case <- job.cancelChan:
+			close(cancel)
+			return
+		case status, _ = <- statuses:
+			break
+		}
+		
+		if status.Err != nil {
+			close(cancel)
+			
+			logger.Error("watch master rc error", status.Err)
+			job.isProvisioning = false
+			destroySparkResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		} else {
+			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
+		}
+		
+		var wrcs watchReplicationControllerStatus
+		if err := json.Unmarshal(status.Info, &wrcs); err != nil {
+			close(cancel)
+			
+			logger.Error("parse master rc status", err)
+			job.isProvisioning = false
+			destroySparkResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		}
+		
+		if wrcs.Object.Spec.Replicas == nil {
+			close(cancel)
+			
+			logger.Error("master rc error", err)
+			job.isProvisioning = false
+			destroySparkResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		}
+		
+		println("watch master rs status.replicas: ", wrcs.Object.Status.Replicas)
+		
+		if wrcs.Object.Status.Replicas >= *wrcs.Object.Spec.Replicas {
+			// master running now, to create worker resources
+			close(cancel)
+			break
+		}
+	}
+	
+	if job.cancelled { return }
+	
+	time.Sleep(7 * time.Second)
+	
+	if job.cancelled { return }
+	
+	// create worker resources
+	
+	err = job.createSparkResources_Workers (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	if err != nil {
+		// todo
+	}
+	
+	// create worker resources
+	
+	err = job.createSparkResources_Zeppelin (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	if err != nil {
+		// todo
+	}
 }
 
 //=======================================================================
@@ -260,7 +331,7 @@ func (job *sparkOrchestrationJob) run() {
 
 var SparkTemplateData_Master []byte = nil
 
-func loadSparkResources_Master(instanceID string, res *sparkResources_Master) error {
+func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResources_Master) error {
 	if SparkTemplateData_Master == nil {
 		f, err := os.Open("spark-master.yaml")
 		if err != nil {
@@ -270,12 +341,23 @@ func loadSparkResources_Master(instanceID string, res *sparkResources_Master) er
 		if err != nil {
 			return err
 		}
+		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			SparkTemplateData_Master = bytes.Replace(
+				SparkTemplateData_Master, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
+				-1)
+		}
 	}
 	
 	// todo: max length of res names in kubernetes is 24
 	
-	yamlTemplates := bytes.Replace(SparkTemplateData_Master, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates := SparkTemplateData_Master
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -294,7 +376,7 @@ func loadSparkResources_Master(instanceID string, res *sparkResources_Master) er
 
 var SparkTemplateData_Workers []byte = nil
 
-func loadSparkResources_Workers(instanceID, rootPassword string, res *sparkResources_Workers) error {
+func loadSparkResources_Workers(instanceID, sparkSecret string, res *sparkResources_Workers) error {
 	if SparkTemplateData_Workers == nil {
 		f, err := os.Open("spark-worker.yaml")
 		if err != nil {
@@ -308,8 +390,10 @@ func loadSparkResources_Workers(instanceID, rootPassword string, res *sparkResou
 	
 	// todo: max length of res names in kubernetes is 24
 	
-	yamlTemplates := bytes.Replace(SparkTemplateData_Workers, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
+	yamlTemplates := SparkTemplateData_Workers
+	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
 	
 	
 	//println("========= HA yamlTemplates ===========")
@@ -326,7 +410,7 @@ func loadSparkResources_Workers(instanceID, rootPassword string, res *sparkResou
 
 var SparkTemplateData_Zeppelin []byte = nil
 
-func loadSparkResources_Zeppelin(instanceID, rootPassword string, res *sparkResources_Zeppelin) error {
+func loadSparkResources_Zeppelin(instanceID, sparkSecret string, res *sparkResources_Zeppelin) error {
 	if SparkTemplateData_Zeppelin == nil {
 		f, err := os.Open("spark-zeppelin.yaml")
 		if err != nil {
@@ -336,13 +420,23 @@ func loadSparkResources_Zeppelin(instanceID, rootPassword string, res *sparkReso
 		if err != nil {
 			return err
 		}
+		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			SparkTemplateData_Zeppelin = bytes.Replace(
+				SparkTemplateData_Zeppelin, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
+				-1)
+		}
 	}
 	
 	// todo: max length of res names in kubernetes is 24
 	
-	yamlTemplates := bytes.Replace(SparkTemplateData_Zeppelin, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
+	yamlTemplates := SparkTemplateData_Zeppelin
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)	
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -375,9 +469,9 @@ type sparkResources_Zeppelin struct {
 	route  routeapi.Route
 }
 	
-func createSparkResources_Master (instanceId, serviceBrokerNamespace string) (*sparkResources_Master, error) {
+func createSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Master, error) {
 	var input sparkResources_Master
-	err := loadSparkResources_Master(instanceId, &input)
+	err := loadSparkResources_Master(instanceId, sparkSecret, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -401,11 +495,11 @@ func createSparkResources_Master (instanceId, serviceBrokerNamespace string) (*s
 	return &output, osr.Err
 }
 	
-func getSparkResources_Master (instanceId, serviceBrokerNamespace string) (*sparkResources_Master, error) {
+func getSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Master, error) {
 	var output sparkResources_Master
 	
 	var input sparkResources_Master
-	err := loadSparkResources_Master(instanceId, &input)
+	err := loadSparkResources_Master(instanceId, sparkSecret, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -435,9 +529,9 @@ func destroySparkResources_Master (masterRes *sparkResources_Master, serviceBrok
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.websvc.Name)}()
 }
 	
-func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serviceBrokerNamespace, rootPassword string) error {
+func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string) error {
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, rootPassword, &input)
+	err := loadSparkResources_Workers(instanceId, sparkSecret, &input)
 	if err != nil {
 		return err
 	}
@@ -452,11 +546,11 @@ func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serv
 	return nil
 }
 	
-func getSparkResources_Workers (instanceId, serviceBrokerNamespace, rootPassword string) (*sparkResources_Workers, error) {
+func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Workers, error) {
 	var output sparkResources_Workers
 	
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, rootPassword, &input)
+	err := loadSparkResources_Workers(instanceId, sparkSecret, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -480,36 +574,34 @@ func destroySparkResources_Workers (haRes *sparkResources_Workers, serviceBroker
 	go func() {kdel (serviceBrokerNamespace, "replicationcontrollers", haRes.workerrc.Name)}()
 }
 	
-func createSparkResources_Zeppelin (instanceId, serviceBrokerNamespace string) (*sparkResources_Zeppelin, error) {
+func (job *sparkOrchestrationJob) createSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret string) error {
 	var input sparkResources_Zeppelin
-	err := loadSparkResources_Zeppelin(instanceId, &input)
+	err := loadSparkResources_Zeppelin(instanceId, sparkSecret, &input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	
 	var output sparkResources_Zeppelin
+	go func() {
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.svc, &output.svc); err != nil {
+			return
+		}
+		if err := job.opost (serviceBrokerNamespace, "routes", &input.route, &output.route); err != nil {
+			return
+		}
+	}()
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
-	
-	// here, not use job.post
-	prefix := "/namespaces/" + serviceBrokerNamespace
-	osr.
-		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
-		KPost(prefix + "/services", &input.svc, &output.svc).
-		OPost(prefix + "/routes", &input.route, &output.route)
-	
-	if osr.Err != nil {
-		logger.Error("createSparkResources_Zeppelin", osr.Err)
-	}
-	
-	return &output, osr.Err
+	return nil
 }
 
-func getSparkResources_Zeppelin (instanceId, serviceBrokerNamespace string) (*sparkResources_Zeppelin, error) {
+func getSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Zeppelin, error) {
 	var output sparkResources_Zeppelin
 	
 	var input sparkResources_Zeppelin
-	err := loadSparkResources_Zeppelin(instanceId, &input)
+	err := loadSparkResources_Zeppelin(instanceId, sparkSecret, &input)
 	if err != nil {
 		return &output, err
 	}

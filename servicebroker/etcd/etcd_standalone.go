@@ -507,6 +507,7 @@ func (job *etcdOrchestrationJob) run() {
 	// create HA resources
 	
 	err = job.createEtcdResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	// todo: if err != nil
 	
 	// delete boot pod
 	//println("to delete boot pod ...")
@@ -565,8 +566,9 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 	
 	// todo: max length of res names in kubernetes is 24
 	
-	yamlTemplates := bytes.Replace(EtcdTemplateData_Boot, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates := EtcdTemplateData_Boot
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -621,8 +623,7 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 	yamlTemplates := EtcdTemplateData_HA
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)
-	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rootPassword), -1)	
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
