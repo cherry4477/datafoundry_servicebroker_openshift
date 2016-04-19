@@ -23,7 +23,7 @@ import (
 	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 	
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd"
-	//_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
 )
 
 type myServiceBroker struct {
@@ -567,13 +567,22 @@ func etcdget(key string) (*client.Response, error) {
 }
 
 func etcdset(key string, value string) (*client.Response, error) {
+	n := 5
+	
+RETRY:
 	resp, err := etcdapi.Set(context.Background(), key, value, nil)
 	if err != nil {
 		logger.Error("Can not set "+key+" from etcd", err)
+		n --
+		if n > 0 {
+			goto RETRY
+		}
+		
+		return nil, err
 	} else {
 		logger.Debug("Successful set " + key + " from etcd. value is " + value)
+		return resp, nil
 	}
-	return resp, err
 }
 
 func findServiceNameInCatalog(service_id string) string {

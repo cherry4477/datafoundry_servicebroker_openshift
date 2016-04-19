@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"net"
+	//"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
@@ -323,13 +323,6 @@ func (job *sparkOrchestrationJob) cancel() {
 	}
 }
 
-type watchReplicationControllerStatus struct {
-	// The type of watch update contained in the message
-	Type string `json:"type"`
-	// Pod details
-	Object kapi.ReplicationController `json:"object"`
-}
-
 func (job *sparkOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
 	rc := job.masterResources.masterrc
@@ -385,9 +378,15 @@ func (job *sparkOrchestrationJob) run() {
 		println("watch master rs status.replicas: ", wrcs.Object.Status.Replicas)
 		
 		if wrcs.Object.Status.Replicas >= *wrcs.Object.Spec.Replicas {
-			// master running now, to create worker resources
-			close(cancel)
-			break
+			n, _ := statRunningPodsByLabels (serviceInfo.Database, wrcs.Object.Labels)
+			
+			println("wrcs.Object.Status.Replicas = ", wrcs.Object.Status.Replicas, ", running pods = ", n)
+			
+			if n >= *wrcs.Object.Spec.Replicas {
+				// master running now, to create worker resources
+				close(cancel)
+				break
+			}
 		}
 	}
 	
@@ -397,18 +396,24 @@ func (job *sparkOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-	// create worker resources
+	// ...
+	
+	println("to create workers resources")
 	
 	err = job.createSparkResources_Workers (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	if err != nil {
-		// todo
+		logger.Error("create workers resources error", err)
+		return
 	}
 	
-	// create worker resources
+	// ...
+	
+	println("to create zeppelin resources")
 	
 	err = job.createSparkResources_Zeppelin (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 	if err != nil {
-		// todo
+		logger.Error("create zeppelin resources error", err)
+		return
 	}
 }
 
@@ -898,6 +903,34 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 type watchReplicationControllerStatus struct {
 	// The type of watch update contained in the message
 	Type string `json:"type"`
-	// Pod details
+	// RC details
 	Object kapi.ReplicationController `json:"object"`
+}
+
+func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
+	
+	println("to list pods in", serviceBrokerNamespace)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	
+	pods := kapi.PodList{}
+	
+	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KList(uri, labels, &pods)
+	if osr.Err != nil {
+		return 0, osr.Err
+	}
+	
+	nrunnings := 0
+	
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		
+		println("\n pods.Items[", i, "].Status.Phase =", pod.Status.Phase, "\n")
+		
+		if pod.Status.Phase == kapi.PodRunning {
+			nrunnings ++
+		}
+	}
+	
+	return nrunnings, nil
 }

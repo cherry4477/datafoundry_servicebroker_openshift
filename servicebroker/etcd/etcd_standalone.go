@@ -996,6 +996,6 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 type watchReplicationControllerStatus struct {
 	// The type of watch update contained in the message
 	Type string `json:"type"`
-	// Pod details
+	// RC details
 	Object kapi.ReplicationController `json:"object"`
 }

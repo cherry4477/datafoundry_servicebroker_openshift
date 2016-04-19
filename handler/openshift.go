@@ -6,14 +6,14 @@ import (
 	//marathon "github.com/gambol99/go-marathon"
 	//"github.com/pivotal-cf/brokerapi"
 	"time"
-	//"strings"
+	"strings"
 	"bytes"
 	"bufio"
 	//"io"
 	"io/ioutil"
 	"crypto/tls"
 	"net/http"
-	//"net/url"
+	neturl "net/url"
 	"encoding/base64"
 	"encoding/base32"
 	"encoding/json"
@@ -243,7 +243,39 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	return osr
 }
 
+func buildUriWithSelector(uri string, selector map[string]string) string {
+	var buf bytes.Buffer
+	for k, v := range selector {
+		if buf.Len() > 0 {
+			buf.WriteByte(',')
+		}
+		buf.WriteString(k)
+		buf.WriteByte('=')
+		buf.WriteString(v)
+	}
+	
+	if buf.Len() == 0 {
+		return uri
+	}
+	
+	values := neturl.Values{}
+	values.Set("labelSelector", buf.String())
+	
+	if strings.IndexByte(uri, '?') < 0 {
+		uri = uri + "?"
+	}
+	
+	println("\n uri=", uri + values.Encode(), "\n")
+	
+	return uri + values.Encode()
+}
+
 // o 
+
+func (osr *OpenshiftREST) OList (uri string, selector map[string]string, into interface{}) *OpenshiftREST {
+	
+	return osr.doRequest("GET", osr.oc.oapiUrl + buildUriWithSelector(uri, selector), nil, into)
+}
 
 func (osr *OpenshiftREST) OGet (uri string, into interface{}) *OpenshiftREST {
 	return osr.doRequest("GET", osr.oc.oapiUrl + uri, nil, into)
@@ -262,6 +294,10 @@ func (osr *OpenshiftREST) OPut (uri string, body interface{}, into interface{}) 
 }
 
 // k 
+
+func (osr *OpenshiftREST) KList (uri string, selector map[string]string, into interface{}) *OpenshiftREST {
+	return osr.doRequest("GET", osr.oc.kapiUrl + buildUriWithSelector(uri, selector), nil, into)
+}
 
 func (osr *OpenshiftREST) KGet (uri string, into interface{}) *OpenshiftREST {
 	return osr.doRequest("GET", osr.oc.kapiUrl + uri, nil, into)
