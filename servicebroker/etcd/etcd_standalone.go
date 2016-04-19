@@ -36,7 +36,7 @@ import (
 // 
 //==============================================================
 
-const EtcdServcieBrokerName_Standalone = "etcd_openshift_standalone"
+const EtcdServcieBrokerName_Standalone = "ETCD_standalone"
 
 func init() {
 	oshandlder.Register(EtcdServcieBrokerName_Standalone, &Etcd_sampleHandler{})

@@ -105,6 +105,7 @@ func (myBroker *myServiceBroker) Services() []brokerapi.Service {
 	resp, err := etcdapi.Get(context.Background(), "/servicebroker/"+servcieBrokerName+"/catalog", &client.GetOptions{Recursive: true}) //改为环境变量
 	if err != nil {
 		logger.Error("Can not get catalog information from etcd", err) //所有这些出错消息最好命名为常量，放到开始的时候
+		return []brokerapi.Service{}
 	} else {
 		logger.Debug("Successful get catalog information from etcd. NodeInfo is " + resp.Node.Key)
 	}

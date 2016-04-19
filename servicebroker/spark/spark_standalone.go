@@ -35,8 +35,8 @@ import (
 // 
 //==============================================================
 
-const SparkServcieBrokerName_Free = "spark_openshift_free"
-const SparkServcieBrokerName_HighAvailable = "spark_openshift_highavailable"
+const SparkServcieBrokerName_Free = "Spark_One_Worker"
+const SparkServcieBrokerName_HighAvailable = "Spark_Three_Workers"
 
 func init() {
 	oshandlder.Register(SparkServcieBrokerName_Free, &Spark_freeHandler{})
@@ -610,7 +610,7 @@ func getSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret s
 func destroySparkResources_Master (masterRes *sparkResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "replicationcontrollers", masterRes.masterrc.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.masterrc)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.mastersvc.Name)}()
 	go func() {odel (serviceBrokerNamespace, "routes", masterRes.webroute.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.websvc.Name)}()
@@ -658,7 +658,7 @@ func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret 
 func destroySparkResources_Workers (haRes *sparkResources_Workers, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 	
-	go func() {kdel (serviceBrokerNamespace, "replicationcontrollers", haRes.workerrc.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &haRes.workerrc)}()
 }
 	
 func (job *sparkOrchestrationJob) createSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret string) error {
@@ -711,7 +711,7 @@ func getSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret
 func destroySparkResources_Zeppelin (zeppelinRes *sparkResources_Zeppelin, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "replicationcontrollers", zeppelinRes.rc.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &zeppelinRes.rc)}()
 	go func() {kdel (serviceBrokerNamespace, "services", zeppelinRes.svc.Name)}()
 	go func() {odel (serviceBrokerNamespace, "routes", zeppelinRes.route.Name)}()
 }
