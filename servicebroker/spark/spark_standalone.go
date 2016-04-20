@@ -193,6 +193,8 @@ func (handler *Spark_Handler) DoLastOperation(myServiceInfo *oshandlder.ServiceI
 	
 	workers_res, _ := getSparkResources_Workers (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password, handler.numWorkers)
 	
+	// todo: stat running workers pods 
+	
 	if workers_res.workerrc.Name == "" || workers_res.workerrc.Spec.Replicas == nil || workers_res.workerrc.Status.Replicas < *workers_res.workerrc.Spec.Replicas {
 		return brokerapi.LastOperation{
 			State:       brokerapi.InProgress,
@@ -246,6 +248,8 @@ func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bind
 	master_res, _ := getSparkResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	
 	zeppelin_res, _ := getSparkResources_Zeppelin (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	
+	// todo: check if pods are created and running, return error on false.
 	
 	mycredentials := oshandlder.Credentials{
 		Uri:      "http://" + zeppelin_res.route.Spec.Host,
@@ -366,7 +370,7 @@ func (job *sparkOrchestrationJob) run() {
 			return
 		}
 		
-		if wrcs.Object.Spec.Replicas == nil {
+		if wrcs.Object.Spec.Replicas == nil { // should not happen
 			close(cancel)
 			
 			logger.Error("master rc error", err)
@@ -389,6 +393,28 @@ func (job *sparkOrchestrationJob) run() {
 			}
 		}
 	}
+	
+	// wait util master pod is running
+	
+	for {
+		if job.cancelled { return }
+		
+		// 
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
+			
+		println("running pods = ", n)
+		
+		if n >= *rc.Spec.Replicas {
+			// master running now, to create worker resources
+			close(cancel)
+			break
+		}
+		
+		// 
+		time.Sleep(10 * time.Second)
+	}
+	
+	// ...
 	
 	if job.cancelled { return }
 	

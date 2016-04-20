@@ -427,6 +427,10 @@ func (job *etcdOrchestrationJob) run() {
 		}
 	}
 	
+	// todo: check if seed pod is running
+	
+	// ...
+	
 	if job.cancelled { return }
 	
 	time.Sleep(7 * time.Second)
