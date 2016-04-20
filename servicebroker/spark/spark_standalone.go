@@ -382,15 +382,8 @@ func (job *sparkOrchestrationJob) run() {
 		println("watch master rs status.replicas: ", wrcs.Object.Status.Replicas)
 		
 		if wrcs.Object.Status.Replicas >= *wrcs.Object.Spec.Replicas {
-			n, _ := statRunningPodsByLabels (serviceInfo.Database, wrcs.Object.Labels)
-			
-			println("wrcs.Object.Status.Replicas = ", wrcs.Object.Status.Replicas, ", running pods = ", n)
-			
-			if n >= *wrcs.Object.Spec.Replicas {
-				// master running now, to create worker resources
-				close(cancel)
-				break
-			}
+			close(cancel)
+			break
 		}
 	}
 	
