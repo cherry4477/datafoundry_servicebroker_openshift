@@ -398,8 +398,6 @@ func (job *sparkOrchestrationJob) run() {
 		println("running pods = ", n)
 		
 		if n >= *rc.Spec.Replicas {
-			// master running now, to create worker resources
-			close(cancel)
 			break
 		}
 		
