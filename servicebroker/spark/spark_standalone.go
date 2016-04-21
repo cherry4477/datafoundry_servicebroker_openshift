@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	//"net"
+	"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
@@ -161,7 +161,11 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 		zeppelinResources: nil,
 	})
 	
-	serviceSpec.DashboardURL = output.webroute.Spec.Host
+	master_web_host := output.webroute.Spec.Host
+	master_web_port := "80" // strconv.Itoa(master_res.mastersvc.Spec.Ports[0].Port)
+	master_web_uri := "http://" + net.JoinHostPort(master_web_host, master_web_port)
+	
+	serviceSpec.DashboardURL = master_web_uri
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -251,10 +255,17 @@ func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bind
 	
 	// todo: check if pods are created and running, return error on false.
 	
+	master_host := master_res.webroute.Spec.Host
+	master_port := strconv.Itoa(master_res.mastersvc.Spec.Ports[0].Port)
+	master_uri := "spark://" + net.JoinHostPort(master_host, master_port)
+	zeppelin_host := zeppelin_res.route.Spec.Host
+	zeppelin_port := "80"
+	zeppelin_uri := "http://" + net.JoinHostPort(zeppelin_host, zeppelin_port)
+	
 	mycredentials := oshandlder.Credentials{
-		Uri:      "http://" + zeppelin_res.route.Spec.Host,
-		Hostname: master_res.webroute.Spec.Host,
-		Port:     "80",
+		Uri:      fmt.Sprintf("spark: %s zeppelin: %s", master_uri, zeppelin_uri),
+		Hostname: master_host,
+		Port:     master_port,
 		Username: "",
 		Password: myServiceInfo.Password,
 	}
