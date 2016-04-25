@@ -24,6 +24,7 @@ import (
 	
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
 )
 
 type myServiceBroker struct {

@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk
+spec:
+  ports:
+    - name: client
+      port: 2181
+  selector:
+    service-broker: sb-instanceid-zk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-1
+spec:
+  ports:
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-2
+spec:
+  ports:
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-3
+spec:
+  ports:
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "3"
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-1
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "1"
+    spec:
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: wal
+          emptyDir:
+            medium: Memory
+      containers:
+        - name: server
+          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          env:
+            - name: MYID
+              value: "1"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+            - mountPath: /zookeeper/wal
+              name: wal
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "2"
+    spec:
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: wal
+          emptyDir:
+            medium: Memory
+      containers:
+        - name: server
+          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          env:
+            - name: MYID
+              value: "2"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+            - mountPath: /zookeeper/wal
+              name: wal
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-3
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "3"
+    spec:
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: wal
+          emptyDir:
+            medium: Memory
+      containers:
+        - name: server
+          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          env:
+            - name: MYID
+              value: "3"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+            - mountPath: /zookeeper/wal
+              name: wal

@@ -113,17 +113,22 @@ func OC() *OpenshiftClient {
 	return theOC
 }
 
-func EtcdImage() string {
-	return etcdImage
-}
-
 func EndPointSuffix() string {
 	return endpointSuffix
 }
 
+func EtcdImage() string {
+	return etcdImage
+}
+
+func ZookeeperImage() string {
+	return zookeeperImage
+}
+
 var theOC *OpenshiftClient
-var etcdImage string
 var endpointSuffix string
+var etcdImage string
+var zookeeperImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -133,8 +138,9 @@ func init() {
 		getenv("SBNAMESPACE"),
 	)
 	
-	etcdImage = getenv("ETCDIMAGE")
 	endpointSuffix = getenv("ENDPOINTSUFFIX")
+	etcdImage = getenv("ETCDIMAGE")
+	zookeeperImage = getenv("ZOOKEEPERIMAGE")
 }
 
 
