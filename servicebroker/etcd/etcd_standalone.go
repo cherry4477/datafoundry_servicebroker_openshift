@@ -132,31 +132,26 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandlder.Ser
 	
 	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
 	
-	ok := func(rc *kapi.ReplicationController) int {
+	ok := func(rc *kapi.ReplicationController) bool {
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			return 0
+			return false
 		}
-		return 1
+		return true
 	}
 	
 	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	
-	num_ok_rcs := 0
-	num_ok_rcs += ok (&ha_res.etcdrc1)
-	num_ok_rcs += ok (&ha_res.etcdrc2)
-	num_ok_rcs += ok (&ha_res.etcdrc3)
-	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if num_ok_rcs < 3 {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "In progress.",
-		}, nil
-	} else {
+	if ok (&ha_res.etcdrc1) && ok (&ha_res.etcdrc2) && ok (&ha_res.etcdrc3) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
+		}, nil
+	} else {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
 		}, nil
 	}
 }

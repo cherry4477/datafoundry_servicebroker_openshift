@@ -136,43 +136,31 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandlder.Serv
 	
 	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	
-	
-	
-	
-	//ok := func(rc *kapi.ReplicationController) int {
+	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-	//		return 0
+	//		return false
 	//	}
-	//	return 1
+	//	return true
 	//}
-	ok := func(rc *kapi.ReplicationController) int {
-		
+	ok := func(rc *kapi.ReplicationController) bool {
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			return 0
+			return false
 		}
 		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
-		if n < *rc.Spec.Replicas {
-			return 0
-		}
-		return 1
+		return n >= *rc.Spec.Replicas
 	}
-	
-	num_ok_rcs := 0
-	num_ok_rcs += ok (&master_res.rc1)
-	num_ok_rcs += ok (&master_res.rc2)
-	num_ok_rcs += ok (&master_res.rc3)
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if num_ok_rcs < 3 {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "In progress.",
-		}, nil
-	} else {
+	if ok (&master_res.rc1) && ok (&master_res.rc2) && ok (&master_res.rc3) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
+		}, nil
+	} else {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
 		}, nil
 	}
 }
@@ -182,6 +170,11 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandlder.Servic
 	println("to destroy resources")
 	
 	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	// under current frame, it is not a good idea to return here
+	//if err != nil {
+	//	return brokerapi.IsAsync(false), err
+	//}
+	
 	destroyZookeeperResources_Master (master_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil
