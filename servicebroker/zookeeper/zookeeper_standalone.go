@@ -3,7 +3,7 @@ package zookeeper
 
 import (
 	"fmt"
-	//"errors"
+	"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -186,8 +186,13 @@ func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, b
 	
 	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	
+	client_port := oshandler.GetServicePortByName(&master_res.service, "client")
+	if client_port == nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("client port not found")
+	}
+	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(master_res.service.Spec.Ports[0].Port)
+	port := strconv.Itoa(client_port.Port)
 	
 	mycredentials := oshandler.Credentials{
 		Uri:      "",

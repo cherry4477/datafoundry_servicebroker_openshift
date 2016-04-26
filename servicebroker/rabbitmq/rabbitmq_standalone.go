@@ -3,7 +3,7 @@ package rabbitmq
 
 import (
 	"fmt"
-	//"errors"
+	"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -12,7 +12,7 @@ import (
 	"net"
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
-	//"strconv"
+	"strconv"
 	"strings"
 	"bytes"
 	"encoding/json"
@@ -188,15 +188,15 @@ func (handler *Rabbitmq_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	//svcport := oshandler.GetServicePortByName(&master_res.service, "mq")
-	//if svcport == nil {
-	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("port with name mq is not found in service")
-	//}
-	//
-	//host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	//port := strconv.Itoa(port.Port)
-	host := master_res.routeMQ.Spec.Host
-	port := "80"
+	mq_port := oshandler.GetServicePortByName(&master_res.service, "mq")
+	if mq_port == nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+	}
+	
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
+	port := strconv.Itoa(mq_port.Port)
+	//host := master_res.routeMQ.Spec.Host
+	//port := "80"
 	
 	mycredentials := oshandler.Credentials{
 		Uri:      fmt.Sprintf("amqp://%s:%s@%s:%s", myServiceInfo.User, myServiceInfo.Password, host, port),
@@ -261,7 +261,7 @@ func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword str
 	decoder.
 		Decode(&res.rc).
 		Decode(&res.routeAdmin).
-		Decode(&res.routeMQ).
+		//Decode(&res.routeMQ).
 		Decode(&res.service)
 	
 	return decoder.Err
@@ -270,7 +270,7 @@ func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword str
 type rabbitmqResources_Master struct {
 	rc         kapi.ReplicationController
 	routeAdmin routeapi.Route
-	routeMQ    routeapi.Route
+	//routeMQ    routeapi.Route
 	service    kapi.Service
 }
 	
@@ -290,7 +290,7 @@ func createRabbitmqResources_Master (instanceId, serviceBrokerNamespace, rabbitm
 	osr.
 		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
 		OPost(prefix + "/routes", &input.routeAdmin, &output.routeAdmin).
-		OPost(prefix + "/routes", &input.routeMQ, &output.routeMQ).
+		//OPost(prefix + "/routes", &input.routeMQ, &output.routeMQ).
 		KPost(prefix + "/services", &input.service, &output.service)
 	
 	if osr.Err != nil {
@@ -315,7 +315,7 @@ func getRabbitmqResources_Master (instanceId, serviceBrokerNamespace, rabbitmqUs
 	osr.
 		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
 		OGet(prefix + "/routes/" + input.routeAdmin.Name, &output.routeAdmin).
-		OGet(prefix + "/routes/" + input.routeMQ.Name, &output.routeMQ).
+		//OGet(prefix + "/routes/" + input.routeMQ.Name, &output.routeMQ).
 		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
 	if osr.Err != nil {
@@ -330,7 +330,7 @@ func destroyRabbitmqResources_Master (masterRes *rabbitmqResources_Master, servi
 
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
 	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeAdmin.Name)}()
-	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeMQ.Name)}()
+	//go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeMQ.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
 }
 
