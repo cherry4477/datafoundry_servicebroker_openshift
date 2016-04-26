@@ -240,8 +240,8 @@ func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword 
 	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
 	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
 	
-	sum := sha1.Sum([]byte(zookeeperPassword))
-	zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum[:])
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%s", zookeeperUser, zookeeperPassword)))
+	zoo_password := fmt.Sprintf("%s:%s", zookeeperUser, base64.StdEncoding.EncodeToString (sum[:]))
 	
 	// todo: max length of res names in kubernetes is 24
 	
