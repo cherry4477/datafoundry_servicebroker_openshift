@@ -319,6 +319,23 @@ func (osr *OpenshiftREST) KPut (uri string, body interface{}, into interface{}) 
 // 
 //===============================================================
 
+func GetServicePortByName(service *kapi.Service, name string) *kapi.ServicePort {
+	if service != nil {
+		for i := range service.Spec.Ports {
+			port := &service.Spec.Ports[i]
+			if port.Name == name {
+				return port
+			}
+		}
+	}
+	
+	return nil
+}
+
+//===============================================================
+// 
+//===============================================================
+
 // maybe the replace order is important, so using slice other than map would be better
 /*
 func Yaml2Json(yamlTemplates []byte, replaces map[string]string) ([][]byte, error) {

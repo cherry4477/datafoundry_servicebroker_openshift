@@ -1,23 +1,23 @@
-package zookeeper
+package rabbitmq
 
 
 import (
 	"fmt"
-	//"errors"
+	"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	//"net"
+	"net"
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	"strconv"
 	"strings"
 	"bytes"
 	"encoding/json"
-	"crypto/sha1"
-	"encoding/base64"
+	//"crypto/sha1"
+	//"encoding/base64"
 	//"text/template"
 	//"io"
 	"io/ioutil"
@@ -28,7 +28,7 @@ import (
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
-	//routeapi "github.com/openshift/origin/route/api/v1"
+	routeapi "github.com/openshift/origin/route/api/v1"
 	
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
@@ -37,12 +37,12 @@ import (
 // 
 //==============================================================
 
-const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_standalone"
+const RabbitmqServcieBrokerName_Standalone = "RabbitMQ_standalone"
 
 func init() {
-	oshandler.Register(ZookeeperServcieBrokerName_Standalone, &Zookeeper_freeHandler{})
+	oshandler.Register(RabbitmqServcieBrokerName_Standalone, &Rabbitmq_freeHandler{})
 	
-	logger = lager.NewLogger(ZookeeperServcieBrokerName_Standalone)
+	logger = lager.NewLogger(RabbitmqServcieBrokerName_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 }
 
@@ -52,40 +52,40 @@ var logger lager.Logger
 // 
 //==============================================================
 
-type Zookeeper_freeHandler struct{}
+type Rabbitmq_freeHandler struct{}
 
-func (handler *Zookeeper_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newZookeeperHandler().DoProvision(instanceID, details, asyncAllowed)
+func (handler *Rabbitmq_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRabbitmqHandler().DoProvision(instanceID, details, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
-	return newZookeeperHandler().DoLastOperation(myServiceInfo)
+func (handler *Rabbitmq_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+	return newRabbitmqHandler().DoLastOperation(myServiceInfo)
 }
 
-func (handler *Zookeeper_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	return newZookeeperHandler().DoDeprovision(myServiceInfo, asyncAllowed)
+func (handler *Rabbitmq_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	return newRabbitmqHandler().DoDeprovision(myServiceInfo, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
-	return newZookeeperHandler().DoBind(myServiceInfo, bindingID, details)
+func (handler *Rabbitmq_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+	return newRabbitmqHandler().DoBind(myServiceInfo, bindingID, details)
 }
 
-func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	return newZookeeperHandler().DoUnbind(myServiceInfo, mycredentials)
+func (handler *Rabbitmq_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+	return newRabbitmqHandler().DoUnbind(myServiceInfo, mycredentials)
 }
 
 //==============================================================
 // 
 //==============================================================
 
-type Zookeeper_Handler struct{
+type Rabbitmq_Handler struct{
 }
 
-func newZookeeperHandler() *Zookeeper_Handler {
-	return &Zookeeper_Handler{}
+func newRabbitmqHandler() *Rabbitmq_Handler {
+	return &Rabbitmq_Handler{}
 }
 
-func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -100,41 +100,41 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	zookeeperUser := "super" // oshandler.NewElevenLengthID()
-	zookeeperPassword := oshandler.GenGUID()
+	rabbitmqUser := oshandler.NewElevenLengthID()
+	rabbitmqPassword := oshandler.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 	
-	// master zookeeper
+	// master rabbitmq
 	
-	output, err := createZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+	output, err := createRabbitmqResources_Master(instanceIdInTempalte, serviceBrokerNamespace, rabbitmqUser, rabbitmqPassword)
 
 	if err != nil {
-		destroyZookeeperResources_Master(output, serviceBrokerNamespace)
+		destroyRabbitmqResources_Master(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
 	}
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = zookeeperUser
-	serviceInfo.Password = zookeeperPassword
+	serviceInfo.User = rabbitmqUser
+	serviceInfo.Password = rabbitmqPassword
 	
-	serviceSpec.DashboardURL = ""
+	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 	
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Rabbitmq_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
 	// assume in provisioning
 	
 	// the job may be finished or interrupted or running in another instance.
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -152,7 +152,7 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if ok (&master_res.rc1) && ok (&master_res.rc2) && ok (&master_res.rc3) {
+	if ok (&master_res.rc) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -165,34 +165,38 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	}
 }
 
-func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Rabbitmq_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// ...
 	
 	println("to destroy resources")
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	// under current frame, it is not a good idea to return here
 	//if err != nil {
 	//	return brokerapi.IsAsync(false), err
 	//}
 	
-	destroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+	destroyRabbitmqResources_Master (master_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+func (handler *Rabbitmq_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	
+	port := oshandler.GetServicePortByName(&master_res.service, "mq")
+	if port == nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("port with name mq is not found in service")
+	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(master_res.service.Spec.Ports[0].Port)
 	
 	mycredentials := oshandler.Credentials{
 		Uri:      "",
 		Hostname: host,
-		Port:     port,
+		Port:     strconv.Itoa(port.Port),
 		Username: myServiceInfo.User,
 		Password: myServiceInfo.Password,
 	}
@@ -202,7 +206,7 @@ func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, b
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+func (handler *Rabbitmq_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	// do nothing
 	
 	return nil
@@ -212,42 +216,36 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 // 
 //=======================================================================
 
-var ZookeeperTemplateData_Master []byte = nil
+var RabbitmqTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword string, res *zookeeperResources_Master) error {
-	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper.yaml")
+func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword string, res *rabbitmqResources_Master) error {
+	if RabbitmqTemplateData_Master == nil {
+		f, err := os.Open("rabbitmq.yaml")
 		if err != nil {
 			return err
 		}
-		ZookeeperTemplateData_Master, err = ioutil.ReadAll(f)
+		RabbitmqTemplateData_Master, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
-		zookeeper_image := oshandler.ZookeeperImage()
-		zookeeper_image = strings.TrimSpace(zookeeper_image)
-		if len(zookeeper_image) > 0 {
-			ZookeeperTemplateData_Master = bytes.Replace(
-				ZookeeperTemplateData_Master, 
-				[]byte("http://etcd-image-place-holder/zookeeper-openshift-orchestration"), 
-				[]byte(zookeeper_image), 
+		endpoint_postfix := oshandler.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			RabbitmqTemplateData_Master = bytes.Replace(
+				RabbitmqTemplateData_Master, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
 				-1)
 		}
 	}
 	
 	// ...
 	
-	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
-	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
-	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
-	
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%s", zookeeperUser, zookeeperPassword)))
-	zoo_password := fmt.Sprintf("%s:%s", zookeeperUser, base64.StdEncoding.EncodeToString (sum[:]))
-	
-	yamlTemplates := ZookeeperTemplateData_Master
+	yamlTemplates := RabbitmqTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user1234"), []byte(rabbitmqUser), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(rabbitmqPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -256,62 +254,49 @@ func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword 
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.service).
-		Decode(&res.svc1).
-		Decode(&res.svc2).
-		Decode(&res.svc3).
-		Decode(&res.rc1).
-		Decode(&res.rc2).
-		Decode(&res.rc3)
+		Decode(&res.rc).
+		Decode(&res.route).
+		Decode(&res.service)
 	
 	return decoder.Err
 }
 
-type zookeeperResources_Master struct {
+type rabbitmqResources_Master struct {
+	rc      kapi.ReplicationController
+	route   routeapi.Route
 	service kapi.Service
-	
-	svc1  kapi.Service
-	svc2  kapi.Service
-	svc3  kapi.Service
-	rc1   kapi.ReplicationController
-	rc2   kapi.ReplicationController
-	rc3   kapi.ReplicationController
 }
 	
-func createZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var input zookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+func createRabbitmqResources_Master (instanceId, serviceBrokerNamespace, rabbitmqUser, rabbitmqPassword string) (*rabbitmqResources_Master, error) {
+	var input rabbitmqResources_Master
+	err := loadRabbitmqResources_Master(instanceId, rabbitmqUser, rabbitmqPassword, &input)
 	if err != nil {
 		return nil, err
 	}
 	
-	var output zookeeperResources_Master
+	var output rabbitmqResources_Master
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
-		KPost(prefix + "/services", &input.svc1, &output.svc1).
-		KPost(prefix + "/services", &input.svc2, &output.svc2).
-		KPost(prefix + "/services", &input.svc3, &output.svc3).
-		KPost(prefix + "/replicationcontrollers", &input.rc1, &output.rc1).
-		KPost(prefix + "/replicationcontrollers", &input.rc2, &output.rc2).
-		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3)
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
+		OPost(prefix + "/routes", &input.route, &output.route).
+		KPost(prefix + "/services", &input.service, &output.service)
 	
 	if osr.Err != nil {
-		logger.Error("createZookeeperResources_Master", osr.Err)
+		logger.Error("createRabbitmqResources_Master", osr.Err)
 	}
 	
 	return &output, osr.Err
 }
 	
-func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var output zookeeperResources_Master
+func getRabbitmqResources_Master (instanceId, serviceBrokerNamespace, rabbitmqUser, rabbitmqPassword string) (*rabbitmqResources_Master, error) {
+	var output rabbitmqResources_Master
 	
-	var input zookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+	var input rabbitmqResources_Master
+	err := loadRabbitmqResources_Master(instanceId, rabbitmqUser, rabbitmqPassword, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -320,31 +305,23 @@ func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeper
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.service.Name, &output.service).
-		KGet(prefix + "/services/" + input.svc1.Name, &output.svc1).
-		KGet(prefix + "/services/" + input.svc2.Name, &output.svc2).
-		KGet(prefix + "/services/" + input.svc3.Name, &output.svc3).
-		KGet(prefix + "/replicationcontrollers/" + input.rc1.Name, &output.rc1).
-		KGet(prefix + "/replicationcontrollers/" + input.rc2.Name, &output.rc2).
-		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3)
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
+		KGet(prefix + "/routes/" + input.route.Name, &output.route).
+		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
 	if osr.Err != nil {
-		logger.Error("getZookeeperResources_Master", osr.Err)
+		logger.Error("getRabbitmqResources_Master", osr.Err)
 	}
 	
 	return &output, osr.Err
 }
 
-func destroyZookeeperResources_Master (masterRes *zookeeperResources_Master, serviceBrokerNamespace string) {
+func destroyRabbitmqResources_Master (masterRes *rabbitmqResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
+	go func() {kdel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc1.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc2.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc3.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc1)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc2)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc3)}()
 }
 
 //===============================================================
@@ -493,11 +470,11 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 			status, _ := <- statuses
 			
 			if status.Err != nil {
-				logger.Error("watch HA zookeeper rc error", status.Err)
+				logger.Error("watch HA rabbitmq rc error", status.Err)
 				close(cancel)
 				return
 			} else {
-				//logger.Debug("watch zookeeper HA rc, status.Info: " + string(status.Info))
+				//logger.Debug("watch rabbitmq HA rc, status.Info: " + string(status.Info))
 			}
 			
 			var wrcs watchReplicationControllerStatus
@@ -555,7 +532,7 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	return nrunnings, nil
 }
 
-// todo: set ACL: https://godoc.org/github.com/samuel/go-zookeeper/zk#Conn.SetACL 
+// todo: set ACL: https://godoc.org/github.com/samuel/go-rabbitmq/zk#Conn.SetACL 
 
 /*
 bin/zkCli.sh 127.0.0.1:2181

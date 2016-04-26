@@ -28,7 +28,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	routeapi "github.com/openshift/origin/route/api/v1"
 	
-	oshandlder "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
+	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
 
 //==============================================================
@@ -39,8 +39,8 @@ const SparkServcieBrokerName_Free = "Spark_One_Worker"
 const SparkServcieBrokerName_HighAvailable = "Spark_Three_Workers"
 
 func init() {
-	oshandlder.Register(SparkServcieBrokerName_Free, &Spark_freeHandler{})
-	oshandlder.Register(SparkServcieBrokerName_HighAvailable, &Spark_haHandler{})
+	oshandler.Register(SparkServcieBrokerName_Free, &Spark_freeHandler{})
+	oshandler.Register(SparkServcieBrokerName_HighAvailable, &Spark_haHandler{})
 	
 	logger = lager.NewLogger("spark_openshift")
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
@@ -54,23 +54,23 @@ var logger lager.Logger
 
 type Spark_freeHandler struct{}
 
-func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
+func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	return newSparkHandler(1).DoProvision(instanceID, details, asyncAllowed)
 }
 
-func (handler *Spark_freeHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Spark_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	return newSparkHandler(1).DoLastOperation(myServiceInfo)
 }
 
-func (handler *Spark_freeHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Spark_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	return newSparkHandler(1).DoDeprovision(myServiceInfo, asyncAllowed)
 }
 
-func (handler *Spark_freeHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+func (handler *Spark_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	return newSparkHandler(1).DoBind(myServiceInfo, bindingID, details)
 }
 
-func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	return newSparkHandler(1).DoUnbind(myServiceInfo, mycredentials)
 }
 
@@ -78,23 +78,23 @@ func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo
 
 type Spark_haHandler struct{}
 
-func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
+func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	return newSparkHandler(3).DoProvision(instanceID, details, asyncAllowed)
 }
 
-func (handler *Spark_haHandler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Spark_haHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	return newSparkHandler(3).DoLastOperation(myServiceInfo)
 }
 
-func (handler *Spark_haHandler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Spark_haHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	return newSparkHandler(3).DoDeprovision(myServiceInfo, asyncAllowed)
 }
 
-func (handler *Spark_haHandler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+func (handler *Spark_haHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	return newSparkHandler(3).DoBind(myServiceInfo, bindingID, details)
 }
 
-func (handler *Spark_haHandler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+func (handler *Spark_haHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	return newSparkHandler(3).DoUnbind(myServiceInfo, mycredentials)
 }
 
@@ -112,11 +112,11 @@ func newSparkHandler(numWorkers int) *Spark_Handler {
 		}
 }
 
-func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandlder.ServiceInfo, error) {
+func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
-	serviceInfo := oshandlder.ServiceInfo{}
+	serviceInfo := oshandler.ServiceInfo{}
 	
 	//if asyncAllowed == false {
 	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
@@ -124,10 +124,10 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 	serviceSpec.IsAsync = true
 	
 	//instanceIdInTempalte   := instanceID // todo: ok?
-	instanceIdInTempalte   := strings.ToLower(oshandlder.NewThirteenLengthID())
+	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
-	serviceBrokerNamespace := oshandlder.OC().Namespace()
-	sparkSecret := oshandlder.GenGUID()
+	serviceBrokerNamespace := oshandler.OC().Namespace()
+	sparkSecret := oshandler.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
@@ -146,7 +146,7 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	//serviceInfo.User = oshandlder.NewElevenLengthID()
+	//serviceInfo.User = oshandler.NewElevenLengthID()
 	serviceInfo.Password = sparkSecret
 	
 	startSparkOrchestrationJob(&sparkOrchestrationJob{
@@ -170,7 +170,7 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Spark_Handler) DoLastOperation(myServiceInfo *oshandlder.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Spark_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
 	job := getSparkOrchestrationJob (myServiceInfo.Url)
 	if job != nil {
@@ -214,7 +214,7 @@ func (handler *Spark_Handler) DoLastOperation(myServiceInfo *oshandlder.ServiceI
 	// todo: check zeppelin
 }
 
-func (handler *Spark_Handler) DoDeprovision(myServiceInfo *oshandlder.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Spark_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
 		job := getSparkOrchestrationJob (myServiceInfo.Url)
 		if job != nil {
@@ -246,7 +246,7 @@ func (handler *Spark_Handler) DoDeprovision(myServiceInfo *oshandlder.ServiceInf
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandlder.Credentials, error) {
+func (handler *Spark_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
 	master_res, _ := getSparkResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
@@ -262,7 +262,7 @@ func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bind
 	zeppelin_port := "80"
 	zeppelin_uri := "http://" + net.JoinHostPort(zeppelin_host, zeppelin_port)
 	
-	mycredentials := oshandlder.Credentials{
+	mycredentials := oshandler.Credentials{
 		Uri:      fmt.Sprintf("spark: %s zeppelin: %s", master_uri, zeppelin_uri),
 		Hostname: master_host,
 		Port:     master_port,
@@ -275,7 +275,7 @@ func (handler *Spark_Handler) DoBind(myServiceInfo *oshandlder.ServiceInfo, bind
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Spark_Handler) DoUnbind(myServiceInfo *oshandlder.ServiceInfo, mycredentials *oshandlder.Credentials) error {
+func (handler *Spark_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	// do nothing
 	
 	return nil
@@ -320,7 +320,7 @@ type sparkOrchestrationJob struct {
 	
 	isProvisioning bool // false for deprovisionings
 	
-	serviceInfo    *oshandlder.ServiceInfo
+	serviceInfo    *oshandler.ServiceInfo
 	planNumWorkers int
 	
 	masterResources *sparkResources_Master
@@ -342,7 +342,7 @@ func (job *sparkOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
 	rc := job.masterResources.masterrc
 	uri := "/namespaces/" + serviceInfo.Database + "/replicationcontrollers/" + rc.Name
-	statuses, cancel, err := oshandlder.OC().KWatch (uri)
+	statuses, cancel, err := oshandler.OC().KWatch (uri)
 	if err != nil {
 		logger.Error("start watching master rc", err)
 		job.isProvisioning = false
@@ -351,7 +351,7 @@ func (job *sparkOrchestrationJob) run() {
 	}
 	
 	for {
-		var status oshandlder.WatchStatus
+		var status oshandler.WatchStatus
 		select {
 		case <- job.cancelChan:
 			close(cancel)
@@ -461,7 +461,7 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 		if err != nil {
 			return err
 		}
-		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
 			SparkTemplateData_Master = bytes.Replace(
@@ -471,8 +471,6 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 				-1)
 		}
 	}
-	
-	// todo: max length of res names in kubernetes is 24
 	
 	yamlTemplates := SparkTemplateData_Master
 	
@@ -484,7 +482,7 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 	//println()
 
 	
-	decoder := oshandlder.NewYamlDecoder(yamlTemplates)
+	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.masterrc).
 		Decode(&res.mastersvc).
@@ -521,7 +519,7 @@ func loadSparkResources_Workers(instanceID, sparkSecret string, numWorkers int, 
 	//println()
 
 	
-	decoder := oshandlder.NewYamlDecoder(yamlTemplates)
+	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.workerrc)
 	
@@ -540,7 +538,7 @@ func loadSparkResources_Zeppelin(instanceID, sparkSecret string, res *sparkResou
 		if err != nil {
 			return err
 		}
-		endpoint_postfix := oshandlder.EndPointSuffix()
+		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
 			SparkTemplateData_Zeppelin = bytes.Replace(
@@ -563,7 +561,7 @@ func loadSparkResources_Zeppelin(instanceID, sparkSecret string, res *sparkResou
 	//println()
 
 	
-	decoder := oshandlder.NewYamlDecoder(yamlTemplates)
+	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.rc).
 		Decode(&res.svc).
@@ -598,7 +596,7 @@ func createSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecre
 	
 	var output sparkResources_Master
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
@@ -624,7 +622,7 @@ func getSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret s
 		return &output, err
 	}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -675,7 +673,7 @@ func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret 
 		return &output, err
 	}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -726,7 +724,7 @@ func getSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret
 		return &output, err
 	}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC())
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
@@ -763,7 +761,7 @@ RETRY:
 		return nil
 	}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KPost(uri, body, into)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
 	} else {
@@ -790,7 +788,7 @@ RETRY:
 		return nil
 	}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).OPost(uri, body, into)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).OPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
 	} else {
@@ -817,7 +815,7 @@ func kdel (serviceBrokerNamespace, typeName, resName string) error {
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
 RETRY:
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KDelete(uri, nil)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KDelete(uri, nil)
 	if osr.Err == nil {
 		logger.Info("delete " + uri + " succeeded")
 	} else {
@@ -844,7 +842,7 @@ func odel (serviceBrokerNamespace, typeName, resName string) error {
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
 RETRY:
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).ODelete(uri, nil)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).ODelete(uri, nil)
 	if osr.Err == nil {
 		logger.Info("delete " + uri + " succeeded")
 	} else {
@@ -882,7 +880,7 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	
 	zero := 0
 	rc.Spec.Replicas = &zero
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KPut(uri, rc, nil)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPut(uri, rc, nil)
 	if osr.Err != nil {
 		logger.Error("modify HA rc", osr.Err)
 		return
@@ -890,7 +888,7 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	
 	// start watching rc status
 	
-	statuses, cancel, err := oshandlder.OC().KWatch (uri)
+	statuses, cancel, err := oshandler.OC().KWatch (uri)
 	if err != nil {
 		logger.Error("start watching HA rc", err)
 		return
@@ -943,7 +941,7 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	
 	pods := kapi.PodList{}
 	
-	osr := oshandlder.NewOpenshiftREST(oshandlder.OC()).KList(uri, labels, &pods)
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
 	if osr.Err != nil {
 		return 0, osr.Err
 	}

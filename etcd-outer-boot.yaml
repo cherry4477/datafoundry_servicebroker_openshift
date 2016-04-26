@@ -8,7 +8,7 @@ metadata:
 spec:
   ports:
   - name: etcd-client-port
-    port: 80
+    port: 2379
     protocol: TCP
     targetPort: 2379
   selector:
