@@ -170,11 +170,10 @@ func (handler *Rabbitmq_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceI
 	
 	println("to destroy resources")
 	
-	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	// under current frame, it is not a good idea to return here
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
+	master_res, err := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		return brokerapi.IsAsync(false), err
+	}
 	
 	destroyRabbitmqResources_Master (master_res, myServiceInfo.Database)
 	
@@ -184,7 +183,10 @@ func (handler *Rabbitmq_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceI
 func (handler *Rabbitmq_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, err := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
 	
 	//svcport := oshandler.GetServicePortByName(&master_res.service, "mq")
 	//if svcport == nil {
@@ -197,7 +199,7 @@ func (handler *Rabbitmq_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bi
 	port := "80"
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      fmt.Sprintf("amqp://%s:%s@%s:%s", host, port, myServiceInfo.User, myServiceInfo.Password),
+		Uri:      fmt.Sprintf("amqp://%s:%s@%s:%s", myServiceInfo.User, myServiceInfo.Password, host, port),
 		Hostname: host,
 		Port:     port,
 		Username: myServiceInfo.User,
@@ -312,8 +314,8 @@ func getRabbitmqResources_Master (instanceId, serviceBrokerNamespace, rabbitmqUs
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
 		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
-		KGet(prefix + "/routes/" + input.routeAdmin.Name, &output.routeAdmin).
-		KGet(prefix + "/routes/" + input.routeMQ.Name, &output.routeMQ).
+		OGet(prefix + "/routes/" + input.routeAdmin.Name, &output.routeAdmin).
+		OGet(prefix + "/routes/" + input.routeMQ.Name, &output.routeMQ).
 		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
 	if osr.Err != nil {
@@ -327,8 +329,8 @@ func destroyRabbitmqResources_Master (masterRes *rabbitmqResources_Master, servi
 	// todo: add to retry queue on fail
 
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
-	go func() {kdel (serviceBrokerNamespace, "routes", masterRes.routeAdmin.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "routes", masterRes.routeMQ.Name)}()
+	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeAdmin.Name)}()
+	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeMQ.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
 }
 
