@@ -34,13 +34,28 @@ spec:
 apiVersion: v1
 kind: Route
 metadata:
+  name: sb-instanceid-rbbtmqa
+  labels:
+    servicebroker: sb-instanceid-rabbitmq-admin
+spec:
+  host: sb-instanceid-rabbitmq-admin.endpoint-postfix-place-holder
+  port:
+    targetPort: admin
+  to:
+    kind: Service
+    name: sb-instanceid-rbbtmq
+---
+#Route for mq
+apiVersion: v1
+kind: Route
+metadata:
   name: sb-instanceid-rbbtmq
   labels:
     servicebroker: sb-instanceid-rabbitmq
 spec:
   host: sb-instanceid-rabbitmq.endpoint-postfix-place-holder
   port:
-    targetPort: admin
+    targetPort: mq
   to:
     kind: Service
     name: sb-instanceid-rbbtmq
