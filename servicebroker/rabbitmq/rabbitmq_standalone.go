@@ -542,7 +542,7 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	return nrunnings, nil
 }
 
-// todo: set ACL: https://godoc.org/github.com/samuel/go-rabbitmq/zk#Conn.SetACL 
+// todo: 
 
 /*
 bin/zkCli.sh 127.0.0.1:2181
