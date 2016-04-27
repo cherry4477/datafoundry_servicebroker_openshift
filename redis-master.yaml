@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    sb-instanceid-redis: redis
+    sb-instanceid-sentinel: sentinel
+    servicebroker: sb-instanceid-redis
+  name: sb-instanceid-redisbt
+  #name: sb-instanceid-redisboot
+spec:
+  containers:
+    - name: master
+      image: http://etcd-image-place-holder/redis-openshift-orchestration
+      env:
+        - name: MASTER
+          value: "true"
+        - name: REDIS_PASSWORD
+          value: test1234
+      ports:
+        - containerPort: 6379
+      resources:
+        limits:
+          cpu: "0.1"
+      volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+    - name: sentinel
+      image: http://etcd-image-place-holder/redis-openshift-orchestration
+      env:
+        - name: SENTINEL
+          value: "true"
+        - name: SENTINEL_HOST
+          value: sb-instanceid-redis
+        - name: SENTINEL_PORT
+          value: "26379"
+        - name: REDIS_PASSWORD
+          value: test1234
+      ports:
+        - containerPort: 26379
+  volumes:
+    - name: data
+      emptyDir: {}

@@ -77,7 +77,7 @@ spec:
             medium: Memory
       containers:
         - name: server
-          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          image: http://zookeeper-image-place-holder/zookeeper-openshift-orchestration
           env:
             - name: MYID
               value: "1"
@@ -117,7 +117,7 @@ spec:
             medium: Memory
       containers:
         - name: server
-          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          image: http://zookeeper-image-place-holder/zookeeper-openshift-orchestration
           env:
             - name: MYID
               value: "2"
@@ -157,7 +157,7 @@ spec:
             medium: Memory
       containers:
         - name: server
-          image: http://etcd-image-place-holder/zookeeper-openshift-orchestration
+          image: http://zookeeper-image-place-holder/zookeeper-openshift-orchestration
           env:
             - name: MYID
               value: "3"

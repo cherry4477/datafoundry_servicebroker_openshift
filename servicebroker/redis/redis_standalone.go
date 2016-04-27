@@ -1,9 +1,9 @@
-package zookeeper
+package redis
 
 
 import (
 	"fmt"
-	"errors"
+	//"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -16,8 +16,8 @@ import (
 	"strings"
 	"bytes"
 	"encoding/json"
-	"crypto/sha1"
-	"encoding/base64"
+	//"crypto/sha1"
+	//"encoding/base64"
 	//"text/template"
 	//"io"
 	"io/ioutil"
@@ -37,12 +37,12 @@ import (
 // 
 //==============================================================
 
-const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_standalone"
+const RedisServcieBrokerName_Standalone = "Redis_standalone"
 
 func init() {
-	oshandler.Register(ZookeeperServcieBrokerName_Standalone, &Zookeeper_freeHandler{})
+	oshandler.Register(RedisServcieBrokerName_Standalone, &Redis_freeHandler{})
 	
-	logger = lager.NewLogger(ZookeeperServcieBrokerName_Standalone)
+	logger = lager.NewLogger(RedisServcieBrokerName_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 }
 
@@ -52,40 +52,40 @@ var logger lager.Logger
 // 
 //==============================================================
 
-type Zookeeper_freeHandler struct{}
+type Redis_freeHandler struct{}
 
-func (handler *Zookeeper_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newZookeeperHandler().DoProvision(instanceID, details, asyncAllowed)
+func (handler *Redis_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRedisHandler().DoProvision(instanceID, details, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
-	return newZookeeperHandler().DoLastOperation(myServiceInfo)
+func (handler *Redis_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+	return newRedisHandler().DoLastOperation(myServiceInfo)
 }
 
-func (handler *Zookeeper_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	return newZookeeperHandler().DoDeprovision(myServiceInfo, asyncAllowed)
+func (handler *Redis_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	return newRedisHandler().DoDeprovision(myServiceInfo, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
-	return newZookeeperHandler().DoBind(myServiceInfo, bindingID, details)
+func (handler *Redis_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+	return newRedisHandler().DoBind(myServiceInfo, bindingID, details)
 }
 
-func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	return newZookeeperHandler().DoUnbind(myServiceInfo, mycredentials)
+func (handler *Redis_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+	return newRedisHandler().DoUnbind(myServiceInfo, mycredentials)
 }
 
 //==============================================================
 // 
 //==============================================================
 
-type Zookeeper_Handler struct{
+type Redis_Handler struct{
 }
 
-func newZookeeperHandler() *Zookeeper_Handler {
-	return &Zookeeper_Handler{}
+func newRedisHandler() *Redis_Handler {
+	return &Redis_Handler{}
 }
 
-func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -100,41 +100,44 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	zookeeperUser := "super" // oshandler.NewElevenLengthID()
-	zookeeperPassword := oshandler.GenGUID()
+	//redisUser := oshandler.NewElevenLengthID()
+	redisPassword := oshandler.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 	
-	// master zookeeper
+	// master redis
 	
-	output, err := createZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+	output, err := createRedisResources_Master(instanceIdInTempalte, serviceBrokerNamespace, redisPassword)
 
 	if err != nil {
-		destroyZookeeperResources_Master(output, serviceBrokerNamespace)
+		destroyRedisResources_Master(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
 	}
 	
+	// todo: maybe it is better to create a new job
+	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = zookeeperUser
-	serviceInfo.Password = zookeeperPassword
+	//serviceInfo.User = redisUser
+	serviceInfo.Password = redisPassword
 	
 	serviceSpec.DashboardURL = ""
 	
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
 	// assume in provisioning
 	
 	// the job may be finished or interrupted or running in another instance.
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -152,7 +155,7 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if ok (&master_res.rc1) && ok (&master_res.rc2) && ok (&master_res.rc3) {
+	if master_res.pod.Status.Phase == kapi.PodRunning && ok (&more_res.rc) && ok (&more_res.rcSentinel) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -165,37 +168,47 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	}
 }
 
-func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// ...
 	
 	println("to destroy resources")
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	// under current frame, it is not a good idea to return here
+	master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	//if err != nil {
+	//	return brokerapi.IsAsync(false), err
+	//}
+	more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	//if err != nil {
 	//	return brokerapi.IsAsync(false), err
 	//}
 	
-	destroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+	destroyRedisResources_Master (master_res, myServiceInfo.Database)
+	
+	destroyRedisResources_More (more_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	
-	client_port := oshandler.GetServicePortByName(&master_res.service, "client")
-	if client_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("client port not found")
+	more_res, err := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(client_port.Port)
+	mq_port := &more_res.serviceSentinel.Spec.Ports[0]
+	//if mq_port == nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+	//}
+	
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", more_res.serviceSentinel.Name, myServiceInfo.Database)
+	port := strconv.Itoa(mq_port.Port)
+	//host := master_res.routeMQ.Spec.Host
+	//port := "80"
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      "",
+		Uri:      fmt.Sprintf("amqp://%s:%s@%s:%s", myServiceInfo.User, myServiceInfo.Password, host, port),
 		Hostname: host,
 		Port:     port,
 		Username: myServiceInfo.User,
@@ -207,7 +220,7 @@ func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, b
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+func (handler *Redis_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	// do nothing
 	
 	return nil
@@ -217,42 +230,35 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 // 
 //=======================================================================
 
-var ZookeeperTemplateData_Master []byte = nil
+var RedisTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword string, res *zookeeperResources_Master) error {
-	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper.yaml")
+func loadRedisResources_Master(instanceID, redisPassword string, res *redisResources_Master) error {
+	if RedisTemplateData_Master == nil {
+		f, err := os.Open("redis-master.yaml")
 		if err != nil {
 			return err
 		}
-		ZookeeperTemplateData_Master, err = ioutil.ReadAll(f)
+		RedisTemplateData_Master, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
-		zookeeper_image := oshandler.ZookeeperImage()
-		zookeeper_image = strings.TrimSpace(zookeeper_image)
-		if len(zookeeper_image) > 0 {
-			ZookeeperTemplateData_Master = bytes.Replace(
-				ZookeeperTemplateData_Master, 
-				[]byte("http://zookeeper-image-place-holder/zookeeper-openshift-orchestration"), 
-				[]byte(zookeeper_image), 
+		redis_image := oshandler.RedisImage()
+		redis_image = strings.TrimSpace(redis_image)
+		if len(redis_image) > 0 {
+			RedisTemplateData_Master = bytes.Replace(
+				RedisTemplateData_Master, 
+				[]byte("http://redis-image-place-holder/redis-openshift-orchestration"), 
+				[]byte(redis_image), 
 				-1)
 		}
 	}
 	
 	// ...
 	
-	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
-	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
-	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
-	
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%s", zookeeperUser, zookeeperPassword)))
-	zoo_password := fmt.Sprintf("%s:%s", zookeeperUser, base64.StdEncoding.EncodeToString (sum[:]))
-	
-	yamlTemplates := ZookeeperTemplateData_Master
+	yamlTemplates := RedisTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(redisPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -261,62 +267,93 @@ func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword 
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.service).
-		Decode(&res.svc1).
-		Decode(&res.svc2).
-		Decode(&res.svc3).
-		Decode(&res.rc1).
-		Decode(&res.rc2).
-		Decode(&res.rc3)
+		Decode(&res.pod)
 	
 	return decoder.Err
 }
 
-type zookeeperResources_Master struct {
-	service kapi.Service
+var RedisTemplateData_More []byte = nil
+
+func loadRedisResources_More(instanceID, redisPassword string, res *redisResources_More) error {
+	if RedisTemplateData_More == nil {
+		f, err := os.Open("redis-more.yaml")
+		if err != nil {
+			return err
+		}
+		RedisTemplateData_More, err = ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		redis_image := oshandler.RedisImage()
+		redis_image = strings.TrimSpace(redis_image)
+		if len(redis_image) > 0 {
+			RedisTemplateData_More = bytes.Replace(
+				RedisTemplateData_More, 
+				[]byte("http://redis-image-place-holder/redis-openshift-orchestration"), 
+				[]byte(redis_image), 
+				-1)
+		}
+	}
 	
-	svc1  kapi.Service
-	svc2  kapi.Service
-	svc3  kapi.Service
-	rc1   kapi.ReplicationController
-	rc2   kapi.ReplicationController
-	rc3   kapi.ReplicationController
+	// ...
+	
+	yamlTemplates := RedisTemplateData_More
+	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(redisPassword), -1)	
+	
+	//println("========= More yamlTemplates ===========")
+	//println(string(yamlTemplates))
+	//println()
+
+	
+	decoder := oshandler.NewYamlDecoder(yamlTemplates)
+	decoder.
+		Decode(&res.serviceSentinel).
+		Decode(&res.rc).
+		Decode(&res.rcSentinel)
+	
+	return decoder.Err
+}
+
+type redisResources_Master struct {
+	pod      kapi.Pod
+}
+
+type redisResources_More struct {
+	serviceSentinel kapi.Service
+	rc              kapi.ReplicationController
+	rcSentinel      kapi.ReplicationController
 }
 	
-func createZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var input zookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+func createRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_Master, error) {
+	var input redisResources_Master
+	err := loadRedisResources_Master(instanceId, redisPassword, &input)
 	if err != nil {
 		return nil, err
 	}
 	
-	var output zookeeperResources_Master
+	var output redisResources_Master
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
-		KPost(prefix + "/services", &input.svc1, &output.svc1).
-		KPost(prefix + "/services", &input.svc2, &output.svc2).
-		KPost(prefix + "/services", &input.svc3, &output.svc3).
-		KPost(prefix + "/replicationcontrollers", &input.rc1, &output.rc1).
-		KPost(prefix + "/replicationcontrollers", &input.rc2, &output.rc2).
-		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3)
+		KPost(prefix + "/pods", &input.pod, &output.pod)
 	
 	if osr.Err != nil {
-		logger.Error("createZookeeperResources_Master", osr.Err)
+		logger.Error("createRedisResources_Master", osr.Err)
 	}
 	
 	return &output, osr.Err
 }
 	
-func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var output zookeeperResources_Master
+func getRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_Master, error) {
+	var output redisResources_Master
 	
-	var input zookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+	var input redisResources_Master
+	err := loadRedisResources_Master(instanceId, redisPassword, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -325,31 +362,76 @@ func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeper
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.service.Name, &output.service).
-		KGet(prefix + "/services/" + input.svc1.Name, &output.svc1).
-		KGet(prefix + "/services/" + input.svc2.Name, &output.svc2).
-		KGet(prefix + "/services/" + input.svc3.Name, &output.svc3).
-		KGet(prefix + "/replicationcontrollers/" + input.rc1.Name, &output.rc1).
-		KGet(prefix + "/replicationcontrollers/" + input.rc2.Name, &output.rc2).
-		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3)
+		KGet(prefix + "/pods/" + input.pod.Name, &output.pod)
 	
 	if osr.Err != nil {
-		logger.Error("getZookeeperResources_Master", osr.Err)
+		logger.Error("getRedisResources_Master", osr.Err)
 	}
 	
 	return &output, osr.Err
 }
 
-func destroyZookeeperResources_Master (masterRes *zookeeperResources_Master, serviceBrokerNamespace string) {
+func destroyRedisResources_Master (masterRes *redisResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc1.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc2.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc3.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc1)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc2)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc3)}()
+	go func() {kdel (serviceBrokerNamespace, "pods", masterRes.pod.Name)}()
+}
+	
+func createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_More, error) {
+	var input redisResources_More
+	err := loadRedisResources_More(instanceId, redisPassword, &input)
+	if err != nil {
+		return nil, err
+	}
+	
+	var output redisResources_More
+	
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
+	
+	// here, not use job.post
+	prefix := "/namespaces/" + serviceBrokerNamespace
+	osr.
+		KPost(prefix + "/services", &input.serviceSentinel, &output.serviceSentinel).
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
+		KPost(prefix + "/replicationcontrollers", &input.rcSentinel, &output.rcSentinel)
+	
+	if osr.Err != nil {
+		logger.Error("createRedisResources_More", osr.Err)
+	}
+	
+	return &output, osr.Err
+}
+	
+func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_More, error) {
+	var output redisResources_More
+	
+	var input redisResources_More
+	err := loadRedisResources_More(instanceId, redisPassword, &input)
+	if err != nil {
+		return &output, err
+	}
+	
+	osr := oshandler.NewOpenshiftREST(oshandler.OC())
+	
+	prefix := "/namespaces/" + serviceBrokerNamespace
+	osr.
+		KGet(prefix + "/services/" + input.serviceSentinel.Name, &output.serviceSentinel).
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
+		KGet(prefix + "/replicationcontrollers/" + input.rcSentinel.Name, &output.rcSentinel)
+	
+	if osr.Err != nil {
+		logger.Error("getRedisResources_More", osr.Err)
+	}
+	
+	return &output, osr.Err
+}
+
+func destroyRedisResources_More (masterRes *redisResources_More, serviceBrokerNamespace string) {
+	// todo: add to retry queue on fail
+
+	go func() {kdel (serviceBrokerNamespace, "services", masterRes.serviceSentinel.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rcSentinel)}()
 }
 
 //===============================================================
@@ -498,11 +580,11 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 			status, _ := <- statuses
 			
 			if status.Err != nil {
-				logger.Error("watch HA zookeeper rc error", status.Err)
+				logger.Error("watch HA redis rc error", status.Err)
 				close(cancel)
 				return
 			} else {
-				//logger.Debug("watch zookeeper HA rc, status.Info: " + string(status.Info))
+				//logger.Debug("watch redis HA rc, status.Info: " + string(status.Info))
 			}
 			
 			var wrcs watchReplicationControllerStatus
@@ -561,8 +643,6 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 }
 
 // todo: 
-// set ACL: https://godoc.org/github.com/samuel/go-zookeeper/zk#Conn.SetACL
-// github.com/samuel/go-zookeeper/zk 
 
 /*
 bin/zkCli.sh 127.0.0.1:2181
