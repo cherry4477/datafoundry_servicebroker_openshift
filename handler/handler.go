@@ -125,10 +125,30 @@ func ZookeeperImage() string {
 	return zookeeperImage
 }
 
+func RedisImage() string {
+	return redisImage
+}
+
+func KafkaImage() string {
+	return kafkaImage
+}
+
+func StormImage() string {
+	return stormImage
+}
+
+func CassandraImage() string {
+	return cassandraImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 var etcdImage string
 var zookeeperImage string
+var redisImage string
+var kafkaImage string
+var stormImage string
+var cassandraImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -141,6 +161,11 @@ func init() {
 	endpointSuffix = getenv("ENDPOINTSUFFIX")
 	etcdImage = getenv("ETCDIMAGE")
 	zookeeperImage = getenv("ZOOKEEPERIMAGE")
+	redisImage = getenv("REDISIMAGE")
+	kafkaImage = getenv("STORMIMAGE")
+	stormImage = getenv("KAFKAIMAGE")
+	cassandraImage = getenv("CASSANDRAIMAGE")
 }
+
 
 
