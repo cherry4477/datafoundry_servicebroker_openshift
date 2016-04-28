@@ -11,7 +11,7 @@ import (
 	//"net/http"
 	//"net"
 	"github.com/pivotal-cf/brokerapi"
-	//"time"
+	"time"
 	"strconv"
 	"strings"
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	//"io"
 	"io/ioutil"
 	"os"
-	//"sync"
+	"sync"
 	
 	"github.com/pivotal-golang/lager"
 	
@@ -118,6 +118,15 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 		return serviceSpec, serviceInfo, err
 	}
 	
+	startRedisOrchestrationJob(&redisOrchestrationJob{
+		cancelled:  false,
+		cancelChan: make(chan struct{}),
+		
+		serviceInfo:     &serviceInfo,
+		masterResources: output,
+		moreResources:   nil,
+	})
+	
 	// todo: maybe it is better to create a new job
 	
 	serviceInfo.Url = instanceIdInTempalte
@@ -169,22 +178,30 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 }
 
 func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	// ...
-	
-	println("to destroy resources")
-	
-	master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
-	more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
-	
-	destroyRedisResources_Master (master_res, myServiceInfo.Database)
-	
-	destroyRedisResources_More (more_res, myServiceInfo.Database)
+	go func() {
+		job := getRedisOrchestrationJob (myServiceInfo.Url)
+		if job != nil {
+			job.cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == getRedisOrchestrationJob (myServiceInfo.Url) {
+					break
+				}
+			}
+		}
+		
+		// ...
+		
+		println("to destroy resources")
+		
+		more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		destroyRedisResources_More (more_res, myServiceInfo.Database)
+		
+		master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		destroyRedisResources_Master (master_res, myServiceInfo.Database)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
@@ -208,10 +225,10 @@ func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	//port := "80"
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      fmt.Sprintf("amqp://%s:%s@%s:%s", myServiceInfo.User, myServiceInfo.Password, host, port),
+		Uri:      "",
 		Hostname: host,
 		Port:     port,
-		Username: myServiceInfo.User,
+		//Username: myServiceInfo.User,
 		Password: myServiceInfo.Password,
 	}
 
@@ -224,6 +241,128 @@ func (handler *Redis_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, myc
 	// do nothing
 	
 	return nil
+}
+
+//=======================================================================
+// 
+//=======================================================================
+	
+var redisOrchestrationJobs = map[string]*redisOrchestrationJob{}
+var redisOrchestrationJobsMutex sync.Mutex
+
+func getRedisOrchestrationJob (instanceId string) *redisOrchestrationJob {
+	redisOrchestrationJobsMutex.Lock()
+	defer redisOrchestrationJobsMutex.Unlock()
+	
+	return redisOrchestrationJobs[instanceId]
+}
+
+func startRedisOrchestrationJob (job *redisOrchestrationJob) {
+	redisOrchestrationJobsMutex.Lock()
+	defer redisOrchestrationJobsMutex.Unlock()
+	
+	if redisOrchestrationJobs[job.serviceInfo.Url] == nil {
+		redisOrchestrationJobs[job.serviceInfo.Url] = job
+		go func() {
+			job.run()
+			
+			redisOrchestrationJobsMutex.Lock()
+			delete(redisOrchestrationJobs, job.serviceInfo.Url)
+			redisOrchestrationJobsMutex.Unlock()
+		}()
+	}
+}
+
+type redisOrchestrationJob struct {
+	//instanceId string // use serviceInfo.
+	
+	cancelled bool
+	cancelChan chan struct{}
+	cancelMetex sync.Mutex
+	
+	serviceInfo   *oshandler.ServiceInfo
+	
+	masterResources *redisResources_Master
+	moreResources   *redisResources_More
+}
+
+func (job *redisOrchestrationJob) cancel() {
+	job.cancelMetex.Lock()
+	defer job.cancelMetex.Unlock()
+	
+	if ! job.cancelled {
+		job.cancelled = true
+		close (job.cancelChan)
+	}
+}
+
+type watchPodStatus struct {
+	// The type of watch update contained in the message
+	Type string `json:"type"`
+	// Pod details
+	Object kapi.Pod `json:"object"`
+}
+
+func (job *redisOrchestrationJob) run() {
+	serviceInfo := job.serviceInfo
+	pod := job.masterResources.pod
+	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
+	statuses, cancel, err := oshandler.OC().KWatch (uri)
+	if err != nil {
+		logger.Error("start watching boot pod", err)
+		destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
+		return
+	}
+	
+	for {
+		var status oshandler.WatchStatus
+		select {
+		case <- job.cancelChan:
+			close(cancel)
+			return
+		case status, _ = <- statuses:
+			break
+		}
+		
+		if status.Err != nil {
+			close(cancel)
+			
+			logger.Error("watch boot pod error", status.Err)
+			destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		} else {
+			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
+		}
+		
+		var wps watchPodStatus
+		if err := json.Unmarshal(status.Info, &wps); err != nil {
+			close(cancel)
+			
+			logger.Error("parse boot pod status", err)
+			destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		}
+		
+		if wps.Object.Status.Phase != kapi.PodPending {
+			println("watch pod phase: ", wps.Object.Status.Phase)
+			
+			if wps.Object.Status.Phase != kapi.PodRunning {
+				close(cancel)
+				
+				logger.Debug("pod phase is neither pending nor running")
+				destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
+				return
+			}
+			
+			// running now, to create HA resources
+			close(cancel)
+			break
+		}
+	}
+	
+	// create more resources
+	
+	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 }
 
 //=======================================================================
@@ -377,15 +516,16 @@ func destroyRedisResources_Master (masterRes *redisResources_Master, serviceBrok
 	go func() {kdel (serviceBrokerNamespace, "pods", masterRes.pod.Name)}()
 }
 	
-func createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_More, error) {
+func (job *redisOrchestrationJob) createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) error {
 	var input redisResources_More
 	err := loadRedisResources_More(instanceId, redisPassword, &input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	
 	var output redisResources_More
 	
+	/*
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
@@ -398,8 +538,21 @@ func createRedisResources_More (instanceId, serviceBrokerNamespace, redisPasswor
 	if osr.Err != nil {
 		logger.Error("createRedisResources_More", osr.Err)
 	}
+	*/
+
+	go func() {
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.serviceSentinel, &output.serviceSentinel); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rcSentinel, &output.rcSentinel); err != nil {
+			return
+		}
+	}()
 	
-	return &output, osr.Err
+	return nil
 }
 	
 func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_More, error) {
@@ -438,12 +591,15 @@ func destroyRedisResources_More (masterRes *redisResources_More, serviceBrokerNa
 // 
 //===============================================================
 
-func kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *redisOrchestrationJob) kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
 	
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
+	if job.cancelled {
+		return nil
+	}
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPost(uri, body, into)
 	if osr.Err == nil {
@@ -462,12 +618,15 @@ RETRY:
 	return nil
 }
 
-func opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *redisOrchestrationJob) opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
 	
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
+	if job.cancelled {
+		return nil
+	}
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).OPost(uri, body, into)
 	if osr.Err == nil {
@@ -642,19 +801,4 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	return nrunnings, nil
 }
 
-// todo: 
 
-/*
-bin/zkCli.sh 127.0.0.1:2181
-bin/zkCli.sh -server sb-instanceid-zk:2181
-
-echo conf|nc localhost 2181
-echo cons|nc localhost 2181
-echo ruok|nc localhost 2181
-echo srst|nc localhost 2181
-echo crst|nc localhost 2181
-echo dump|nc localhost 2181
-echo srvr|nc localhost 2181
-echo stat|nc localhost 2181
-echo mntr|nc localhost 2181
-*/
