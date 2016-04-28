@@ -10,7 +10,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: http://etcd-image-place-holder/redis-openshift-orchestration
+      image: http://redis-image-place-holder/redis-openshift-orchestration
       env:
         - name: MASTER
           value: "true"
@@ -25,7 +25,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: http://etcd-image-place-holder/redis-openshift-orchestration
+      image: http://redis-image-place-holder/redis-openshift-orchestration
       env:
         - name: SENTINEL
           value: "true"
