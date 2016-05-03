@@ -137,7 +137,6 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 	// master spark
 	
 	output, err := createSparkResources_Master(instanceIdInTempalte, serviceBrokerNamespace, sparkSecret)
-
 	if err != nil {
 		destroySparkResources_Master(output, serviceBrokerNamespace)
 		
@@ -149,6 +148,7 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 	//serviceInfo.User = oshandler.NewElevenLengthID()
 	serviceInfo.Password = sparkSecret
 	
+	// todo: improve watch. Pod may be already running before watching!
 	startSparkOrchestrationJob(&sparkOrchestrationJob{
 		cancelled:  false,
 		cancelChan: make(chan struct{}),
@@ -157,8 +157,8 @@ func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.P
 		serviceInfo:       &serviceInfo,
 		planNumWorkers:    handler.numWorkers,
 		masterResources:   output,
-		slavesResources:   nil,
-		zeppelinResources: nil,
+		//slavesResources:   nil,
+		//zeppelinResources: nil,
 	})
 	
 	master_web_host := output.webroute.Spec.Host
@@ -324,8 +324,8 @@ type sparkOrchestrationJob struct {
 	planNumWorkers int
 	
 	masterResources *sparkResources_Master
-	slavesResources   *sparkResources_Workers
-	zeppelinResources   *sparkResources_Zeppelin
+	//slavesResources   *sparkResources_Workers
+	//zeppelinResources   *sparkResources_Zeppelin
 }
 
 func (job *sparkOrchestrationJob) cancel() {

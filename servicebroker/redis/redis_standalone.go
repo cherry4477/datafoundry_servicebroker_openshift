@@ -125,6 +125,7 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 	//serviceInfo.User = redisUser
 	serviceInfo.Password = redisPassword
 	
+	// todo: improve watch. Pod may be already running before watching!
 	startRedisOrchestrationJob(&redisOrchestrationJob{
 		cancelled:  false,
 		cancelChan: make(chan struct{}),

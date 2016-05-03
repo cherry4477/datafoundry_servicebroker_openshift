@@ -11,7 +11,7 @@ import (
 	//"net/http"
 	//"net"
 	"github.com/pivotal-cf/brokerapi"
-	"time"
+	//"time"
 	"strconv"
 	"strings"
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	//"io"
 	"io/ioutil"
 	"os"
-	"sync"
+	//"sync"
 	
 	"github.com/pivotal-golang/lager"
 	
@@ -110,10 +110,10 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	
 	// master zookeeper
 	
-	output, err := createZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+	output, err := CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
 
 	if err != nil {
-		destroyZookeeperResources_Master(output, serviceBrokerNamespace)
+		DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
 	}
@@ -134,7 +134,7 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	
 	// the job may be finished or interrupted or running in another instance.
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -170,13 +170,13 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 	
 	println("to destroy resources")
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	// under current frame, it is not a good idea to return here
 	//if err != nil {
 	//	return brokerapi.IsAsync(false), err
 	//}
 	
-	destroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil
 }
@@ -184,15 +184,12 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := getZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	
-	client_port := oshandler.GetServicePortByName(&master_res.service, "client")
-	if client_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("client port not found")
+	host, port, err := master_res.ServiceHostPort(myServiceInfo.Database)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, nil
 	}
-	
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(client_port.Port)
 	
 	mycredentials := oshandler.Credentials{
 		Uri:      "",
@@ -217,150 +214,122 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 // interfaces for other service brokers which depend on zk
 //==============================================================
 
-
-var zookeeperOrchestrationJobs = map[string]*zookeeperOrchestrationJob{}
-var zookeeperOrchestrationJobsMutex sync.Mutex
-
-func getZookeeperOrchestrationJob (instanceId string) *zookeeperOrchestrationJob {
-	zookeeperOrchestrationJobsMutex.Lock()
-	defer zookeeperOrchestrationJobsMutex.Unlock()
-	
-	return zookeeperOrchestrationJobs[instanceId]
-}
-
-func startZookeeperOrchestrationJob (job *zookeeperOrchestrationJob) {
-	zookeeperOrchestrationJobsMutex.Lock()
-	defer zookeeperOrchestrationJobsMutex.Unlock()
-	
-	if zookeeperOrchestrationJobs[job.serviceInfo.Url] == nil {
-		zookeeperOrchestrationJobs[job.serviceInfo.Url] = job
-		go func() {
-			job.run()
-			
-			zookeeperOrchestrationJobsMutex.Lock()
-			delete(zookeeperOrchestrationJobs, job.serviceInfo.Url)
-			zookeeperOrchestrationJobsMutex.Unlock()
-		}()
-	}
-}
-
-type zookeeperOrchestrationJob struct {
-	//instanceId string // use serviceInfo.
-	
-	cancelled bool
-	cancelChan chan struct{}
-	cancelMetex sync.Mutex
-	
-	serviceInfo    *oshandler.ServiceInfo
-	planNumWorkers int
-	
-	masterResources *zookeeperResources_Master
-}
-
-func (job *zookeeperOrchestrationJob) cancel() {
-	job.cancelMetex.Lock()
-	defer job.cancelMetex.Unlock()
-	
-	if ! job.cancelled {
-		job.cancelled = true
-		close (job.cancelChan)
-	}
-}
-
-func (job *zookeeperOrchestrationJob) run() {
-	serviceInfo := job.serviceInfo
-	rc := job.masterResources.rc1
-	uri := "/namespaces/" + serviceInfo.Database + "/replicationcontrollers/" + rc.Name
-	statuses, cancel, err := oshandler.OC().KWatch (uri)
+func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (result <-chan bool, cancel chan<- struct{}, err error) {
+	var input ZookeeperResources_Master
+	err = loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
-		logger.Error("start watching master rc", err)
-		destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
 		return
 	}
 	
-	for {
-		var status oshandler.WatchStatus
-		select {
-		case <- job.cancelChan:
-			close(cancel)
-			return
-		case status, _ = <- statuses:
-			break
-		}
-		
-		if status.Err != nil {
-			close(cancel)
-			
-			logger.Error("watch master rc error", status.Err)
-			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
-			return
-		} else {
-			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
-		}
-		
-		var wrcs watchReplicationControllerStatus
-		if err := json.Unmarshal(status.Info, &wrcs); err != nil {
-			close(cancel)
-			
-			logger.Error("parse master rc status", err)
-			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
-			return
-		}
-		
-		if wrcs.Object.Spec.Replicas == nil { // should not happen
-			close(cancel)
-			
-			logger.Error("master rc error", err)
-			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
-			return
-		}
-		
-		println("watch master rs status.replicas: ", wrcs.Object.Status.Replicas)
-		
-		if wrcs.Object.Status.Replicas >= *wrcs.Object.Spec.Replicas {
-			close(cancel)
-			break
-		}
+	rc1 := &input.rc1
+	rc2 := &input.rc2
+	rc3 := &input.rc3
+	uri1 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc1.Name
+	uri2 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc2.Name
+	uri3 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc3.Name
+	statuses1, cancel1, err := oshandler.OC().KWatch (uri1)
+	if err != nil {
+		return
+	}
+	statuses2, cancel2, err := oshandler.OC().KWatch (uri2)
+	if err != nil {
+		close(cancel1)
+		return
+	}
+	statuses3, cancel3, err := oshandler.OC().KWatch (uri3)
+	if err != nil {
+		close(cancel1)
+		close(cancel2)
+		return
 	}
 	
-	// wait util master pod is running
-	
-	for {
-		if job.cancelled { return }
-		
-		// 
-		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
-			
-		println("running pods = ", n)
-		
-		if n >= *rc.Spec.Replicas {
-			break
-		}
-		
-		// 
-		time.Sleep(10 * time.Second)
+	close_all := func() {
+		close(cancel1)
+		close(cancel2)
+		close(cancel3)
 	}
 	
-	// ...
+	var output ZookeeperResources_Master
+	err = getZookeeperResources_Master(serviceBrokerNamespace, &input, &output)
+	if err != nil {
+		close_all()
+		return
+	}
 	
-	if job.cancelled { return }
+	rc1 = &output.rc1
+	rc2 = &output.rc2
+	rc3 = &output.rc3
 	
-	time.Sleep(7 * time.Second)
+	theresult := make(chan bool)
+	result = theresult
+	cancelled := make(chan struct{})
+	cancel = cancelled
 	
-	if job.cancelled { return }
+	go func() {
+		ok := func(rc *kapi.ReplicationController) bool {
+			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+				return false
+			}
+			n, _ := statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
+			return n >= *rc.Spec.Replicas
+		}
+		
+		for {
+			if ok (rc1) && ok (rc2) && ok (rc3) {
+				theresult <- true
+				
+				close_all()
+				return
+			}
+			
+			var status oshandler.WatchStatus
+			var valid bool
+			var rc **kapi.ReplicationController
+			select {
+			case <- cancelled:
+				valid = false
+			case status, valid = <- statuses1:
+				rc = &rc1
+			case status, valid = <- statuses2:
+				rc = &rc2
+			case status, valid = <- statuses3:
+				rc = &rc3
+			}
+			
+			if valid {
+				if status.Err != nil {
+					valid = false
+					logger.Error("watch master rcs error", status.Err)
+				} else {
+					var wrcs watchReplicationControllerStatus
+					if err := json.Unmarshal(status.Info, &wrcs); err != nil {
+						valid = false
+						logger.Error("parse master rc status", err)
+					} else {
+						*rc = &wrcs.Object
+					}
+				}
+			}
+			
+			if ! valid {
+				theresult <- false
+				
+				close_all()
+				return
+			}
+		}
+	}()
 	
-	// ...
-	
-	println("to create zookeeper resources")
+	return
 }
 
 //=======================================================================
-// 
+// the zookeeper functions may be called by outer packages 
 //=======================================================================
 
 var ZookeeperTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword string, res *zookeeperResources_Master) error {
+func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
 		if err != nil {
@@ -413,7 +382,7 @@ func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword 
 	return decoder.Err
 }
 
-type zookeeperResources_Master struct {
+type ZookeeperResources_Master struct {
 	service kapi.Service
 	
 	svc1  kapi.Service
@@ -423,15 +392,28 @@ type zookeeperResources_Master struct {
 	rc2   kapi.ReplicationController
 	rc3   kapi.ReplicationController
 }
+
+func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespace string) (string, string, error) {
+		
+	client_port := oshandler.GetServicePortByName(&masterRes.service, "client")
+	if client_port == nil {
+		return "", "", errors.New("client port not found")
+	}
 	
-func createZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var input zookeeperResources_Master
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", masterRes.service.Name, serviceBrokerNamespace)
+	port := strconv.Itoa(client_port.Port)
+	
+	return host, port, nil
+}
+	
+func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
+	var input ZookeeperResources_Master
 	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
 		return nil, err
 	}
 	
-	var output zookeeperResources_Master
+	var output ZookeeperResources_Master
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
@@ -453,15 +435,20 @@ func createZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookee
 	return &output, osr.Err
 }
 	
-func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*zookeeperResources_Master, error) {
-	var output zookeeperResources_Master
+func GetZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
+	var output ZookeeperResources_Master
 	
-	var input zookeeperResources_Master
+	var input ZookeeperResources_Master
 	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
 		return &output, err
 	}
 	
+	err = getZookeeperResources_Master(serviceBrokerNamespace, &input, &output)
+	return &output, err
+}
+
+func getZookeeperResources_Master(serviceBrokerNamespace string, input, output *ZookeeperResources_Master) error {
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
@@ -478,10 +465,10 @@ func getZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeper
 		logger.Error("getZookeeperResources_Master", osr.Err)
 	}
 	
-	return &output, osr.Err
+	return osr.Err
 }
 
-func destroyZookeeperResources_Master (masterRes *zookeeperResources_Master, serviceBrokerNamespace string) {
+func DestroyZookeeperResources_Master (masterRes *ZookeeperResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()

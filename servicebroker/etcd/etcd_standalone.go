@@ -92,6 +92,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	serviceInfo.Password = oshandler.GenGUID()
 	
+	// todo: improve watch. Pod may be already running before watching!
 	startEtcdOrchestrationJob(&etcdOrchestrationJob{
 		cancelled:  false,
 		cancelChan: make(chan struct{}),
@@ -99,7 +100,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 		isProvisioning: true,
 		serviceInfo:    &serviceInfo,
 		bootResources:  output,
-		haResources:    nil,
+		//haResources:    nil,
 	})
 	
 	serviceSpec.DashboardURL = "http://not-available-now"
@@ -331,7 +332,7 @@ type etcdOrchestrationJob struct {
 	serviceInfo   *oshandler.ServiceInfo
 	
 	bootResources *etcdResources_Boot
-	haResources   *etcdResources_HA
+	//haResources   *etcdResources_HA
 }
 
 func (job *etcdOrchestrationJob) cancel() {
