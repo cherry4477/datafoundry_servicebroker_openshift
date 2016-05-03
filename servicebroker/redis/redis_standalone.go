@@ -118,6 +118,13 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 		return serviceSpec, serviceInfo, err
 	}
 	
+	// todo: maybe it is better to create a new job
+	
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	//serviceInfo.User = redisUser
+	serviceInfo.Password = redisPassword
+	
 	startRedisOrchestrationJob(&redisOrchestrationJob{
 		cancelled:  false,
 		cancelChan: make(chan struct{}),
@@ -127,19 +134,20 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 		moreResources:   nil,
 	})
 	
-	// todo: maybe it is better to create a new job
-	
-	serviceInfo.Url = instanceIdInTempalte
-	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	//serviceInfo.User = redisUser
-	serviceInfo.Password = redisPassword
-	
 	serviceSpec.DashboardURL = ""
 	
 	return serviceSpec, serviceInfo, nil
 }
 
 func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+	// try to get state from running job
+	job := getRedisOrchestrationJob (myServiceInfo.Url)
+	if job != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress .",
+		}, nil
+	}
 	
 	// assume in provisioning
 	
@@ -252,9 +260,10 @@ var redisOrchestrationJobsMutex sync.Mutex
 
 func getRedisOrchestrationJob (instanceId string) *redisOrchestrationJob {
 	redisOrchestrationJobsMutex.Lock()
-	defer redisOrchestrationJobsMutex.Unlock()
+	job := redisOrchestrationJobs[instanceId]
+	redisOrchestrationJobsMutex.Unlock()
 	
-	return redisOrchestrationJobs[instanceId]
+	return job
 }
 
 func startRedisOrchestrationJob (job *redisOrchestrationJob) {

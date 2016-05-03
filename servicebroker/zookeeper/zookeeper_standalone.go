@@ -11,7 +11,7 @@ import (
 	//"net/http"
 	//"net"
 	"github.com/pivotal-cf/brokerapi"
-	//"time"
+	"time"
 	"strconv"
 	"strings"
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	//"io"
 	"io/ioutil"
 	"os"
-	//"sync"
+	"sync"
 	
 	"github.com/pivotal-golang/lager"
 	
@@ -211,6 +211,147 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 	// do nothing
 	
 	return nil
+}
+
+//==============================================================
+// interfaces for other service brokers which depend on zk
+//==============================================================
+
+
+var zookeeperOrchestrationJobs = map[string]*zookeeperOrchestrationJob{}
+var zookeeperOrchestrationJobsMutex sync.Mutex
+
+func getZookeeperOrchestrationJob (instanceId string) *zookeeperOrchestrationJob {
+	zookeeperOrchestrationJobsMutex.Lock()
+	defer zookeeperOrchestrationJobsMutex.Unlock()
+	
+	return zookeeperOrchestrationJobs[instanceId]
+}
+
+func startZookeeperOrchestrationJob (job *zookeeperOrchestrationJob) {
+	zookeeperOrchestrationJobsMutex.Lock()
+	defer zookeeperOrchestrationJobsMutex.Unlock()
+	
+	if zookeeperOrchestrationJobs[job.serviceInfo.Url] == nil {
+		zookeeperOrchestrationJobs[job.serviceInfo.Url] = job
+		go func() {
+			job.run()
+			
+			zookeeperOrchestrationJobsMutex.Lock()
+			delete(zookeeperOrchestrationJobs, job.serviceInfo.Url)
+			zookeeperOrchestrationJobsMutex.Unlock()
+		}()
+	}
+}
+
+type zookeeperOrchestrationJob struct {
+	//instanceId string // use serviceInfo.
+	
+	cancelled bool
+	cancelChan chan struct{}
+	cancelMetex sync.Mutex
+	
+	serviceInfo    *oshandler.ServiceInfo
+	planNumWorkers int
+	
+	masterResources *zookeeperResources_Master
+}
+
+func (job *zookeeperOrchestrationJob) cancel() {
+	job.cancelMetex.Lock()
+	defer job.cancelMetex.Unlock()
+	
+	if ! job.cancelled {
+		job.cancelled = true
+		close (job.cancelChan)
+	}
+}
+
+func (job *zookeeperOrchestrationJob) run() {
+	serviceInfo := job.serviceInfo
+	rc := job.masterResources.rc1
+	uri := "/namespaces/" + serviceInfo.Database + "/replicationcontrollers/" + rc.Name
+	statuses, cancel, err := oshandler.OC().KWatch (uri)
+	if err != nil {
+		logger.Error("start watching master rc", err)
+		destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
+		return
+	}
+	
+	for {
+		var status oshandler.WatchStatus
+		select {
+		case <- job.cancelChan:
+			close(cancel)
+			return
+		case status, _ = <- statuses:
+			break
+		}
+		
+		if status.Err != nil {
+			close(cancel)
+			
+			logger.Error("watch master rc error", status.Err)
+			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		} else {
+			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
+		}
+		
+		var wrcs watchReplicationControllerStatus
+		if err := json.Unmarshal(status.Info, &wrcs); err != nil {
+			close(cancel)
+			
+			logger.Error("parse master rc status", err)
+			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		}
+		
+		if wrcs.Object.Spec.Replicas == nil { // should not happen
+			close(cancel)
+			
+			logger.Error("master rc error", err)
+			destroyZookeeperResources_Master (job.masterResources, serviceInfo.Database)
+			return
+		}
+		
+		println("watch master rs status.replicas: ", wrcs.Object.Status.Replicas)
+		
+		if wrcs.Object.Status.Replicas >= *wrcs.Object.Spec.Replicas {
+			close(cancel)
+			break
+		}
+	}
+	
+	// wait util master pod is running
+	
+	for {
+		if job.cancelled { return }
+		
+		// 
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
+			
+		println("running pods = ", n)
+		
+		if n >= *rc.Spec.Replicas {
+			break
+		}
+		
+		// 
+		time.Sleep(10 * time.Second)
+	}
+	
+	// ...
+	
+	if job.cancelled { return }
+	
+	time.Sleep(7 * time.Second)
+	
+	if job.cancelled { return }
+	
+	// ...
+	
+	println("to create zookeeper resources")
 }
 
 //=======================================================================
