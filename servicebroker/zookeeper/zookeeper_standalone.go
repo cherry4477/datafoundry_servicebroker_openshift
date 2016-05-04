@@ -11,7 +11,7 @@ import (
 	//"net/http"
 	//"net"
 	"github.com/pivotal-cf/brokerapi"
-	//"time"
+	"time"
 	"strconv"
 	"strings"
 	"bytes"
@@ -267,15 +267,16 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	
 	go func() {
 		ok := func(rc *kapi.ReplicationController) bool {
-			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-				return false
-			}
+			//if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+			//	return false
+			//}
 			n, _ := statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
 			
 			println("rc = ", rc, ", n = ", n)
 			
 			return n >= *rc.Spec.Replicas
 		}
+		
 		
 		for {
 			println("rc1 = ", rc1, ", rc2 = ", rc2, ", rc3 = ", rc3)
@@ -289,16 +290,23 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 			
 			var status oshandler.WatchStatus
 			var valid bool
-			var rc **kapi.ReplicationController
+			//var rc **kapi.ReplicationController
 			select {
 			case <- cancelled:
 				valid = false
 			case status, valid = <- statuses1:
-				rc = &rc1
+				//rc = &rc1
+				break
 			case status, valid = <- statuses2:
-				rc = &rc2
+				//rc = &rc2
+				break
 			case status, valid = <- statuses3:
-				rc = &rc3
+				//rc = &rc3
+				break
+			case <- time.After(7 * time.Second):
+				// bug: pod phase change will not trigger rc status change.
+				// so need this case
+				continue
 			}
 			
 			if valid {
@@ -310,8 +318,8 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 					if err := json.Unmarshal(status.Info, &wrcs); err != nil {
 						valid = false
 						logger.Error("parse master rc status", err)
-					} else {
-						*rc = &wrcs.Object
+					//} else {
+					//	*rc = &wrcs.Object
 					}
 				}
 			}
