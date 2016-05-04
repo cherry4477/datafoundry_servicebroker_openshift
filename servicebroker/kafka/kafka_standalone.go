@@ -324,6 +324,8 @@ func (job *kafkaOrchestrationJob) cancel() {
 }
 
 func (job *kafkaOrchestrationJob) run() {
+	println("-- kafkaOrchestrationJob start --")
+	
 	result, cancel, err := zookeeper.WatchZookeeperOrchestration (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password)
 	if err != nil {
 		zookeeper_res, _ := zookeeper.GetZookeeperResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password)
@@ -341,8 +343,12 @@ func (job *kafkaOrchestrationJob) run() {
 		break
 	}
 	
+	println("-- kafkaOrchestrationJob done, succeeded:", succeeded)
+	
 	if succeeded {
-		_, _ = createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.User, job.serviceInfo.Password)
+		println("  to create kafka resources")
+		
+		_ = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.User, job.serviceInfo.Password)
 	}
 }
 
@@ -395,15 +401,16 @@ type kafkaResources_Master struct {
 	rc      kapi.ReplicationController
 }
 	
-func createKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser, kafkaPassword string) (*kafkaResources_Master, error) {
+func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser, kafkaPassword string) error {
 	var input kafkaResources_Master
 	err := loadKafkaResources_Master(instanceId, kafkaUser, kafkaPassword, &input)
 	if err != nil {
-		return nil, err
+		//return nil, err
+		return err
 	}
 	
 	var output kafkaResources_Master
-	
+	/*
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
@@ -417,6 +424,17 @@ func createKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser,
 	}
 	
 	return &output, osr.Err
+	*/
+	go func() {
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.service, &output.service); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
+			return
+		}
+	}()
+	
+	return nil
 }
 	
 func getKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser, kafkaPassword string) (*kafkaResources_Master, error) {
@@ -453,12 +471,15 @@ func destroyKafkaResources_Master (masterRes *kafkaResources_Master, serviceBrok
 // 
 //===============================================================
 
-func kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *kafkaOrchestrationJob) kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
 	
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
+	if job.cancelled {
+		return nil
+	}
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPost(uri, body, into)
 	if osr.Err == nil {

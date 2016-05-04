@@ -311,6 +311,8 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 				}
 			}
 			
+			println("> WatchZookeeperOrchestration valid:", valid)
+			
 			if ! valid {
 				theresult <- false
 				
