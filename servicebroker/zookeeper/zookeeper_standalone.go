@@ -271,10 +271,15 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 				return false
 			}
 			n, _ := statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
+			
+			println("rc = ", rc, ", n = ", n)
+			
 			return n >= *rc.Spec.Replicas
 		}
 		
 		for {
+			println("rc1 = ", rc1, ", rc2 = ", rc2, ", rc3 = ", rc3)
+			
 			if ok (rc1) && ok (rc2) && ok (rc3) {
 				theresult <- true
 				
