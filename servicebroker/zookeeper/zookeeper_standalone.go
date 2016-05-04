@@ -221,6 +221,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 		return
 	}
 	
+	/*
 	rc1 := &input.rc1
 	rc2 := &input.rc2
 	rc3 := &input.rc3
@@ -248,17 +249,21 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 		close(cancel2)
 		close(cancel3)
 	}
+	*/
 	
 	var output ZookeeperResources_Master
 	err = getZookeeperResources_Master(serviceBrokerNamespace, &input, &output)
 	if err != nil {
-		close_all()
+		//close_all()
 		return
 	}
 	
-	rc1 = &output.rc1
-	rc2 = &output.rc2
-	rc3 = &output.rc3
+	rc1 := &output.rc1
+	rc2 := &output.rc2
+	rc3 := &output.rc3
+	rc1.Status.Replicas = 0
+	rc2.Status.Replicas = 0
+	rc3.Status.Replicas = 0
 	
 	theresult := make(chan bool)
 	result = theresult
@@ -267,48 +272,50 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	
 	go func() {
 		ok := func(rc *kapi.ReplicationController) bool {
-			//if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			//	return false
-			//}
-			n, _ := statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
+			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil {
+				return false
+			}
 			
-			println("rc = ", rc, ", n = ", n)
+			if rc.Status.Replicas < *rc.Spec.Replicas {
+				rc.Status.Replicas, _ = statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
 			
-			return n >= *rc.Spec.Replicas
+				println("rc = ", rc, ", rc.Status.Replicas = ", rc.Status.Replicas)
+			}
+			
+			return rc.Status.Replicas >= *rc.Spec.Replicas
 		}
 		
 		
 		for {
-			println("rc1 = ", rc1, ", rc2 = ", rc2, ", rc3 = ", rc3)
-			
 			if ok (rc1) && ok (rc2) && ok (rc3) {
 				theresult <- true
 				
-				close_all()
+				//close_all()
 				return
 			}
 			
-			var status oshandler.WatchStatus
+			//var status oshandler.WatchStatus
 			var valid bool
 			//var rc **kapi.ReplicationController
 			select {
 			case <- cancelled:
 				valid = false
-			case status, valid = <- statuses1:
-				//rc = &rc1
-				break
-			case status, valid = <- statuses2:
-				//rc = &rc2
-				break
-			case status, valid = <- statuses3:
-				//rc = &rc3
-				break
-			case <- time.After(7 * time.Second):
+			//case status, valid = <- statuses1:
+			//	//rc = &rc1
+			//	break
+			//case status, valid = <- statuses2:
+			//	//rc = &rc2
+			//	break
+			//case status, valid = <- statuses3:
+			//	//rc = &rc3
+			//	break
+			case <- time.After(15 * time.Second):
 				// bug: pod phase change will not trigger rc status change.
 				// so need this case
 				continue
 			}
 			
+			/*
 			if valid {
 				if status.Err != nil {
 					valid = false
@@ -325,11 +332,12 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 			}
 			
 			println("> WatchZookeeperOrchestration valid:", valid)
+			*/
 			
 			if ! valid {
 				theresult <- false
 				
-				close_all()
+				//close_all()
 				return
 			}
 		}
