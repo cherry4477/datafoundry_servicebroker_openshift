@@ -50,15 +50,15 @@ spec:
   selector:
     app: sb-instanceid-cassandra
 
----
-
-#Route to client
-apiVersion: v1
-kind: Route
-metadata:
-  name: sb-instanceid-cassandra
-spec:
-  host: sb-instanceid-cassandra.endpoint-postfix-place-holder
-  to:
-    kind: Service
-    name: sb-instanceid-cassandra
+#---
+#
+##Route to client
+#apiVersion: v1
+#kind: Route
+#metadata:
+#  name: sb-instanceid-cassandra
+#spec:
+#  host: sb-instanceid-cassandra.endpoint-postfix-place-holder
+#  to:
+#    kind: Service
+#    name: sb-instanceid-cassandra

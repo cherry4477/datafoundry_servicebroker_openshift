@@ -137,7 +137,8 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
-		return true
+		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
+		return n >= *rc.Spec.Replicas
 	}
 	
 	ha_res, _ := getEtcdResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
@@ -997,3 +998,35 @@ type watchReplicationControllerStatus struct {
 	// RC details
 	Object kapi.ReplicationController `json:"object"`
 }
+
+func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
+	
+	println("to list pods in", serviceBrokerNamespace)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	
+	pods := kapi.PodList{}
+	
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
+	if osr.Err != nil {
+		return 0, osr.Err
+	}
+	
+	nrunnings := 0
+	
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		
+		println("\n pods.Items[", i, "].Status.Phase =", pod.Status.Phase, "\n")
+		
+		if pod.Status.Phase == kapi.PodRunning {
+			nrunnings ++
+		}
+	}
+	
+	return nrunnings, nil
+}
+
+// todo:
+//   use etcd clientv3 instead, which is able to close a client.
+

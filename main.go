@@ -28,6 +28,7 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/rabbitmq"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/cassandra"
 )
 
 type myServiceBroker struct {

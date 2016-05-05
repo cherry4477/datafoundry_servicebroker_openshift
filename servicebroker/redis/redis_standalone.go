@@ -223,13 +223,13 @@ func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	mq_port := &more_res.serviceSentinel.Spec.Ports[0]
-	//if mq_port == nil {
-	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+	client_port := &more_res.serviceSentinel.Spec.Ports[0]
+	//if client_port == nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("client port not found")
 	//}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", more_res.serviceSentinel.Name, myServiceInfo.Database)
-	port := strconv.Itoa(mq_port.Port)
+	port := strconv.Itoa(client_port.Port)
 	//host := master_res.routeMQ.Spec.Host
 	//port := "80"
 	

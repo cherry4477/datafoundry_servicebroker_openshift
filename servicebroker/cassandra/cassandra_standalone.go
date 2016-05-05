@@ -8,10 +8,10 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"net"
+	//"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
-	//"strconv"
+	"strconv"
 	"strings"
 	"bytes"
 	"encoding/json"
@@ -22,12 +22,12 @@ import (
 	"sync"
 	
 	"github.com/pivotal-golang/lager"
-	//cassandra "github.com/gocql/gocql"
-	"golang.org/x/net/context"
+	cassandra "github.com/gocql/gocql"
+	//"golang.org/x/net/context"
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
-	routeapi "github.com/openshift/origin/route/api/v1"
+	//routeapi "github.com/openshift/origin/route/api/v1"
 	
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
@@ -86,6 +86,7 @@ func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details b
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.User = oshandler.NewElevenLengthID()
 	serviceInfo.Password = oshandler.GenGUID()
 	
 	// todo: improve watch. Pod may be already running before watching!
@@ -119,13 +120,13 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 	// the job may be finished or interrupted or running in another instance.
 	
 	// check boot route, if it doesn't exist, return failed
-	boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-	if boot_res.route.Name == "" {
-		return brokerapi.LastOperation{
-			State:       brokerapi.Failed,
-			Description: "Failed!",
-		}, nil
-	}
+	//boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+	//if boot_res.route.Name == "" {
+	//	return brokerapi.LastOperation{
+	//		State:       brokerapi.Failed,
+	//		Description: "Failed!",
+	//	}, nil
+	//}
 	
 	// only check the statuses of 3 ReplicationControllers. The cassandra pods may be not running well.
 	
@@ -133,14 +134,15 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
-		return true
+		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
+		return n >= *rc.Spec.Replicas
 	}
 	
-	ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if ok (&ha_res.cassandrarc1) && ok (&ha_res.cassandrarc2) && ok (&ha_res.cassandrarc3) {
+	if ok (&ha_res.rc) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -172,7 +174,7 @@ func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.S
 		
 		println("to destroy resources")
 		
-		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 		destroyCassandraResources_HA (ha_res, myServiceInfo.Database)
 		
 		boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
@@ -189,59 +191,36 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
-	//if len(boot_res.service.Spec.Ports) == 0 {
-	//	err := errors.New("no ports in boot service")
-	//	logger.Error("", err)
-	//	return brokerapi.Binding{}, Credentials{}, err
-	//}
 	
-	cassandra_addr, host, port := boot_res.endpoint()
-	println("cassandra addr: ", cassandra_addr)
-	cassandra_addrs := []string{cassandra_addr}
+	host, port, err := boot_res.ServiceHostPort(myServiceInfo.Database)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
+	
+	// ...
+	
+	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		logger.Error("create cassandra authrized session", err)
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
+	defer cassandra_session.Close()
 
 	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
 	newpassword := oshandler.GenGUID()
 	
-	/*
-	cassandra_client, err := newAuthrizedCassandraClient (cassandra_addrs, "root", myServiceInfo.Password)
-	if err != nil {
-		logger.Error("create cassandra authrized client", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	
-	cassandra_userapi := cassandra.NewAuthUserAPI(cassandra_client)
-	
-	err = cassandra_userapi.AddUser(context.Background(), newusername, newpassword)
-	if err != nil {
+	if err := cassandra_session.Query(`CREATE USER ? WITH PASSWORD '?' SUPERUSER`,
+			newusername, newpassword).Exec(); err != nil {
 		logger.Error("create new cassandra user", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	_, err = cassandra_userapi.GrantUser(context.Background(), newusername, []string{CassandraBindRole})
-	if err != nil {
-		logger.Error("grant new cassandra user", err)
-		
-		err2 := cassandra_userapi.RemoveUser(context.Background(), newusername)
-		if err2 != nil {
-			logger.Error("remove new cassandra user", err2)
-		}
-		
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	
-	// cassandra bug: need to change password to make the user applied
-	// todo: may this bug is already fixed now.
-	_, err = cassandra_userapi.ChangePassword(context.Background(), newusername, newpassword)
-	if err != nil {
-		logger.Error("change new user password", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	*/
+	// ...
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      cassandra_addr,
+		Uri:      "",
 		Hostname: host,
-		Port:     port,
+		Port:     strconv.Itoa(port),
 		Username: newusername,
 		Password: newpassword,
 	}
@@ -256,36 +235,28 @@ func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.Servic
 	if err != nil {
 		return err
 	}
-	//if len(boot_res.service.Spec.Ports) == 0 {
-	//     err := errors.New("no ports in boot service")
-	//	logger.Error("", err)
-	//	return err
-	//}
 	
-	cassandra_addr, _, _ := boot_res.endpoint()
-	println("cassandra addr: ", cassandra_addr)
-	cassandra_addrs := []string{cassandra_addr}
-	
-	/*
-	cassandra_client, err := newAuthrizedCassandraClient (cassandra_addrs, "root", myServiceInfo.Password)
+	host, port, err := boot_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
-		logger.Error("create cassandra authrized client", err)
 		return err
 	}
 	
-	cassandra_userapi := cassandra.NewAuthUserAPI(cassandra_client)
-	_, err = cassandra_userapi.RevokeUser(context.Background(), mycredentials.Username, []string{CassandraBindRole})
-	if err != nil {
-		logger.Error("revoke role in unbinding", err)
-		// return err
-	}
+	// ...
 	
-	err = cassandra_userapi.RemoveUser(context.Background(), mycredentials.Username)
+	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
 	if err != nil {
-		logger.Error("remove user", err)
+		logger.Error("create cassandra authrized session", err)
 		return err
 	}
-	*/
+	defer cassandra_session.Close()
+	
+	if err := cassandra_session.Query(`DROP USER ?`,
+			mycredentials.Username).Exec(); err != nil {
+		logger.Error("delete cassandra user", err)
+		return err
+	}
+	
+	// ...
 	
 	return nil
 }
@@ -353,18 +324,9 @@ type watchPodStatus struct {
 	Object kapi.Pod `json:"object"`
 }
 
-
-//provisioning steps:
-//1. create first cassandra pod/service/route (aka. a single node cassandra cluster)
-//   watch pod status to running
-//2. modify cassandra acl (add root, remove gust, add bind role)
-//3. create HA resources
-//4. watch HA pods, when all are running, delete boot pod
-//   (or add 2nd and 3rd cassandra pod, so no need to delete boot pod)
-
 func (job *cassandraOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
-	pod := job.bootResources.cassandrapod
+	pod := job.bootResources.pod
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
 	statuses, cancel, err := oshandler.OC().KWatch (uri)
 	if err != nil {
@@ -429,113 +391,83 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-	time.Sleep(7 * time.Second)
+	// ...
 	
-	if job.cancelled { return }
-	
-	cassandra_addr, _, _ := job.bootResources.endpoint()
-	println("cassandra addr: ", cassandra_addr)
-	cassandra_addrs := []string{cassandra_addr}
-	
-	// cassandra acl
-	
-	/*
-	cassandra_client, err := newUnauthrizedCassandraClient (cassandra_addrs)
+	host, port, err := job.bootResources.ServiceHostPort(serviceInfo.Database)
 	if err != nil {
-		logger.Error("create cassandra unauthrized client", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
 		return
 	}
 	
-	cassandra_userapi := cassandra.NewAuthUserAPI(cassandra_client)
-	err = cassandra_userapi.AddUser(context.Background(), "root", serviceInfo.Password)
-	if err != nil {
-		logger.Error("create cassandra root user", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+	default_root_user     := "cassandra"
+	default_root_password := "cassandra"
+	
+	f1 := func() bool {
+		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
+		if err != nil {
+			logger.Error("create cassandra authrized session", err)
+			return false
+		}
+		defer cassandra_session.Close()
+		
+		if err := cassandra_session.Query(`CREATE USER ? WITH PASSWORD '?' SUPERUSER`,
+				serviceInfo.User, serviceInfo.Password).Exec(); err != nil {
+			logger.Error("create new cassandra super user", err)
+			return false
+		}
+		
+		return true
+	}
+	
+	if f1() == false {
 		return
 	}
 	
-	cassandra_client, err = newAuthrizedCassandraClient (cassandra_addrs, "root", serviceInfo.Password)
-	if err != nil {
-		logger.Error("create cassandra authrized client", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+	f2 := func() bool {
+		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", serviceInfo.User, serviceInfo.Password)
+		if err != nil {
+			logger.Error("create cassandra authrized session", err)
+			return false
+		}
+		defer cassandra_session.Close()
+		
+		if err := cassandra_session.Query(`DROP USER ?`,
+				default_root_user).Exec(); err != nil {
+			logger.Error("drop user cassandra", err)
+			return false
+		}
+		
+		return true
+	}
+	
+	if f2() == false {
 		return
 	}
 	
-	cassandra_authapi := cassandra.NewAuthAPI(cassandra_client)
-	err = cassandra_authapi.Enable(context.Background())
-	if err != nil {
-		logger.Error("enable cassandra auth", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
-		return
-	}
-	
-	cassandra_roleapi := cassandra.NewAuthRoleAPI(cassandra_client)
-	_, err = cassandra_roleapi.RevokeRoleKV(context.Background(), "guest", []string{"/*"}, cassandra.ReadWritePermission)
-	if err != nil {
-		logger.Error("revoke guest role permission", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
-		return
-	}
-	
-	err = cassandra_roleapi.AddRole(context.Background(), CassandraBindRole)
-	if err != nil {
-		logger.Error("add cassandra binduser role", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
-		return
-	}
-	
-	_, err = cassandra_roleapi.GrantRoleKV(context.Background(), CassandraBindRole, []string{"/*"}, cassandra.ReadWritePermission)
-	if err != nil {
-		logger.Error("grant ectd binduser role", err)
-		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
-		return
-	}
-	*/
+	// ...
 	
 	if job.cancelled { return }
 	
 	// create HA resources
 	
-	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
 	
-	// delete boot pod
-	//println("to delete boot pod ...")
-	//
-	//time.Sleep(60 * time.Second)
-	//if job.cancelled { return }
-	//destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, false)
 }
 
-/*
-func newUnauthrizedCassandraClient (cassandraEndPoints []string) (cassandra.Client, error) {
-	cfg := cassandra.Config{
-		Endpoints: cassandraEndPoints,
-		Transport: cassandra.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-	}
-	return cassandra.New(cfg)
+func newUnauthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string) (*cassandra.Session, error) {
+	cluster := cassandra.NewCluster(cassandraEndPoints...)
+	cluster.Keyspace = initialKeyspace
+	cluster.Consistency = cassandra.Quorum
+	return cluster.CreateSession()
 }
 
-func newAuthrizedCassandraClient (cassandraEndPoints []string, cassandraUser, cassandraPassword string) (cassandra.Client, error) {
-	cfg := cassandra.Config{
-		Endpoints: cassandraEndPoints,
-		Transport: cassandra.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-		Username:                cassandraUser,
-		Password:                cassandraPassword,
-	}
-	return cassandra.New(cfg)
+func newAuthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string, cassandraUser, cassandraPassword string) (*cassandra.Session, error) {
+	cluster := cassandra.NewCluster(cassandraEndPoints...)
+	cluster.Keyspace = initialKeyspace
+	cluster.Consistency = cassandra.Quorum
+	cluster.Authenticator = cassandra.PasswordAuthenticator{Username: cassandraUser, Password: cassandraPassword}
+	return cluster.CreateSession()
 }
-*/
 
 //===============================================================
 // 
@@ -545,7 +477,7 @@ var CassandraTemplateData_Boot []byte = nil
 
 func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot) error {
 	if CassandraTemplateData_Boot == nil {
-		f, err := os.Open("cassandra-outer-boot.yaml")
+		f, err := os.Open("cassandra-boot.yaml")
 		if err != nil {
 			return err
 		}
@@ -557,8 +489,8 @@ func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot
 		cassandra_image := oshandler.CassandraImage()
 		cassandra_image = strings.TrimSpace(cassandra_image)
 		if len(cassandra_image) > 0 {
-			CassandraTemplateData_HA = bytes.Replace(
-				CassandraTemplateData_HA, 
+			CassandraTemplateData_Boot = bytes.Replace(
+				CassandraTemplateData_Boot, 
 				[]byte("http://cassandra-image-place-holder/cassandra-openshift-orchestration"), 
 				[]byte(cassandra_image), 
 				-1)
@@ -587,19 +519,18 @@ func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.service).
-		Decode(&res.route).
-		Decode(&res.cassandrapod).
-		Decode(&res.cassandrasrv)
+		Decode(&res.pod).
+		Decode(&res.service)//.
+		//Decode(&res.route)
 	
 	return decoder.Err
 }
 
 var CassandraTemplateData_HA []byte = nil
 
-func loadCassandraResources_HA(instanceID, rootPassword string, res *cassandraResources_HA) error {
+func loadCassandraResources_HA(instanceID string, res *cassandraResources_HA) error {
 	if CassandraTemplateData_HA == nil {
-		f, err := os.Open("cassandra-outer-ha.yaml")
+		f, err := os.Open("cassandra-ha.yaml")
 		if err != nil {
 			return err
 		}
@@ -630,36 +561,40 @@ func loadCassandraResources_HA(instanceID, rootPassword string, res *cassandraRe
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.cassandrarc1).
-		Decode(&res.cassandrasrv1).
-		Decode(&res.cassandrarc2).
-		Decode(&res.cassandrasrv2).
-		Decode(&res.cassandrarc3).
-		Decode(&res.cassandrasrv3)
+		Decode(&res.rc)
 	
 	return decoder.Err
 }
 
 type cassandraResources_Boot struct {
+	pod     kapi.Pod
 	service kapi.Service
-	route   routeapi.Route
-	cassandrapod kapi.Pod
-	cassandrasrv kapi.Service
+	//route   routeapi.Route
 }
 
 type cassandraResources_HA struct {
-	cassandrarc1  kapi.ReplicationController
-	cassandrasrv1 kapi.Service
-	cassandrarc2  kapi.ReplicationController
-	cassandrasrv2 kapi.Service
-	cassandrarc3  kapi.ReplicationController
-	cassandrasrv3 kapi.Service
+	rc  kapi.ReplicationController
 }
 
-func (bootRes *cassandraResources_Boot) endpoint() (string, string, string) {
-	port := "80" // strconv.Itoa(bootRes.service.Spec.Ports[0].Port)
-	host := bootRes.route.Spec.Host
-	return "http://" + net.JoinHostPort(host, port), host, port
+//func (bootRes *cassandraResources_Boot) endpoint() (string, string, string) {
+//	//port := "80" // strconv.Itoa(bootRes.service.Spec.Ports[0].Port)
+//	//host := bootRes.route.Spec.Host
+//	//return "http://" + net.JoinHostPort(host, port), host, port
+//}
+
+func (bootRes *cassandraResources_Boot) ServiceHostPort(serviceBrokerNamespace string) (string, int, error) {
+	
+	//client_port := oshandler.GetServicePortByName(&masterRes.service, "client")
+	//if client_port == nil {
+	//	return "", "", errors.New("client port not found")
+	//}
+	
+	client_port := &bootRes.service.Spec.Ports[0]
+	
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", bootRes.service.Name, serviceBrokerNamespace)
+	port := client_port.Port
+	
+	return host, port, nil
 }
 	
 func createCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*cassandraResources_Boot, error) {
@@ -676,10 +611,9 @@ func createCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
-		OPost(prefix + "/routes", &input.route, &output.route).
-		KPost(prefix + "/pods", &input.cassandrapod, &output.cassandrapod).
-		KPost(prefix + "/services", &input.cassandrasrv, &output.cassandrasrv)
+		KPost(prefix + "/pods", &input.pod, &output.pod).
+		KPost(prefix + "/services", &input.service, &output.service)//.
+		//OPost(prefix + "/routes", &input.route, &output.route)
 	
 	if osr.Err != nil {
 		logger.Error("createCassandraResources_Boot", osr.Err)
@@ -701,10 +635,9 @@ func getCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*ca
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.service.Name, &output.service).
-		OGet(prefix + "/routes/" + input.route.Name, &output.route).
-		KGet(prefix + "/pods/" + input.cassandrapod.Name, &output.cassandrapod).
-		KGet(prefix + "/services/" + input.cassandrasrv.Name, &output.cassandrasrv)
+		KGet(prefix + "/pods/" + input.pod.Name, &output.pod).
+		KGet(prefix + "/services/" + input.service.Name, &output.service)//.
+		//OGet(prefix + "/routes/" + input.route.Name, &output.route)
 	
 	if osr.Err != nil {
 		logger.Error("getCassandraResources_Boot", osr.Err)
@@ -715,19 +648,15 @@ func getCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*ca
 
 func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBrokerNamespace string, all bool) {
 	// todo: add to retry queue on fail
-	
-	if all {
-		go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
-		go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
-	}
-	
-	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.cassandrapod.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", bootRes.cassandrasrv.Name)}()
+
+	//go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)}()
 }
 	
-func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) error {
+func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) error {
 	var input cassandraResources_HA
-	err := loadCassandraResources_HA(instanceId, rootPassword, &input)
+	err := loadCassandraResources_HA(instanceId, &input)
 	if err != nil {
 		return err
 	}
@@ -739,12 +668,7 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/replicationcontrollers", &input.cassandrarc1, &output.cassandrarc1).
-		KPost(prefix + "/services", &input.cassandrasrv1, &output.cassandrasrv1).
-		KPost(prefix + "/replicationcontrollers", &input.cassandrarc2, &output.cassandrarc2).
-		KPost(prefix + "/services", &input.cassandrasrv2, &output.cassandrasrv2).
-		KPost(prefix + "/replicationcontrollers", &input.cassandrarc3, &output.cassandrarc3).
-		KPost(prefix + "/services", &input.cassandrasrv3, &output.cassandrasrv3)
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc)
 	
 	if osr.Err != nil {
 		logger.Error("createCassandraResources_HA", osr.Err)
@@ -753,22 +677,7 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 	return osr.Err
 	*/
 	go func() {
-		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.cassandrarc1, &output.cassandrarc1); err != nil {
-			return
-		}
-		if err := job.kpost (serviceBrokerNamespace, "services", &input.cassandrasrv1, &output.cassandrasrv1); err != nil {
-			return
-		}
-		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.cassandrarc2, &output.cassandrarc2); err != nil {
-			return
-		}
-		if err := job.kpost (serviceBrokerNamespace, "services", &input.cassandrasrv2, &output.cassandrasrv2); err != nil {
-			return
-		}
-		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.cassandrarc3, &output.cassandrarc3); err != nil {
-			return
-		}
-		if err := job.kpost (serviceBrokerNamespace, "services", &input.cassandrasrv3, &output.cassandrasrv3); err != nil {
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
 			return
 		}
 	}()
@@ -776,11 +685,11 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 	return nil
 }
 	
-func getCassandraResources_HA (instanceId, serviceBrokerNamespace, rootPassword string) (*cassandraResources_HA, error) {
+func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cassandraResources_HA, error) {
 	var output cassandraResources_HA
 	
 	var input cassandraResources_HA
-	err := loadCassandraResources_HA(instanceId, rootPassword, &input)
+	err := loadCassandraResources_HA(instanceId, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -789,12 +698,7 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace, rootPassword 
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.cassandrasrv1.Name, &output.cassandrasrv1).
-		KGet(prefix + "/replicationcontrollers/" + input.cassandrarc1.Name, &output.cassandrarc1).
-		KGet(prefix + "/services/" + input.cassandrasrv2.Name, &output.cassandrasrv2).
-		KGet(prefix + "/replicationcontrollers/" + input.cassandrarc2.Name, &output.cassandrarc2).
-		KGet(prefix + "/services/" + input.cassandrasrv3.Name, &output.cassandrasrv3).
-		KGet(prefix + "/replicationcontrollers/" + input.cassandrarc3.Name, &output.cassandrarc3)
+		KGet(prefix + "/services/" + input.rc.Name, &output.rc)
 	
 	if osr.Err != nil {
 		logger.Error("getCassandraResources_HA", osr.Err)
@@ -806,14 +710,7 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace, rootPassword 
 func destroyCassandraResources_HA (haRes *cassandraResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 	
-	go func() {kdel (serviceBrokerNamespace, "services", haRes.cassandrasrv1.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &haRes.cassandrarc1)}()
-	
-	go func() {kdel (serviceBrokerNamespace, "services", haRes.cassandrasrv2.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &haRes.cassandrarc2)}()
-	
-	go func() {kdel (serviceBrokerNamespace, "services", haRes.cassandrasrv3.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &haRes.cassandrarc3)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &haRes.rc)}()
 }
 
 //===============================================================
@@ -1001,3 +898,34 @@ type watchReplicationControllerStatus struct {
 	// RC details
 	Object kapi.ReplicationController `json:"object"`
 }
+
+func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
+	
+	println("to list pods in", serviceBrokerNamespace)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	
+	pods := kapi.PodList{}
+	
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
+	if osr.Err != nil {
+		return 0, osr.Err
+	}
+	
+	nrunnings := 0
+	
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		
+		println("\n pods.Items[", i, "].Status.Phase =", pod.Status.Phase, "\n")
+		
+		if pod.Status.Phase == kapi.PodRunning {
+			nrunnings ++
+		}
+	}
+	
+	return nrunnings, nil
+}
+
+
+
