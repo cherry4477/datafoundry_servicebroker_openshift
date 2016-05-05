@@ -398,11 +398,14 @@ func (job *cassandraOrchestrationJob) run() {
 		return
 	}
 	
+	println("to create new super user")
+	
 	default_root_user     := "cassandra"
-	default_root_password := "cassandra"
+	//default_root_password := "cassandra"
 	
 	f1 := func() bool {
-		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
+		//cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
+		cassandra_session, err := newUnauthrizedCassandraSession ([]string{host}, port, "")
 		if err != nil {
 			logger.Error("create cassandra authrized session", err)
 			return false
@@ -422,10 +425,12 @@ func (job *cassandraOrchestrationJob) run() {
 		return
 	}
 	
+	println("to delete user cassandra")
+	
 	f2 := func() bool {
 		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", serviceInfo.User, serviceInfo.Password)
 		if err != nil {
-			logger.Error("create cassandra authrized session", err)
+			logger.Error("create cassandra authrized session.", err)
 			return false
 		}
 		defer cassandra_session.Close()
@@ -446,6 +451,8 @@ func (job *cassandraOrchestrationJob) run() {
 	// ...
 	
 	if job.cancelled { return }
+	
+	println("to create HA resources")
 	
 	// create HA resources
 	
