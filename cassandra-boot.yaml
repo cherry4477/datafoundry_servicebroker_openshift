@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   labels:
     app: sb-instanceid-cassandra
-  name: sb-instanceid-cassandra
+  name: sb-instanceid-cssndr
 spec:
   containers:
   - args:
@@ -12,7 +12,7 @@ spec:
       limits:
         cpu: "0.1"
     image: http://cassandra-image-place-holder/cassandra-openshift-orchestration
-    name: sb-instanceid-cassandra
+    name: sb-instanceid-cssndr
     ports:
     - name: cql
       containerPort: 9042
@@ -27,7 +27,7 @@ spec:
     - name: HEAP_NEWSIZE
       value: 100M
     - name: CASSANDRA_SERVICE
-      value: sb-instanceid-cassandra
+      value: sb-instanceid-cssndr
     - name: POD_NAMESPACE
       valueFrom:
         fieldRef:
@@ -43,7 +43,7 @@ kind: Service
 metadata:
   labels:
     app: sb-instanceid-cassandra
-  name: sb-instanceid-cassandra
+  name: sb-instanceid-cssndr
 spec:
   ports:
     - port: 9042
@@ -56,9 +56,9 @@ spec:
 #apiVersion: v1
 #kind: Route
 #metadata:
-#  name: sb-instanceid-cassandra
+#  name: sb-instanceid-cssndr
 #spec:
 #  host: sb-instanceid-cassandra.endpoint-postfix-place-holder
 #  to:
 #    kind: Service
-#    name: sb-instanceid-cassandra
+#    name: sb-instanceid-cssndr

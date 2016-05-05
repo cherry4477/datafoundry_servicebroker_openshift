@@ -3,7 +3,7 @@ kind: ReplicationController
 metadata:
   labels:
     app: sb-instanceid-cassandra
-  name: sb-instanceid-cassandra
+  name: sb-instanceid-cssndr
 spec:
   replicas: 4
   selector:
@@ -31,7 +31,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           image: http://cassandra-image-place-holder/cassandra-openshift-orchestration
-          name: sb-instanceid-cassandra
+          name: sb-instanceid-cssndr
           ports:
             - containerPort: 9042
               name: cql
