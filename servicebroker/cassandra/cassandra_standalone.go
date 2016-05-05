@@ -391,11 +391,11 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-	time.Sleep(10 * time.Second) // the pod and service may be not ininited fully
+	time.Sleep(30 * time.Second) // the pod and service may be not ininited fully
 	
 	if job.cancelled { return }
 	
-	// ...
+	// ... 
 	
 	host, port, err := job.bootResources.ServiceHostPort(serviceInfo.Database)
 	if err != nil {
@@ -468,14 +468,14 @@ func (job *cassandraOrchestrationJob) run() {
 func newUnauthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string) (*cassandra.Session, error) {
 	cluster := cassandra.NewCluster(cassandraEndPoints...)
 	cluster.Keyspace = initialKeyspace
-	cluster.Consistency = cassandra.Quorum
+	cluster.Consistency = cassandra.One // Quorum
 	return cluster.CreateSession()
 }
 
 func newAuthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string, cassandraUser, cassandraPassword string) (*cassandra.Session, error) {
 	cluster := cassandra.NewCluster(cassandraEndPoints...)
 	cluster.Keyspace = initialKeyspace
-	cluster.Consistency = cassandra.Quorum
+	cluster.Consistency = cassandra.One // Quorum
 	cluster.Authenticator = cassandra.PasswordAuthenticator{Username: cassandraUser, Password: cassandraPassword}
 	return cluster.CreateSession()
 }
