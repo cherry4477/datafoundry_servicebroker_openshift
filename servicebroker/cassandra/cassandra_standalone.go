@@ -391,6 +391,10 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
+	time.Sleep(10 * time.Second) // the pod and service may be not ininited fully
+	
+	if job.cancelled { return }
+	
 	// ...
 	
 	host, port, err := job.bootResources.ServiceHostPort(serviceInfo.Database)
@@ -401,11 +405,11 @@ func (job *cassandraOrchestrationJob) run() {
 	println("to create new super user")
 	
 	default_root_user     := "cassandra"
-	//default_root_password := "cassandra"
+	default_root_password := "cassandra"
 	
 	f1 := func() bool {
-		//cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
-		cassandra_session, err := newUnauthrizedCassandraSession ([]string{host}, port, "")
+		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
+		//cassandra_session, err := newUnauthrizedCassandraSession ([]string{host}, port, "")
 		if err != nil {
 			logger.Error("create cassandra authrized session", err)
 			return false
