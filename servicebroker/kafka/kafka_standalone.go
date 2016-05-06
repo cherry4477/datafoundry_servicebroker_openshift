@@ -101,8 +101,8 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	kafkaUser := oshandler.NewElevenLengthID()
-	kafkaPassword := oshandler.GenGUID()
+	//kafkaUser := oshandler.NewElevenLengthID()
+	//kafkaPassword := oshandler.GenGUID()
 	zookeeperUser := "super" // oshandler.NewElevenLengthID()
 	zookeeperPassword := oshandler.GenGUID()
 	
@@ -127,8 +127,8 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = kafkaUser
-	serviceInfo.Password = kafkaPassword
+	//serviceInfo.User = kafkaUser
+	//serviceInfo.Password = kafkaPassword
 	serviceInfo.Admin_user = zookeeperUser
 	serviceInfo.Admin_password = zookeeperPassword
 	
@@ -159,7 +159,7 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	
 	// the job may be finished or interrupted or running in another instance.
 	
-	master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -216,7 +216,7 @@ func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		
 		println("to destroy kafka resources")
 		
-		master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+		master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
 		destroyKafkaResources_Master (master_res, myServiceInfo.Database)
 	}()
 	
@@ -236,7 +236,7 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, nil
 	}
 	
-	master_res, err := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, err := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
@@ -348,7 +348,7 @@ func (job *kafkaOrchestrationJob) run() {
 	if succeeded {
 		println("  to create kafka resources")
 		
-		_ = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.User, job.serviceInfo.Password)
+		_ = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
 	}
 }
 
@@ -358,7 +358,7 @@ func (job *kafkaOrchestrationJob) run() {
 
 var KafkaTemplateData_Master []byte = nil
 
-func loadKafkaResources_Master(instanceID, kafkaUser, kafkaPassword string, res *kafkaResources_Master) error {
+func loadKafkaResources_Master(instanceID/*, kafkaUser, kafkaPassword*/ string, res *kafkaResources_Master) error {
 	if KafkaTemplateData_Master == nil {
 		f, err := os.Open("kafka.yaml")
 		if err != nil {
@@ -383,6 +383,8 @@ func loadKafkaResources_Master(instanceID, kafkaUser, kafkaPassword string, res 
 	
 	yamlTemplates := KafkaTemplateData_Master	
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
 	//println()
@@ -401,9 +403,9 @@ type kafkaResources_Master struct {
 	rc      kapi.ReplicationController
 }
 	
-func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser, kafkaPassword string) error {
+func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string) error {
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId, kafkaUser, kafkaPassword, &input)
+	err := loadKafkaResources_Master(instanceId/*, kafkaUser, kafkaPassword*/, &input)
 	if err != nil {
 		//return nil, err
 		return err
@@ -437,11 +439,11 @@ func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, servi
 	return nil
 }
 	
-func getKafkaResources_Master (instanceId, serviceBrokerNamespace, kafkaUser, kafkaPassword string) (*kafkaResources_Master, error) {
+func getKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string) (*kafkaResources_Master, error) {
 	var output kafkaResources_Master
 	
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId, kafkaUser, kafkaPassword, &input)
+	err := loadKafkaResources_Master(instanceId/*, kafkaUser, kafkaPassword*/, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -498,12 +500,15 @@ RETRY:
 	return nil
 }
 
-func opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *kafkaOrchestrationJob) opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
 	
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
+	if job.cancelled {
+		return nil
+	}
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).OPost(uri, body, into)
 	if osr.Err == nil {

@@ -1,0 +1,98 @@
+
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-stormsv
+spec:
+  replicas: 2
+  selector:
+    sb-instanceid-storm: supervisor
+  template:
+    metadata:
+      labels:
+        sb-instanceid-storm: supervisor
+        service-broker: sb-instanceid-storm
+    spec:
+      containers:
+      - name: zookeeper
+        image: http://storm-image-place-holder/storm-openshift-orchestration
+        env:
+        - name: CONFIGURE_ZOOKEEPER
+          value: "true"
+        - name: STORM_CMD
+          value: "supervisor"
+        - name: ZK_SERVER_1_SERVICE_HOST
+          value: "sb-instanceid-zk"
+        - name: APACHE_STORM_NIMBUS_SERVICE_HOST
+          value: sb-instanceid-stormnb
+        volumeMounts:
+        - name: storm-data
+          mountPath: /opt/apache-storm/storm-local
+      volumes:
+      - name: storm-data
+        emptyDir: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-stormui
+spec:
+  selector:
+    sb-instanceid-storm: ui
+  ports:
+  - name: storm-ui-port
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+
+---
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-stormui
+spec:
+  host: sb-instanceid-stormui.endpoint-postfix-place-holder
+  port:
+    targetPort: storm-ui-port
+  to:
+    kind: Service
+    name: sb-instanceid-stormui
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-stormui
+spec:
+  replicas: 1
+  selector:
+    sb-instanceid-storm: ui
+  template:
+    metadata:
+      labels:
+        sb-instanceid-storm: ui
+        service-broker: sb-instanceid-storm
+    spec:
+      containers:
+      - name: zookeeper
+        image: http://storm-image-place-holder/storm-openshift-orchestration
+        env:
+        - name: CONFIGURE_ZOOKEEPER
+          value: "true"
+        - name: STORM_CMD
+          value: "ui"
+        - name: ZK_SERVER_1_SERVICE_HOST
+          value: "sb-instanceid-zk"
+        - name: APACHE_STORM_NIMBUS_SERVICE_HOST
+          value: sb-instanceid-stormnb
+        volumeMounts:
+        - name: storm-data
+          mountPath: /opt/apache-storm/storm-local
+      volumes:
+      - name: storm-data
+        emptyDir: {}

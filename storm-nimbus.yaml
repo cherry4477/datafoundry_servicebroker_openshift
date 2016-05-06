@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-stormnb
+spec:
+  selector:
+    sb-instanceid-storm: nimbus
+  ports:
+  - name: storm-nimbus-port
+    protocol: TCP
+    port: 6627
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-stormnb
+spec:
+  replicas: 1
+  selector:
+    sb-instanceid-storm: nimbus
+  template:
+    metadata:
+      labels:
+        sb-instanceid-storm: nimbus
+        service-broker: sb-instanceid-storm
+    spec:
+      containers:
+      - name: zookeeper
+        image: http://storm-image-place-holder/storm-openshift-orchestration
+        env:
+        - name: CONFIGURE_ZOOKEEPER
+          value: "true"
+        - name: STORM_CMD
+          value: "nimbus"
+        - name: ZK_SERVER_1_SERVICE_HOST
+          value: "sb-instanceid-zk"
+        volumeMounts:
+        - name: storm-data
+          mountPath: /opt/apache-storm/storm-local
+      volumes:
+      - name: storm-data
+        emptyDir: {}

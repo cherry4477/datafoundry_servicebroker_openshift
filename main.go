@@ -29,6 +29,7 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/cassandra"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm"
 )
 
 type myServiceBroker struct {
