@@ -391,7 +391,9 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-	time.Sleep(30 * time.Second) // the pod and service may be not ininited fully
+RETRY:
+
+	time.Sleep(17 * time.Second) // the pod and service may be not ininited fully
 	
 	if job.cancelled { return }
 	
@@ -426,7 +428,8 @@ func (job *cassandraOrchestrationJob) run() {
 	}
 	
 	if f1() == false {
-		return
+		//return
+		goto RETRY
 	}
 	
 	println("to delete user cassandra")
