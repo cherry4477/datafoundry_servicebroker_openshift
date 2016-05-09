@@ -37,7 +37,7 @@ import (
 // 
 //==============================================================
 
-const RedisServcieBrokerName_Standalone = "Redis_standalone"
+const RedisServcieBrokerName_Standalone = "Redis-v2.8_standalone"
 
 func init() {
 	oshandler.Register(RedisServcieBrokerName_Standalone, &Redis_freeHandler{})

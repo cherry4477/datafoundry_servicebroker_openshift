@@ -37,7 +37,7 @@ import (
 // 
 //==============================================================
 
-const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_standalone"
+const ZookeeperServcieBrokerName_Standalone = "ZooKeeper-v3.4.8_standalone"
 
 func init() {
 	oshandler.Register(ZookeeperServcieBrokerName_Standalone, &Zookeeper_freeHandler{})

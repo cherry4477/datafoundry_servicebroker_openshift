@@ -35,8 +35,8 @@ import (
 // 
 //==============================================================
 
-const SparkServcieBrokerName_Free = "Spark_One_Worker"
-const SparkServcieBrokerName_HighAvailable = "Spark_Three_Workers"
+const SparkServcieBrokerName_Free = "Spark-v1.5.2_One_Worker"
+const SparkServcieBrokerName_HighAvailable = "Spark-v1.5.2_Three_Workers"
 
 func init() {
 	oshandler.Register(SparkServcieBrokerName_Free, &Spark_freeHandler{})

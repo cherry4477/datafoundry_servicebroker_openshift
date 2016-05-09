@@ -38,7 +38,7 @@ import (
 // 
 //==============================================================
 
-const KafkaServcieBrokerName_Standalone = "Kafka_standalone"
+const KafkaServcieBrokerName_Standalone = "Kafka-v0.9.0_standalone"
 
 func init() {
 	oshandler.Register(KafkaServcieBrokerName_Standalone, &Kafka_freeHandler{})

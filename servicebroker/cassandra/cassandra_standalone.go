@@ -36,7 +36,7 @@ import (
 // 
 //==============================================================
 
-const CassandraServcieBrokerName_Standalone = "Cassandra_standalone"
+const CassandraServcieBrokerName_Standalone = "Cassandra-v3.4_standalone"
 
 func init() {
 	oshandler.Register(CassandraServcieBrokerName_Standalone, &Cassandra_sampleHandler{})
