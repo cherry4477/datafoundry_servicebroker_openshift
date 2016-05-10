@@ -368,7 +368,7 @@ func (job *stormOrchestrationJob) run() {
 	
 	// ...
 	
-	println("  to create storm resources")
+	println("  to create storm nimbus resources")
 	
 	job.nimbusResources, err = job.createStormResources_Nimbus (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
 	if err != nil {
@@ -377,54 +377,53 @@ func (job *stormOrchestrationJob) run() {
 		return
 	}
 	
-	// storm nimbus
+	// wait nimbus full initialized
 	
 	rc := &job.nimbusResources.rc
 	
-	go func() {
-		ok := func(rc *kapi.ReplicationController) bool {
-			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil {
-				return false
-			}
-			
-			if rc.Status.Replicas < *rc.Spec.Replicas {
-				rc.Status.Replicas, _ = statRunningPodsByLabels (job.serviceInfo.Database, rc.Labels)
-			
-				println("rc = ", rc, ", rc.Status.Replicas = ", rc.Status.Replicas)
-			}
-			
-			return rc.Status.Replicas >= *rc.Spec.Replicas
+	ok := func(rc *kapi.ReplicationController) bool {
+		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil {
+			return false
 		}
 		
+		if rc.Status.Replicas < *rc.Spec.Replicas {
+			rc.Status.Replicas, _ = statRunningPodsByLabels (job.serviceInfo.Database, rc.Labels)
 		
-		for {
-			if ok (rc) {
-				break
-			}
-			
-			select {
-			case <- job.cancelChan:
-				return
-			case <- time.After(15 * time.Second):
-				// pod phase change will not trigger rc status change.
-				// so need this case
-				continue
-			}
+			println("rc = ", rc, ", rc.Status.Replicas = ", rc.Status.Replicas)
 		}
-	}()
+		
+		return rc.Status.Replicas >= *rc.Spec.Replicas
+	}
 	
-	// todo: check if seed pod is running
+	for {
+		if ok (rc) {
+			break
+		}
+		
+		select {
+		case <- job.cancelChan:
+			return
+		case <- time.After(15 * time.Second):
+			// pod phase change will not trigger rc status change.
+			// so need this case
+			continue
+		}
+	}
 	
 	// ...
 	
 	if job.cancelled { return }
 	
-	time.Sleep(7 * time.Second)
+	time.Sleep(10 * time.Second) // maybe numbus is not fullly inited yet
 	
 	if job.cancelled { return }
 	
-	_ = job.createStormResources_UiSuperviser (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
+	println("  to create storm ui+supervisor resources")
 	
+	err = job.createStormResources_UiSuperviser (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
+	if err != nil {
+		logger.Error("createStormResources_UiSuperviser", err)
+	}
 }
 
 //=======================================================================
