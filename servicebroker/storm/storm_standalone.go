@@ -618,6 +618,7 @@ func destroyStormResources_Nimbus (nimbusRes *stormResources_Nimbus, serviceBrok
 	
 func (job *stormOrchestrationJob) createStormResources_UiSuperviser (instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/ string) error {
 	var input stormResources_UiSuperviser
+	
 	err := loadStormResources_UiSuperviser(instanceId/*, stormUser, stormPassword*/, &input)
 	if err != nil {
 		//return nil, err
@@ -673,7 +674,7 @@ func getStormResources_UiSuperviser (instanceId, serviceBrokerNamespace/*, storm
 	osr.
 		KGet(prefix + "/replicationcontrollers/" + input.superviserrc.Name, &output.superviserrc).
 		KGet(prefix + "/services/" + input.uiservice.Name, &output.uiservice).
-		OPost(prefix + "/routes", &input.uiroute, &output.uiroute).
+		OGet(prefix + "/routes" + input.uiroute.Name, &output.uiroute).
 		KGet(prefix + "/replicationcontrollers/" + input.uirc.Name, &output.uirc)
 	
 	if osr.Err != nil {
