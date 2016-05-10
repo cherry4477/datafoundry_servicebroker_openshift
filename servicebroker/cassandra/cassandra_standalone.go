@@ -419,8 +419,8 @@ RETRY_CREATE_NEW_USER:
 		defer cassandra_session.Close()
 		
 		if err := cassandra_session.Query(
-				`CREATE USER '?' WITH PASSWORD '?' SUPERUSER;`,
-				serviceInfo.User, serviceInfo.Password).Exec(); err != nil {
+				//`CREATE USER '?' WITH PASSWORD '?' SUPERUSER;`, serviceInfo.User, serviceInfo.Password).Exec(); err != nil {
+				fmt.Sprintf(`CREATE USER '%s' WITH PASSWORD '%s' SUPERUSER;`, serviceInfo.User, serviceInfo.Password)).Exec(); err != nil {
 			logger.Error("create new cassandra super user (" + serviceInfo.User + "," + serviceInfo.Password + ")", err)
 			return false
 		}
@@ -447,7 +447,9 @@ RETRY_DELETE_DEFAULT_USER:
 		}
 		defer cassandra_session.Close()
 		
-		if err := cassandra_session.Query(`DROP USER '?';`, default_root_user).Exec(); err != nil {
+		if err := cassandra_session.Query(
+				//`DROP USER '?';`, default_root_user).Exec(); err != nil {
+				fmt.Sprintf(`DROP USER '%s';`, default_root_user)).Exec(); err != nil {
 			logger.Error("drop user cassandra", err)
 			return false
 		}
