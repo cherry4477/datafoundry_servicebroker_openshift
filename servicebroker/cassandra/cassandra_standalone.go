@@ -393,7 +393,7 @@ func (job *cassandraOrchestrationJob) run() {
 	
 RETRY:
 
-	time.Sleep(17 * time.Second) // the pod and service may be not ininited fully
+	time.Sleep(60 * time.Second) // the pod and service may be not ininited fully
 	
 	if job.cancelled { return }
 	
@@ -418,9 +418,10 @@ RETRY:
 		}
 		defer cassandra_session.Close()
 		
-		if err := cassandra_session.Query(`CREATE USER ? WITH PASSWORD '?' SUPERUSER`,
+		if err := cassandra_session.Query(
+				`CREATE USER '?' WITH PASSWORD '?' SUPERUSER;`,
 				serviceInfo.User, serviceInfo.Password).Exec(); err != nil {
-			logger.Error("create new cassandra super user", err)
+			logger.Error("create new cassandra super user (" + serviceInfo.User + "," + serviceInfo.Password + ")", err)
 			return false
 		}
 		
@@ -442,8 +443,7 @@ RETRY:
 		}
 		defer cassandra_session.Close()
 		
-		if err := cassandra_session.Query(`DROP USER ?`,
-				default_root_user).Exec(); err != nil {
+		if err := cassandra_session.Query(`DROP USER '?';`, default_root_user).Exec(); err != nil {
 			logger.Error("drop user cassandra", err)
 			return false
 		}
