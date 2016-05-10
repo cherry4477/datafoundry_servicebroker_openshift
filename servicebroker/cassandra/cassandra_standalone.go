@@ -391,7 +391,7 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
-RETRY:
+RETRY_CREATE_NEW_USER:
 
 	time.Sleep(60 * time.Second) // the pod and service may be not ininited fully
 	
@@ -430,8 +430,12 @@ RETRY:
 	
 	if f1() == false {
 		//return
-		goto RETRY
+		goto RETRY_CREATE_NEW_USER
 	}
+	
+RETRY_DELETE_DEFAULT_USER:
+
+	time.Sleep(20 * time.Second) // last action may be not fully applied yet, maybe, who konws.
 	
 	println("to delete user cassandra")
 	
@@ -452,10 +456,15 @@ RETRY:
 	}
 	
 	if f2() == false {
-		return
+		//return
+		goto RETRY_DELETE_DEFAULT_USER
 	}
 	
 	// ...
+	
+	if job.cancelled { return }
+	
+	time.Sleep(20 * time.Second) 
 	
 	if job.cancelled { return }
 	
