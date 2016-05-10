@@ -468,21 +468,25 @@ RETRY:
 	
 }
 
-func newUnauthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string) (*cassandra.Session, error) {
+func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKeyspace string) *cassandra.ClusterConfig {
 	cluster := cassandra.NewCluster(cassandraEndPoints...)
+	cluster.Port = port
 	cluster.Keyspace = initialKeyspace
-	//cluster.Consistency = cassandra.One // Quorum
-	//cluster.CQLVersion = "3.4.0"
+	cluster.Consistency = cassandra.One // Quorum
+	cluster.CQLVersion = "3.4.0"
 	cluster.ProtoVersion = 4
+	cluster.Timeout = 30 * time.Second
+	
+	return cluster
+}
+
+func newUnauthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string) (*cassandra.Session, error) {
+	cluster := newCassandraClusterConfig(cassandraEndPoints, port, initialKeyspace)
 	return cluster.CreateSession()
 }
 
 func newAuthrizedCassandraSession (cassandraEndPoints []string, port int, initialKeyspace string, cassandraUser, cassandraPassword string) (*cassandra.Session, error) {
-	cluster := cassandra.NewCluster(cassandraEndPoints...)
-	cluster.Keyspace = initialKeyspace
-	//cluster.Consistency = cassandra.One // Quorum
-	//cluster.CQLVersion = "3.4.0"
-	cluster.ProtoVersion = 4
+	cluster := newCassandraClusterConfig(cassandraEndPoints, port, initialKeyspace)
 	cluster.Authenticator = cassandra.PasswordAuthenticator{Username: cassandraUser, Password: cassandraPassword}
 	return cluster.CreateSession()
 }
