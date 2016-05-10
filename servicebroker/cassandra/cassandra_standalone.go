@@ -209,8 +209,9 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
 	newpassword := oshandler.GenGUID()
 	
-	if err := cassandra_session.Query(`CREATE USER ? WITH PASSWORD '?' SUPERUSER`,
-			newusername, newpassword).Exec(); err != nil {
+	if err := cassandra_session.Query(
+			//`CREATE USER ? WITH PASSWORD '?' SUPERUSER`, newusername, newpassword).Exec(); err != nil {
+			fmt.Sprintf(`CREATE USER '%s' WITH PASSWORD '%s' SUPERUSER;`, newusername, newpassword)).Exec(); err != nil {
 		logger.Error("create new cassandra user", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
@@ -250,8 +251,9 @@ func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.Servic
 	}
 	defer cassandra_session.Close()
 	
-	if err := cassandra_session.Query(`DROP USER ?`,
-			mycredentials.Username).Exec(); err != nil {
+	if err := cassandra_session.Query(
+			//`DROP USER ?`, mycredentials.Username).Exec(); err != nil {
+			fmt.Sprintf(`DROP USER '%s';`, mycredentials.Username)).Exec(); err != nil {
 		logger.Error("delete cassandra user", err)
 		return err
 	}
