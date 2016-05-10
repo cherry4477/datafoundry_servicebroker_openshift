@@ -476,7 +476,7 @@ var StormTemplateData_UiSuperviser []byte = nil
 
 func loadStormResources_UiSuperviser(instanceID/*, stormUser, stormPassword*/ string, res *stormResources_UiSuperviser) error {
 	if StormTemplateData_UiSuperviser == nil {
-		f, err := os.Open("storm-ui-superviser.yaml")
+		f, err := os.Open("storm-ui-supervisor.yaml")
 		if err != nil {
 			return err
 		}
