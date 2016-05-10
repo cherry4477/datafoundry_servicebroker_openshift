@@ -255,7 +255,8 @@ func (handler *Spark_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	
 	// todo: check if pods are created and running, return error on false.
 	
-	master_host := master_res.webroute.Spec.Host
+	//master_host := master_res.webroute.Spec.Host
+	master_host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.mastersvc.Name, myServiceInfo.Database)
 	master_port := strconv.Itoa(master_res.mastersvc.Spec.Ports[0].Port)
 	master_uri := "spark://" + net.JoinHostPort(master_host, master_port)
 	zeppelin_host := zeppelin_res.route.Spec.Host
