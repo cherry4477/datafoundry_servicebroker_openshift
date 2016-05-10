@@ -37,7 +37,7 @@ import (
 // 
 //==============================================================
 
-const RabbitmqServcieBrokerName_Standalone = "RabbitMQ-v0.9.0_standalone"
+const RabbitmqServcieBrokerName_Standalone = "RabbitMQ_standalone"
 
 func init() {
 	oshandler.Register(RabbitmqServcieBrokerName_Standalone, &Rabbitmq_freeHandler{})
