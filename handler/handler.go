@@ -162,8 +162,8 @@ func init() {
 	etcdImage = getenv("ETCDIMAGE")
 	zookeeperImage = getenv("ZOOKEEPERIMAGE")
 	redisImage = getenv("REDISIMAGE")
-	kafkaImage = getenv("STORMIMAGE")
-	stormImage = getenv("KAFKAIMAGE")
+	kafkaImage = getenv("KAFKAIMAGE")
+	stormImage = getenv("STORMIMAGE")
 	cassandraImage = getenv("CASSANDRAIMAGE")
 }
 
