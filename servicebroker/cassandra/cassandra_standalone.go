@@ -79,7 +79,7 @@ func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details b
 	output, err := createCassandraResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
 
 	if err != nil {
-		destroyCassandraResources_Boot(output, serviceBrokerNamespace, true)
+		destroyCassandraResources_Boot(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
 	}
@@ -131,6 +131,11 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 	// only check the statuses of 3 ReplicationControllers. The cassandra pods may be not running well.
 	
 	ok := func(rc *kapi.ReplicationController) bool {
+		println("rc == nil", (rc == nil))
+		println("rc == nil || rc.Name == ''", (rc == nil || rc.Name == ""))
+		println("rc == nil || rc.Name == '' || rc.Spec.Replicas == nil", (rc == nil || rc.Name == "" || rc.Spec.Replicas == nil))
+		println("rc == nil || rc.Name == '' || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas", (rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas))
+		
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
@@ -178,7 +183,7 @@ func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.S
 		println("to destroy resources")
 		
 		boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-		destroyCassandraResources_Boot (boot_res, myServiceInfo.Database, true)
+		destroyCassandraResources_Boot (boot_res, myServiceInfo.Database)
 		
 		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 		destroyCassandraResources_HA (ha_res, myServiceInfo.Database)
@@ -354,7 +359,7 @@ func (job *cassandraOrchestrationJob) run() {
 	if err != nil {
 		logger.Error("start watching boot pod", err)
 		job.isProvisioning = false
-		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+		destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database)
 		return
 	}
 	
@@ -373,7 +378,7 @@ func (job *cassandraOrchestrationJob) run() {
 			
 			logger.Error("watch boot pod error", status.Err)
 			job.isProvisioning = false
-			destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+			destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		} else {
 			//logger.Debug("watch cassandra pod, status.Info: " + string(status.Info))
@@ -385,7 +390,7 @@ func (job *cassandraOrchestrationJob) run() {
 			
 			logger.Error("parse boot pod status", err)
 			job.isProvisioning = false
-			destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+			destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database)
 			return
 		}
 		
@@ -397,7 +402,7 @@ func (job *cassandraOrchestrationJob) run() {
 				
 				logger.Debug("pod phase is neither pending nor running")
 				job.isProvisioning = false
-				destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database, true)
+				destroyCassandraResources_Boot (job.bootResources, serviceInfo.Database)
 				return
 			}
 			
@@ -704,7 +709,7 @@ func getCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*ca
 	return &output, osr.Err
 }
 
-func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBrokerNamespace string, all bool) {
+func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
 	//go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
@@ -759,7 +764,7 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cass
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.rc.Name, &output.rc)
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc)
 	
 	if osr.Err != nil {
 		logger.Error("getCassandraResources_HA", osr.Err)
