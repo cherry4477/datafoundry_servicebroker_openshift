@@ -86,7 +86,7 @@ func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details b
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = oshandler.NewElevenLengthID()
+	serviceInfo.User = oshandler.NewThirteenLengthID() // NewElevenLengthID()
 	serviceInfo.Password = oshandler.GenGUID()
 	
 	// todo: improve watch. Pod may be already running before watching!
@@ -202,7 +202,7 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 	
 	// ...
 
-	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
+	newusername := oshandler.NewThirteenLengthID() // NewElevenLengthID() // oshandler.GenGUID()[:16]
 	newpassword := oshandler.GenGUID()
 	
 	println ("super user:", myServiceInfo.User, ", super password:", myServiceInfo.Password)
