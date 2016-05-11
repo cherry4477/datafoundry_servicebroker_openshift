@@ -198,16 +198,30 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 	}
 	
 	// ...
+
+	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
+	newpassword := oshandler.GenGUID()
+	
+	println ("super user:", myServiceInfo.User, ", super password:", myServiceInfo.Password)
+	println ("new user:", newusername, ", new password:", newpassword)
+	
+	tries := 5
+	
+RETRY:
+	println("tries:", tries)
 	
 	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
 	if err != nil {
 		logger.Error("create cassandra authrized session", err)
+		
+		if tries > 0 {
+			tries --
+			goto RETRY
+		}
+		
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	defer cassandra_session.Close()
-
-	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
-	newpassword := oshandler.GenGUID()
 	
 	if err := cassandra_session.Query(
 			//`CREATE USER ? WITH PASSWORD '?' SUPERUSER`, newusername, newpassword).Exec(); err != nil {
@@ -435,6 +449,8 @@ RETRY_CREATE_NEW_USER:
 		goto RETRY_CREATE_NEW_USER
 	}
 	
+	// temp commnet off to debug
+	/*
 RETRY_DELETE_DEFAULT_USER:
 
 	time.Sleep(20 * time.Second) // last action may be not fully applied yet, maybe, who konws.
@@ -463,6 +479,7 @@ RETRY_DELETE_DEFAULT_USER:
 		//return
 		goto RETRY_DELETE_DEFAULT_USER
 	}
+	*/
 	
 	// ...
 	
