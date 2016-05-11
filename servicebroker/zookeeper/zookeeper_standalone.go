@@ -175,7 +175,6 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 	//if err != nil {
 	//	return brokerapi.IsAsync(false), err
 	//}
-	
 	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil

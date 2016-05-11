@@ -135,6 +135,9 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 			return false
 		}
 		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
+		
+		println("n = ", n, ", *rc.Spec.Replicas = ", *rc.Spec.Replicas)
+		
 		return n >= *rc.Spec.Replicas
 	}
 	
@@ -264,6 +267,9 @@ func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.Servic
 		return err
 	}
 	defer cassandra_session.Close()
+	
+	
+	println("to delete user: ", mycredentials.Username)
 	
 	if err := cassandra_session.Query(
 			//`DROP USER ?`, mycredentials.Username).Exec(); err != nil {
@@ -502,7 +508,7 @@ func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKe
 	cluster := cassandra.NewCluster(cassandraEndPoints...)
 	cluster.Port = port
 	cluster.Keyspace = initialKeyspace
-	cluster.Consistency = cassandra.One // Quorum
+	//cluster.Consistency = cassandra.One // Quorum
 	cluster.CQLVersion = "3.4.0"
 	cluster.ProtoVersion = 4
 	cluster.Timeout = 30 * time.Second

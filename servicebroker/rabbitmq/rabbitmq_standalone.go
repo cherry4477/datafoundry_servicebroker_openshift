@@ -170,11 +170,7 @@ func (handler *Rabbitmq_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceI
 	
 	println("to destroy resources")
 	
-	master_res, err := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	if err != nil {
-		return brokerapi.IsAsync(false), err
-	}
-	
+	master_res, _ := getRabbitmqResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
 	destroyRabbitmqResources_Master (master_res, myServiceInfo.Database)
 	
 	return brokerapi.IsAsync(false), nil
