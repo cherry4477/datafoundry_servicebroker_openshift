@@ -177,11 +177,11 @@ func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.S
 		
 		println("to destroy resources")
 		
-		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
-		destroyCassandraResources_HA (ha_res, myServiceInfo.Database)
-		
 		boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 		destroyCassandraResources_Boot (boot_res, myServiceInfo.Database, true)
+		
+		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
+		destroyCassandraResources_HA (ha_res, myServiceInfo.Database)
 	}()
 	
 	return brokerapi.IsAsync(false), nil
@@ -708,8 +708,11 @@ func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBr
 	// todo: add to retry queue on fail
 
 	//go func() {odel (serviceBrokerNamespace, "routes", bootRes.route.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
-	go func() {kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)}()
+	
+	//go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
+	//go func() {kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)}()
+	kdel (serviceBrokerNamespace, "services", bootRes.service.Name)
+	kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)
 }
 	
 func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) error {
@@ -768,7 +771,8 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cass
 func destroyCassandraResources_HA (haRes *cassandraResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 	
-	go func() {kdel_rc (serviceBrokerNamespace, &haRes.rc)}()
+	//go func() {kdel_rc (serviceBrokerNamespace, &haRes.rc)}()
+	kdel_rc (serviceBrokerNamespace, &haRes.rc)
 }
 
 //===============================================================
@@ -901,6 +905,8 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc.Name
 	
 	// modfiy rc replicas to 0
+	
+	println("to delete rc, uri:", uri)
 	
 	zero := 0
 	rc.Spec.Replicas = &zero
