@@ -349,7 +349,12 @@ func (job *kafkaOrchestrationJob) run() {
 	if succeeded {
 		println("  to create kafka resources")
 		
-		_ = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
+		err = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
+		if err != nil {
+			logger.Error("createKafkaResources_Master", err)
+		} else {
+			println("  succeeded to create kafka resources")
+		}
 	}
 }
 
@@ -430,9 +435,11 @@ func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, servi
 	*/
 	go func() {
 		if err := job.kpost (serviceBrokerNamespace, "services", &input.service, &output.service); err != nil {
+			logger.Error("createKafkaResources_Master.create service", err)
 			return
 		}
 		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
+			logger.Error("createKafkaResources_Master.create rc", err)
 			return
 		}
 	}()

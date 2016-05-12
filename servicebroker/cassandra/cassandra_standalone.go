@@ -131,11 +131,6 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 	// only check the statuses of 3 ReplicationControllers. The cassandra pods may be not running well.
 	
 	ok := func(rc *kapi.ReplicationController) bool {
-		println("rc == nil", (rc == nil))
-		println("rc == nil || rc.Name == ''", (rc == nil || rc.Name == ""))
-		println("rc == nil || rc.Name == '' || rc.Spec.Replicas == nil", (rc == nil || rc.Name == "" || rc.Spec.Replicas == nil))
-		println("rc == nil || rc.Name == '' || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas", (rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas))
-		
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
@@ -182,11 +177,12 @@ func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.S
 		
 		println("to destroy resources")
 		
-		boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-		destroyCassandraResources_Boot (boot_res, myServiceInfo.Database)
-		
+		// must before destroying boot_rs
 		ha_res, _ := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 		destroyCassandraResources_HA (ha_res, myServiceInfo.Database)
+		
+		boot_res, _ := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+		destroyCassandraResources_Boot (boot_res, myServiceInfo.Database)
 	}()
 	
 	return brokerapi.IsAsync(false), nil
