@@ -38,7 +38,7 @@ spec:
           - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
             value: "true"
           - name: DEFAULT_REPLICATION_FACTOR
-            value: 3
+            value: "3"
           - name: KAFKA_PORT
             value: "9092"
           - name: KAFKA_ADVERTISED_PORT
