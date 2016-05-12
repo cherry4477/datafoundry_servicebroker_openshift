@@ -252,7 +252,8 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	//port := "80"
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s", host, port, zk_host, zk_port),
+		Uri:      fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (username: %s, password: %s)", 
+					host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
 		Hostname: host,
 		Port:     port,
 		//Username: myServiceInfo.User,
