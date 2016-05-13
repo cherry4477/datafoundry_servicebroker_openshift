@@ -215,6 +215,7 @@ RETRY:
 	println("tries:", tries)
 	
 	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
+	//cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", "cassandra", "cassandra")
 	if err != nil {
 		logger.Error("create cassandra authrized session", err)
 		
@@ -263,6 +264,7 @@ func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.Servic
 	// ...
 	
 	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
+	//cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", "cassandra", "cassandra")
 	if err != nil {
 		logger.Error("create cassandra authrized session", err)
 		return err
@@ -451,10 +453,13 @@ RETRY_CREATE_NEW_USER:
 		return true
 	}
 	
+time.Sleep(10 * time.Minute)
+if false {
 	if f1() == false {
 		//return
 		goto RETRY_CREATE_NEW_USER
 	}
+}
 	
 	// temp commnet off to debug
 	/*
@@ -503,6 +508,8 @@ RETRY_DELETE_DEFAULT_USER:
 	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
 	
+time.Sleep(10 * time.Minute)
+f1()
 }
 
 func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKeyspace string) *cassandra.ClusterConfig {
