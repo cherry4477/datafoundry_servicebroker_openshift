@@ -2,7 +2,7 @@ package cassandra
 
 import (
 	"fmt"
-	//"errors"
+	"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -191,6 +191,11 @@ func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.S
 func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// output.route.Spec.Host
 	
+	job := getCassandraOrchestrationJob (myServiceInfo.Url)
+	if job != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("not fully initialized yet")
+	}
+	
 	boot_res, err := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
@@ -211,7 +216,8 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 	
 	tries := 5
 	
-RETRY:
+RETRY: // maybe not needed now
+
 	println("tries:", tries)
 	
 	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
@@ -263,10 +269,22 @@ func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.Servic
 	
 	// ...
 	
+	tries := 5
+	
+RETRY: // maybe not needed now
+
+	println("tries:", tries)
+	
 	cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", myServiceInfo.User, myServiceInfo.Password)
 	//cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", "cassandra", "cassandra")
 	if err != nil {
 		logger.Error("create cassandra authrized session", err)
+		
+		if tries > 0 {
+			tries --
+			goto RETRY
+		}
+		
 		return err
 	}
 	defer cassandra_session.Close()
@@ -412,9 +430,29 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	// todo: check if seed pod is running
 	
-	// ...
+	if job.cancelled { return }
+	
+	time.Sleep(10 * time.Minute) // wait seed pod fully initialized
 	
 	if job.cancelled { return }
+	
+	// ...
+	
+	println("to create HA resources")
+	
+	// create HA resources
+	
+	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
+	// todo: if err != nil
+	
+	
+	if job.cancelled { return }
+	
+	time.Sleep(15 * time.Minute) // wait ha pods fully initialized
+	
+	if job.cancelled { return }
+	
+	// create users
 	
 RETRY_CREATE_NEW_USER:
 
@@ -453,16 +491,11 @@ RETRY_CREATE_NEW_USER:
 		return true
 	}
 	
-time.Sleep(10 * time.Minute)
-if false {
 	if f1() == false {
 		//return
 		goto RETRY_CREATE_NEW_USER
 	}
-}
-	
-	// temp commnet off to debug
-	/*
+
 RETRY_DELETE_DEFAULT_USER:
 
 	time.Sleep(20 * time.Second) // last action may be not fully applied yet, maybe, who konws.
@@ -491,25 +524,7 @@ RETRY_DELETE_DEFAULT_USER:
 		//return
 		goto RETRY_DELETE_DEFAULT_USER
 	}
-	*/
-	
-	// ...
-	
-	if job.cancelled { return }
-	
-	time.Sleep(20 * time.Second) 
-	
-	if job.cancelled { return }
-	
-	println("to create HA resources")
-	
-	// create HA resources
-	
-	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
-	// todo: if err != nil
-	
-time.Sleep(10 * time.Minute)
-f1()
+
 }
 
 func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKeyspace string) *cassandra.ClusterConfig {
