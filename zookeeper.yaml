@@ -82,7 +82,7 @@ spec:
             - name: MYID
               value: "1"
             - name: SERVERS
-              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
             - name: JVMFLAGS
               value: "-Xmx2G"
             - name: ZOO_PASSWORD
@@ -122,7 +122,7 @@ spec:
             - name: MYID
               value: "2"
             - name: SERVERS
-              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
             - name: JVMFLAGS
               value: "-Xmx2G"
             - name: ZOO_PASSWORD
@@ -162,7 +162,7 @@ spec:
             - name: MYID
               value: "3"
             - name: SERVERS
-              value: "sb-instanceid-zk-1,sb-instanceid-zk-2,sb-instanceid-zk-3"
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
             - name: JVMFLAGS
               value: "-Xmx2G"
             - name: ZOO_PASSWORD

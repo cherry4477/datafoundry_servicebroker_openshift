@@ -432,6 +432,7 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
+	// todo: judge by trying to connect to cassandra
 	time.Sleep(10 * time.Minute) // wait seed pod fully initialized
 	
 	if job.cancelled { return }
@@ -448,6 +449,7 @@ func (job *cassandraOrchestrationJob) run() {
 	
 	if job.cancelled { return }
 	
+	// todo: 
 	time.Sleep(15 * time.Minute) // wait ha pods fully initialized
 	
 	if job.cancelled { return }
@@ -556,7 +558,7 @@ func newAuthrizedCassandraSession (cassandraEndPoints []string, port int, initia
 
 var CassandraTemplateData_Boot []byte = nil
 
-func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot) error {
+func loadCassandraResources_Boot(instanceID, serviceBrokerNamespace string, res *cassandraResources_Boot) error {
 	if CassandraTemplateData_Boot == nil {
 		f, err := os.Open("cassandra-boot.yaml")
 		if err != nil {
@@ -591,7 +593,8 @@ func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot
 	
 	yamlTemplates := CassandraTemplateData_Boot
 	
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -609,7 +612,7 @@ func loadCassandraResources_Boot(instanceID string, res *cassandraResources_Boot
 
 var CassandraTemplateData_HA []byte = nil
 
-func loadCassandraResources_HA(instanceID string, res *cassandraResources_HA) error {
+func loadCassandraResources_HA(instanceID, serviceBrokerNamespace string, res *cassandraResources_HA) error {
 	if CassandraTemplateData_HA == nil {
 		f, err := os.Open("cassandra-ha.yaml")
 		if err != nil {
@@ -634,6 +637,7 @@ func loadCassandraResources_HA(instanceID string, res *cassandraResources_HA) er
 	yamlTemplates := CassandraTemplateData_HA
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -680,7 +684,7 @@ func (bootRes *cassandraResources_Boot) ServiceHostPort(serviceBrokerNamespace s
 	
 func createCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*cassandraResources_Boot, error) {
 	var input cassandraResources_Boot
-	err := loadCassandraResources_Boot(instanceId, &input)
+	err := loadCassandraResources_Boot(instanceId, serviceBrokerNamespace, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +711,7 @@ func getCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*ca
 	var output cassandraResources_Boot
 	
 	var input cassandraResources_Boot
-	err := loadCassandraResources_Boot(instanceId, &input)
+	err := loadCassandraResources_Boot(instanceId, serviceBrokerNamespace, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -740,7 +744,7 @@ func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBr
 	
 func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) error {
 	var input cassandraResources_HA
-	err := loadCassandraResources_HA(instanceId, &input)
+	err := loadCassandraResources_HA(instanceId, serviceBrokerNamespace, &input)
 	if err != nil {
 		return err
 	}
@@ -773,7 +777,7 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cass
 	var output cassandraResources_HA
 	
 	var input cassandraResources_HA
-	err := loadCassandraResources_HA(instanceId, &input)
+	err := loadCassandraResources_HA(instanceId, serviceBrokerNamespace, &input)
 	if err != nil {
 		return &output, err
 	}

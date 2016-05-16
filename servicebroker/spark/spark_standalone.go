@@ -452,7 +452,7 @@ func (job *sparkOrchestrationJob) run() {
 
 var SparkTemplateData_Master []byte = nil
 
-func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResources_Master) error {
+func loadSparkResources_Master(instanceID, serviceBrokerNamespace, sparkSecret string, res *sparkResources_Master) error {
 	if SparkTemplateData_Master == nil {
 		f, err := os.Open("spark-master.yaml")
 		if err != nil {
@@ -476,7 +476,8 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 	yamlTemplates := SparkTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -495,7 +496,7 @@ func loadSparkResources_Master(instanceID, sparkSecret string, res *sparkResourc
 
 var SparkTemplateData_Workers []byte = nil
 
-func loadSparkResources_Workers(instanceID, sparkSecret string, numWorkers int, res *sparkResources_Workers) error {
+func loadSparkResources_Workers(instanceID, serviceBrokerNamespace, sparkSecret string, numWorkers int, res *sparkResources_Workers) error {
 	if SparkTemplateData_Workers == nil {
 		f, err := os.Open("spark-worker.yaml")
 		if err != nil {
@@ -514,6 +515,7 @@ func loadSparkResources_Workers(instanceID, sparkSecret string, numWorkers int, 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("num-workers-place-holder"), []byte(strconv.Itoa(numWorkers)), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -529,7 +531,7 @@ func loadSparkResources_Workers(instanceID, sparkSecret string, numWorkers int, 
 
 var SparkTemplateData_Zeppelin []byte = nil
 
-func loadSparkResources_Zeppelin(instanceID, sparkSecret string, res *sparkResources_Zeppelin) error {
+func loadSparkResources_Zeppelin(instanceID, serviceBrokerNamespace, sparkSecret string, res *sparkResources_Zeppelin) error {
 	if SparkTemplateData_Zeppelin == nil {
 		f, err := os.Open("spark-zeppelin.yaml")
 		if err != nil {
@@ -555,7 +557,8 @@ func loadSparkResources_Zeppelin(instanceID, sparkSecret string, res *sparkResou
 	yamlTemplates := SparkTemplateData_Zeppelin
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -590,7 +593,7 @@ type sparkResources_Zeppelin struct {
 	
 func createSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret string) (*sparkResources_Master, error) {
 	var input sparkResources_Master
-	err := loadSparkResources_Master(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Master(instanceId, serviceBrokerNamespace, sparkSecret, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -618,7 +621,7 @@ func getSparkResources_Master (instanceId, serviceBrokerNamespace, sparkSecret s
 	var output sparkResources_Master
 	
 	var input sparkResources_Master
-	err := loadSparkResources_Master(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Master(instanceId, serviceBrokerNamespace, sparkSecret, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -650,7 +653,7 @@ func destroySparkResources_Master (masterRes *sparkResources_Master, serviceBrok
 	
 func (job *sparkOrchestrationJob) createSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret string) error {
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, sparkSecret, job.planNumWorkers, &input)
+	err := loadSparkResources_Workers(instanceId, serviceBrokerNamespace, sparkSecret, job.planNumWorkers, &input)
 	if err != nil {
 		return err
 	}
@@ -669,7 +672,7 @@ func getSparkResources_Workers (instanceId, serviceBrokerNamespace, sparkSecret 
 	var output sparkResources_Workers
 	
 	var input sparkResources_Workers
-	err := loadSparkResources_Workers(instanceId, sparkSecret, numWorkers, &input)
+	err := loadSparkResources_Workers(instanceId, serviceBrokerNamespace, sparkSecret, numWorkers, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -695,7 +698,7 @@ func destroySparkResources_Workers (haRes *sparkResources_Workers, serviceBroker
 	
 func (job *sparkOrchestrationJob) createSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret string) error {
 	var input sparkResources_Zeppelin
-	err := loadSparkResources_Zeppelin(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Zeppelin(instanceId, serviceBrokerNamespace, sparkSecret, &input)
 	if err != nil {
 		return err
 	}
@@ -720,7 +723,7 @@ func getSparkResources_Zeppelin (instanceId, serviceBrokerNamespace, sparkSecret
 	var output sparkResources_Zeppelin
 	
 	var input sparkResources_Zeppelin
-	err := loadSparkResources_Zeppelin(instanceId, sparkSecret, &input)
+	err := loadSparkResources_Zeppelin(instanceId, serviceBrokerNamespace, sparkSecret, &input)
 	if err != nil {
 		return &output, err
 	}

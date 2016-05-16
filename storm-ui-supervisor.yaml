@@ -23,9 +23,9 @@ spec:
         - name: STORM_CMD
           value: "supervisor"
         - name: ZK_SERVER_1_SERVICE_HOST
-          value: "sb-instanceid-zk"
+          value: "sb-instanceid-zk.local-service-postfix-place-holder"
         - name: APACHE_STORM_NIMBUS_SERVICE_HOST
-          value: sb-instanceid-stormnb
+          value: sb-instanceid-stormnb.local-service-postfix-place-holder
         volumeMounts:
         - name: storm-data
           mountPath: /opt/apache-storm/storm-local
@@ -87,9 +87,9 @@ spec:
         - name: STORM_CMD
           value: "ui"
         - name: ZK_SERVER_1_SERVICE_HOST
-          value: "sb-instanceid-zk"
+          value: "sb-instanceid-zk.local-service-postfix-place-holder"
         - name: APACHE_STORM_NIMBUS_SERVICE_HOST
-          value: sb-instanceid-stormnb
+          value: sb-instanceid-stormnb.local-service-postfix-place-holder
         volumeMounts:
         - name: storm-data
           mountPath: /opt/apache-storm/storm-local

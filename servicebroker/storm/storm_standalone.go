@@ -432,7 +432,7 @@ func (job *stormOrchestrationJob) run() {
 
 var StormTemplateData_Nimbus []byte = nil
 
-func loadStormResources_Nimbus(instanceID/*, stormUser, stormPassword*/ string, res *stormResources_Nimbus) error {
+func loadStormResources_Nimbus(instanceID, serviceBrokerNamespace/*, stormUser, stormPassword*/ string, res *stormResources_Nimbus) error {
 	if StormTemplateData_Nimbus == nil {
 		f, err := os.Open("storm-nimbus.yaml")
 		if err != nil {
@@ -458,6 +458,7 @@ func loadStormResources_Nimbus(instanceID/*, stormUser, stormPassword*/ string, 
 	yamlTemplates := StormTemplateData_Nimbus	
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -474,7 +475,7 @@ func loadStormResources_Nimbus(instanceID/*, stormUser, stormPassword*/ string, 
 
 var StormTemplateData_UiSuperviser []byte = nil
 
-func loadStormResources_UiSuperviser(instanceID/*, stormUser, stormPassword*/ string, res *stormResources_UiSuperviser) error {
+func loadStormResources_UiSuperviser(instanceID, serviceBrokerNamespace/*, stormUser, stormPassword*/ string, res *stormResources_UiSuperviser) error {
 	if StormTemplateData_UiSuperviser == nil {
 		f, err := os.Open("storm-ui-supervisor.yaml")
 		if err != nil {
@@ -509,6 +510,7 @@ func loadStormResources_UiSuperviser(instanceID/*, stormUser, stormPassword*/ st
 	yamlTemplates := StormTemplateData_UiSuperviser	
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -540,7 +542,7 @@ type stormResources_UiSuperviser struct {
 	
 func (job *stormOrchestrationJob) createStormResources_Nimbus (instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/ string) (*stormResources_Nimbus, error) {
 	var input stormResources_Nimbus
-	err := loadStormResources_Nimbus(instanceId/*, stormUser, stormPassword*/, &input)
+	err := loadStormResources_Nimbus(instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +592,7 @@ func getStormResources_Nimbus (instanceId, serviceBrokerNamespace/*, stormUser, 
 	var output stormResources_Nimbus
 	
 	var input stormResources_Nimbus
-	err := loadStormResources_Nimbus(instanceId/*, stormUser, stormPassword*/, &input)
+	err := loadStormResources_Nimbus(instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -619,7 +621,7 @@ func destroyStormResources_Nimbus (nimbusRes *stormResources_Nimbus, serviceBrok
 func (job *stormOrchestrationJob) createStormResources_UiSuperviser (instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/ string) error {
 	var input stormResources_UiSuperviser
 	
-	err := loadStormResources_UiSuperviser(instanceId/*, stormUser, stormPassword*/, &input)
+	err := loadStormResources_UiSuperviser(instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/, &input)
 	if err != nil {
 		//return nil, err
 		return err
@@ -663,7 +665,7 @@ func getStormResources_UiSuperviser (instanceId, serviceBrokerNamespace/*, storm
 	var output stormResources_UiSuperviser
 	
 	var input stormResources_UiSuperviser
-	err := loadStormResources_UiSuperviser(instanceId/*, stormUser, stormPassword*/, &input)
+	err := loadStormResources_UiSuperviser(instanceId, serviceBrokerNamespace/*, stormUser, stormPassword*/, &input)
 	if err != nil {
 		return &output, err
 	}

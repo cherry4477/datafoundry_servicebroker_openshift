@@ -364,7 +364,7 @@ func (job *kafkaOrchestrationJob) run() {
 
 var KafkaTemplateData_Master []byte = nil
 
-func loadKafkaResources_Master(instanceID/*, kafkaUser, kafkaPassword*/ string, res *kafkaResources_Master) error {
+func loadKafkaResources_Master(instanceID, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string, res *kafkaResources_Master) error {
 	if KafkaTemplateData_Master == nil {
 		f, err := os.Open("kafka.yaml")
 		if err != nil {
@@ -390,6 +390,7 @@ func loadKafkaResources_Master(instanceID/*, kafkaUser, kafkaPassword*/ string, 
 	yamlTemplates := KafkaTemplateData_Master	
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -411,7 +412,7 @@ type kafkaResources_Master struct {
 	
 func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string) error {
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId/*, kafkaUser, kafkaPassword*/, &input)
+	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/, &input)
 	if err != nil {
 		//return nil, err
 		return err
@@ -451,7 +452,7 @@ func getKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, 
 	var output kafkaResources_Master
 	
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId/*, kafkaUser, kafkaPassword*/, &input)
+	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/, &input)
 	if err != nil {
 		return &output, err
 	}

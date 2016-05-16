@@ -215,7 +215,7 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 
 func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (result <-chan bool, cancel chan<- struct{}, err error) {
 	var input ZookeeperResources_Master
-	err = loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+	err = loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
 		return
 	}
@@ -351,7 +351,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 
 var ZookeeperTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
+func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
 		if err != nil {
@@ -384,7 +384,8 @@ func loadZookeeperResources_Master(instanceID, zookeeperUser, zookeeperPassword 
 	yamlTemplates := ZookeeperTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -430,7 +431,7 @@ func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespa
 	
 func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
 	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +462,7 @@ func GetZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeper
 	var output ZookeeperResources_Master
 	
 	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, zookeeperUser, zookeeperPassword, &input)
+	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {
 		return &output, err
 	}

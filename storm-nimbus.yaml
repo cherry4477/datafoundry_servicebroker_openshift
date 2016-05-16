@@ -35,7 +35,7 @@ spec:
         - name: STORM_CMD
           value: "nimbus"
         - name: ZK_SERVER_1_SERVICE_HOST
-          value: "sb-instanceid-zk"
+          value: "sb-instanceid-zk.local-service-postfix-place-holder"
         volumeMounts:
         - name: storm-data
           mountPath: /opt/apache-storm/storm-local

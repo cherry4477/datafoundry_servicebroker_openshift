@@ -15,7 +15,7 @@ spec:
         - name: sb-instanceid-sparkms
           env: 
             - name: SPARK_MASTER
-              value: sb-instanceid-sparkms
+              value: sb-instanceid-sparkms.local-service-postfix-place-holder
             - name: SPARK_SECRET
               value: test1234
           image: index.alauda.cn/asiainfoldp/spark
