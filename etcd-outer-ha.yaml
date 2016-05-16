@@ -1,5 +1,5 @@
 #需要替换intanceid 实例的具体名字
-#需要替换test1234 etcd管理员的密码
+#需要替换test-1234 etcd管理员的密码
 
 apiVersion: v1
 kind: ReplicationController
@@ -23,7 +23,7 @@ spec:
         - etcd1
         - http://sb-instanceid-etcd1:2380
         - sb-instanceid-etcd
-        - test1234
+        - test-1234
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd1
@@ -77,7 +77,7 @@ spec:
         - etcd2
         - http://sb-instanceid-etcd2:2380
         - sb-instanceid-etcd
-        - test1234
+        - test-1234
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd3
@@ -132,7 +132,7 @@ spec:
         - etcd3
         - http://sb-instanceid-etcd3:2380
         - sb-instanceid-etcd
-        - test1234
+        - test-1234
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
         imagePullPolicy: Always
         name: etcd3

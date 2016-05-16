@@ -407,7 +407,7 @@ func loadRedisResources_Master(instanceID, redisPassword string, res *redisResou
 	yamlTemplates := RedisTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(redisPassword), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(redisPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -449,7 +449,7 @@ func loadRedisResources_More(instanceID, redisPassword string, res *redisResourc
 	yamlTemplates := RedisTemplateData_More
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(redisPassword), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(redisPassword), -1)	
 	
 	//println("========= More yamlTemplates ===========")
 	//println(string(yamlTemplates))

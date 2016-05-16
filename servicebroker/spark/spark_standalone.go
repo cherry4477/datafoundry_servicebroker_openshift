@@ -476,7 +476,7 @@ func loadSparkResources_Master(instanceID, serviceBrokerNamespace, sparkSecret s
 	yamlTemplates := SparkTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(sparkSecret), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
@@ -513,7 +513,7 @@ func loadSparkResources_Workers(instanceID, serviceBrokerNamespace, sparkSecret 
 	yamlTemplates := SparkTemplateData_Workers
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(sparkSecret), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("num-workers-place-holder"), []byte(strconv.Itoa(numWorkers)), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
@@ -557,7 +557,7 @@ func loadSparkResources_Zeppelin(instanceID, serviceBrokerNamespace, sparkSecret
 	yamlTemplates := SparkTemplateData_Zeppelin
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test1234"), []byte(sparkSecret), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(sparkSecret), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
 	//println("========= HA yamlTemplates ===========")
