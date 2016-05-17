@@ -25,7 +25,7 @@ spec:
             - name: HEAP_NEWSIZE
               value: 100M
             - name: CASSANDRA_SERVICE
-              value: sb-instanceid-cssndr0.local-service-postfix-place-holder
+              value: sb-instanceid-cssndr.local-service-postfix-place-holder
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -43,19 +43,3 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: sb-instanceid-cassandra
-  name: sb-instanceid-cssndr
-spec:
-  ports:
-  - name: cql
-    port: 9042
-  - name: thrift
-    port: 9160
-  selector:
-    app: sb-instanceid-cassandra

@@ -387,7 +387,12 @@ type watchPodStatus struct {
 func (job *cassandraOrchestrationJob) run() {
 	start_time := time.Now()
 	
+	default_root_user     := "cassandra"
+	default_root_password := "cassandra"
+	
 	serviceInfo := job.serviceInfo
+	
+	/*
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + job.bootResources.pod.Name
 	statuses, cancel, err := oshandler.OC().KWatch (uri)
 	if err != nil {
@@ -445,9 +450,28 @@ func (job *cassandraOrchestrationJob) run() {
 			break
 		}
 	}
+	*/
 	
-	default_root_user     := "cassandra"
-	default_root_password := "cassandra"
+	if job.bootResources.rc.Spec.Replicas == nil { // shouldn't
+		return
+	}
+	
+CHECK_POD_STATE_0:
+	
+	if job.cancelled { return }
+	
+	{
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, job.bootResources.rc.Labels)
+			
+		println("n = ", n, ", *job.bootResources.rc.Spec.Replicas = ", *job.bootResources.rc.Spec.Replicas)
+		
+		if n < *job.bootResources.rc.Spec.Replicas {
+			time.Sleep(10 * time.Second)
+			goto CHECK_POD_STATE_0
+		}
+	}
+	
+	println("seed pod is running now")
 	
 	// todo: check if seed pod is running
 	
@@ -480,13 +504,14 @@ CHECK_POD_STATE_1:
 	
 	ha_res, err := job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
+	
 	if ha_res.rc.Spec.Replicas == nil { // shouldn't
 		return
 	}
 	
 CHECK_POD_STATE_2:
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(10 * time.Second)
 	
 	if job.cancelled { return }
 	
@@ -707,7 +732,7 @@ func loadCassandraResources_Boot(instanceID, serviceBrokerNamespace string, res 
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.pod).
+		Decode(&res.rc).
 		Decode(&res.service)//.
 		//Decode(&res.route)
 	
@@ -750,19 +775,22 @@ func loadCassandraResources_HA(instanceID, serviceBrokerNamespace string, res *c
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.rc)
+		Decode(&res.rc).
+		Decode(&res.service)
 	
 	return decoder.Err
 }
 
 type cassandraResources_Boot struct {
-	pod     kapi.Pod
+	//pod     kapi.Pod
+	rc      kapi.ReplicationController
 	service kapi.Service
 	//route   routeapi.Route
 }
 
 type cassandraResources_HA struct {
-	rc  kapi.ReplicationController
+	rc      kapi.ReplicationController
+	service kapi.Service
 }
 
 //func (bootRes *cassandraResources_Boot) endpoint() (string, string, string) {
@@ -800,7 +828,7 @@ func createCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/pods", &input.pod, &output.pod).
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
 		KPost(prefix + "/services", &input.service, &output.service)//.
 		//OPost(prefix + "/routes", &input.route, &output.route)
 	
@@ -824,7 +852,7 @@ func getCassandraResources_Boot (instanceId, serviceBrokerNamespace string) (*ca
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/pods/" + input.pod.Name, &output.pod).
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
 		KGet(prefix + "/services/" + input.service.Name, &output.service)//.
 		//OGet(prefix + "/routes/" + input.route.Name, &output.route)
 	
@@ -843,7 +871,8 @@ func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBr
 	//go func() {kdel (serviceBrokerNamespace, "services", bootRes.service.Name)}()
 	//go func() {kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)}()
 	kdel (serviceBrokerNamespace, "services", bootRes.service.Name)
-	kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)
+	//kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)
+	kdel_rc (serviceBrokerNamespace, &bootRes.rc)
 }
 	
 func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cassandraResources_HA, error) {
@@ -872,6 +901,9 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
 			return
 		}
+		if err := job.kpost (serviceBrokerNamespace, "/services", &input.service, &output.service); err != nil {
+			return
+		}
 	}()
 	
 	return &input, nil
@@ -890,7 +922,8 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cass
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc)
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
+		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
 	if osr.Err != nil {
 		logger.Error("getCassandraResources_HA", osr.Err)
@@ -902,6 +935,7 @@ func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cass
 func destroyCassandraResources_HA (haRes *cassandraResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 	
+	kdel (serviceBrokerNamespace, "services", haRes.service.Name)
 	//go func() {kdel_rc (serviceBrokerNamespace, &haRes.rc)}()
 	kdel_rc (serviceBrokerNamespace, &haRes.rc)
 }
