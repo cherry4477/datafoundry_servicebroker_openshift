@@ -527,9 +527,9 @@ CHECK_POD_STATE_3:
 	
 	// create users
 	
+	time.Sleep(5 * time.Minute) // wait cluster fully formed.
+	
 RETRY_CREATE_NEW_USER:
-
-	time.Sleep(30 * time.Second) // wait cluster fully formed.
 	
 	if job.cancelled { return }
 	
@@ -564,12 +564,13 @@ RETRY_CREATE_NEW_USER:
 	
 	if f1() == false {
 		//return
+		time.Sleep(30 * time.Second)
 		goto RETRY_CREATE_NEW_USER
 	}
 
 RETRY_DELETE_DEFAULT_USER:
 
-	time.Sleep(10 * time.Second) // last action may be not fully applied yet, maybe, who konws.
+	time.Sleep(30 * time.Second)
 	
 	println("to delete user cassandra")
 	
