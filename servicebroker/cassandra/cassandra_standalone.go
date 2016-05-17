@@ -446,8 +446,8 @@ CHECK_POD_STATE_1:
 			return
 		}
 		if !inited {
-			goto CHECK_POD_STATE_1
 			time.Sleep(30 * time.Second)
+			goto CHECK_POD_STATE_1
 		}
 	}
 	
@@ -476,8 +476,8 @@ CHECK_POD_STATE_2:
 			return
 		}
 		if !inited {
-			goto CHECK_POD_STATE_2
 			time.Sleep(30 * time.Second)
+			goto CHECK_POD_STATE_2
 		}
 	}
 	
