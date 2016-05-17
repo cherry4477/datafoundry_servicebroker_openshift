@@ -230,7 +230,7 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 		return osr
 	}
 	
-	println("22222 len(data) = ", len(data), " , res.StatusCode = ", res.StatusCode)
+	//println("22222 len(data) = ", len(data), " , res.StatusCode = ", res.StatusCode)
 	
 	if res.StatusCode < 200 || res.StatusCode >= 400 {
 		osr.Err = errors.New(string(data))
