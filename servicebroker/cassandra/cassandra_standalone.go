@@ -480,6 +480,9 @@ CHECK_POD_STATE_1:
 	
 	ha_res, err := job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
+	if ha_res.rc.Spec.Replicas == nil { // shouldn't
+		return
+	}
 	
 CHECK_POD_STATE_2:
 
@@ -487,20 +490,14 @@ CHECK_POD_STATE_2:
 	
 	if job.cancelled { return }
 	
-	ok := func(rc *kapi.ReplicationController) bool {
-		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			return false
+	{
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, ha_res.rc.Labels)
+			
+		println("n = ", n, ", *ha_res.rc.Spec.Replicas = ", *ha_res.rc.Spec.Replicas)
+		
+		if n < *ha_res.rc.Spec.Replicas {
+			goto CHECK_POD_STATE_2
 		}
-		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
-		
-		println("n = ", n, ", *rc.Spec.Replicas = ", *rc.Spec.Replicas)
-		
-		return n >= *rc.Spec.Replicas
-	}
-	
-	
-	if ! ok (&ha_res.rc) {
-		goto CHECK_POD_STATE_2
 	}
 	
 	if job.cancelled { return }
