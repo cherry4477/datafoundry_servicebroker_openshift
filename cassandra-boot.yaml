@@ -46,11 +46,12 @@ spec:
 
 
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: sb-instanceid-cassandra-0
+    app/: sb-instanceid-cassandra-0
   name: sb-instanceid-cssndr0
 spec:
   ports:

@@ -207,6 +207,7 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	if osr.Err != nil {
 		return osr
 	}
+	println("00000")
 	
 	var body []byte
 	if bodyParams != nil {
@@ -215,6 +216,8 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 			return osr
 		}
 	}
+	println("11111 ", string(body))
+	
 	
 	//res, osr.Err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
 	res, err := osr.oc.request(method, url, body, GeneralRequestTimeout)
@@ -229,6 +232,8 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	if osr.Err != nil {
 		return osr
 	}
+	
+	println("22222 ", string(data))
 	
 	if res.StatusCode < 200 || res.StatusCode >= 400 {
 		osr.Err = errors.New(string(data))

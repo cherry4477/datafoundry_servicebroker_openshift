@@ -45,6 +45,7 @@ spec:
           emptyDir: {}
 
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -59,3 +60,4 @@ spec:
     port: 9160
   selector:
     app: sb-instanceid-cassandra
+
