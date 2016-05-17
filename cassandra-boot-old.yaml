@@ -37,6 +37,19 @@ spec:
       emptyDir: {}
 
 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sb-instanceid-cassandra
+  name: sb-instanceid-cssndr
+spec:
+  ports:
+    - port: 9042
+  selector:
+    app: sb-instanceid-cassandra
+
 #---
 #
 ##Route to client

@@ -901,7 +901,7 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
 			return
 		}
-		if err := job.kpost (serviceBrokerNamespace, "/services", &input.service, &output.service); err != nil {
+		if err := job.kpost (serviceBrokerNamespace, "services", &input.service, &output.service); err != nil {
 			return
 		}
 	}()
