@@ -529,7 +529,7 @@ CHECK_POD_STATE_3:
 	
 RETRY_CREATE_NEW_USER:
 
-	time.Sleep(10 * time.Second) // the pod and service may be not ininited fully
+	time.Sleep(30 * time.Second) // wait cluster fully formed.
 	
 	if job.cancelled { return }
 	
@@ -597,7 +597,7 @@ RETRY_DELETE_DEFAULT_USER:
 	}
 	
 	end_time := time.Now()
-	println("cassandra cluster inited fully. Used", end_time.Sub(start_time))
+	println("cassandra cluster inited fully. Used", end_time.Sub(start_time).String())
 }
 
 func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKeyspace string) *cassandra.ClusterConfig {

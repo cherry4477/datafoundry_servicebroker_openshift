@@ -46,7 +46,10 @@ metadata:
   name: sb-instanceid-cssndr
 spec:
   ports:
-    - port: 9042
+  - name: cql
+    port: 9042
+  - name: thrift
+    port: 9160
   selector:
     app: sb-instanceid-cassandra
 
