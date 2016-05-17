@@ -332,6 +332,22 @@ func GetServicePortByName(service *kapi.Service, name string) *kapi.ServicePort 
 	return nil
 }
 
+func GetPodPortByName(pod *kapi.Pod, name string) *kapi.ContainerPort {
+	if pod != nil {
+		for i := range pod.Spec.Containers {
+			c := &pod.Spec.Containers[i]
+			for j := range c.Ports {
+				port := &c.Ports[j]
+				if port.Name == name {
+					return port
+				}
+			}
+		}
+	}
+	
+	return nil
+}
+
 //===============================================================
 // 
 //===============================================================

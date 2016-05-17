@@ -369,8 +369,7 @@ type watchPodStatus struct {
 
 func (job *cassandraOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
-	pod := job.bootResources.pod
-	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
+	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + job.bootResources.pod.Name
 	statuses, cancel, err := oshandler.OC().KWatch (uri)
 	if err != nil {
 		logger.Error("start watching boot pod", err)
@@ -428,12 +427,29 @@ func (job *cassandraOrchestrationJob) run() {
 		}
 	}
 	
+	default_root_user     := "cassandra"
+	default_root_password := "cassandra"
+	
 	// todo: check if seed pod is running
 	
+CHECK_POD_STATE_1:
+
 	if job.cancelled { return }
 	
-	// todo: judge by trying to connect to cassandra
-	time.Sleep(10 * time.Minute) // wait seed pod fully initialized
+	//time.Sleep(10 * time.Minute) // wait seed pod fully initialized
+	{
+		inited, err := checkIfCassandraPodsFullyInited (
+			serviceInfo.Database, job.bootResources.service.Spec.Selector,
+			"", default_root_user, default_root_password)
+		if err != nil {
+			logger.Error("checkIfCassandraPodsFullyInited 1", err)
+			return
+		}
+		if !inited {
+			goto CHECK_POD_STATE_1
+			time.Sleep(30 * time.Second)
+		}
+	}
 	
 	if job.cancelled { return }
 	
@@ -446,11 +462,24 @@ func (job *cassandraOrchestrationJob) run() {
 	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
 	
-	
+CHECK_POD_STATE_2:
+
 	if job.cancelled { return }
 	
-	// todo: 
-	time.Sleep(15 * time.Minute) // wait ha pods fully initialized
+	//time.Sleep(15 * time.Minute) // wait ha pods fully initialized
+	{
+		inited, err := checkIfCassandraPodsFullyInited (
+			serviceInfo.Database, job.bootResources.service.Spec.Selector,
+			"", default_root_user, default_root_password)
+		if err != nil {
+			logger.Error("checkIfCassandraPodsFullyInited 2", err)
+			return
+		}
+		if !inited {
+			goto CHECK_POD_STATE_2
+			time.Sleep(30 * time.Second)
+		}
+	}
 	
 	if job.cancelled { return }
 	
@@ -458,7 +487,7 @@ func (job *cassandraOrchestrationJob) run() {
 	
 RETRY_CREATE_NEW_USER:
 
-	time.Sleep(60 * time.Second) // the pod and service may be not ininited fully
+	time.Sleep(10 * time.Second) // the pod and service may be not ininited fully
 	
 	if job.cancelled { return }
 	
@@ -466,13 +495,11 @@ RETRY_CREATE_NEW_USER:
 	
 	host, port, err := job.bootResources.ServiceHostPort(serviceInfo.Database)
 	if err != nil {
+		logger.Error("get ServiceHostPort", err)
 		return
 	}
 	
 	println("to create new super user")
-	
-	default_root_user     := "cassandra"
-	default_root_password := "cassandra"
 	
 	f1 := func() bool {
 		cassandra_session, err := newAuthrizedCassandraSession ([]string{host}, port, "", default_root_user, default_root_password)
@@ -500,7 +527,7 @@ RETRY_CREATE_NEW_USER:
 
 RETRY_DELETE_DEFAULT_USER:
 
-	time.Sleep(20 * time.Second) // last action may be not fully applied yet, maybe, who konws.
+	time.Sleep(10 * time.Second) // last action may be not fully applied yet, maybe, who konws.
 	
 	println("to delete user cassandra")
 	
@@ -550,6 +577,38 @@ func newAuthrizedCassandraSession (cassandraEndPoints []string, port int, initia
 	cluster := newCassandraClusterConfig(cassandraEndPoints, port, initialKeyspace)
 	cluster.Authenticator = cassandra.PasswordAuthenticator{Username: cassandraUser, Password: cassandraPassword}
 	return cluster.CreateSession()
+}
+
+func checkIfCassandraPodsFullyInited (serviceBrokerNamespace string, labels map[string]string,
+		initialKeyspace string, cassandraUser, cassandraPassword string) (bool, error) {
+	
+	inited := true
+	po := PodObserver(func (pod *kapi.Pod) {
+		if inited {
+			port := oshandler.GetPodPortByName(pod, "cql")
+			if port == nil {
+				inited = false
+				return
+			}
+			
+			cassandra_session, err := newAuthrizedCassandraSession(
+				[]string{pod.Status.PodIP}, port.ContainerPort, 
+				initialKeyspace, cassandraUser, cassandraPassword)
+			if err != nil {
+				println("pod ", pod.Name, " has not inited yet")
+				
+				inited = false
+			} else {
+				cassandra_session.Close()
+				
+				println("pod ", pod.Name, " fully inited already")
+			}
+		}
+	})
+	
+	err := po.ObserveRunningPodsByLabels (serviceBrokerNamespace, labels)
+	
+	return inited, err
 }
 
 //===============================================================
@@ -990,6 +1049,41 @@ type watchReplicationControllerStatus struct {
 	Object kapi.ReplicationController `json:"object"`
 }
 
+type PodObserver func (pod *kapi.Pod)
+
+func (podObserver PodObserver) ObserveRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) error {
+	
+	println("to list pods in", serviceBrokerNamespace)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	
+	pods := kapi.PodList{}
+	
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
+	if osr.Err != nil {
+		return osr.Err
+	}
+	
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		podObserver (pod)
+	}
+	
+	return nil
+}
+
+func statRunningPodsByLabels (serviceBrokerNamespace string, labels map[string]string) (int, error) {
+	total := 0
+	po := PodObserver(func (pod *kapi.Pod) {
+		total ++
+	})
+	
+	err := po.ObserveRunningPodsByLabels (serviceBrokerNamespace, labels)
+	
+	return total, err
+}
+
+/*
 func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
 	
 	println("to list pods in", serviceBrokerNamespace)
@@ -1017,6 +1111,6 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	
 	return nrunnings, nil
 }
-
+*/
 
 
