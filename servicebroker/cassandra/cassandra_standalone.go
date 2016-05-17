@@ -145,7 +145,23 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if ok (&ha_res.rc) {
+	if ! ok (&ha_res.rc) {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
+		}, nil
+	}
+	
+	inited, err := checkIfCassandraPodsFullyInited (
+		myServiceInfo.Database, ha_res.rc.Labels,
+		"", myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		inited = false
+		
+		logger.Error("DoLastOperation/checkIfCassandraPodsFullyInited", err)
+	}
+	
+	if inited {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -157,6 +173,7 @@ func (handler *Cassandra_sampleHandler) DoLastOperation(myServiceInfo *oshandler
 		}, nil
 	}
 }
+
 
 func (handler *Cassandra_sampleHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
@@ -368,6 +385,8 @@ type watchPodStatus struct {
 }
 
 func (job *cassandraOrchestrationJob) run() {
+	start_time := time.Now()
+	
 	serviceInfo := job.serviceInfo
 	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + job.bootResources.pod.Name
 	statuses, cancel, err := oshandler.OC().KWatch (uri)
@@ -459,10 +478,36 @@ CHECK_POD_STATE_1:
 	
 	// create HA resources
 	
-	err = job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
+	ha_res, err := job.createCassandraResources_HA (serviceInfo.Url, serviceInfo.Database)
 	// todo: if err != nil
 	
 CHECK_POD_STATE_2:
+
+	time.Sleep(30 * time.Second)
+	
+	if job.cancelled { return }
+	
+	ok := func(rc *kapi.ReplicationController) bool {
+		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+			return false
+		}
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
+		
+		println("n = ", n, ", *rc.Spec.Replicas = ", *rc.Spec.Replicas)
+		
+		return n >= *rc.Spec.Replicas
+	}
+	
+	
+	if ! ok (&ha_res.rc) {
+		goto CHECK_POD_STATE_2
+	}
+	
+	if job.cancelled { return }
+	
+	println("cassandra ha pods are all running now")
+	
+CHECK_POD_STATE_3:
 
 	if job.cancelled { return }
 	
@@ -477,7 +522,7 @@ CHECK_POD_STATE_2:
 		}
 		if !inited {
 			time.Sleep(30 * time.Second)
-			goto CHECK_POD_STATE_2
+			goto CHECK_POD_STATE_3
 		}
 	}
 	
@@ -553,7 +598,9 @@ RETRY_DELETE_DEFAULT_USER:
 		//return
 		goto RETRY_DELETE_DEFAULT_USER
 	}
-
+	
+	end_time := time.Now()
+	println("cassandra cluster inited fully. Used", end_time.Sub(start_time))
 }
 
 func newCassandraClusterConfig (cassandraEndPoints []string, port int, initialKeyspace string) *cassandra.ClusterConfig {
@@ -801,11 +848,11 @@ func destroyCassandraResources_Boot (bootRes *cassandraResources_Boot, serviceBr
 	kdel (serviceBrokerNamespace, "pods", bootRes.pod.Name)
 }
 	
-func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) error {
+func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cassandraResources_HA, error) {
 	var input cassandraResources_HA
 	err := loadCassandraResources_HA(instanceId, serviceBrokerNamespace, &input)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	
 	var output cassandraResources_HA
@@ -829,7 +876,7 @@ func (job *cassandraOrchestrationJob) createCassandraResources_HA (instanceId, s
 		}
 	}()
 	
-	return nil
+	return &input, nil
 }
 	
 func getCassandraResources_HA (instanceId, serviceBrokerNamespace string) (*cassandraResources_HA, error) {
