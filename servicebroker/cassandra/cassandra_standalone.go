@@ -213,12 +213,12 @@ func (handler *Cassandra_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceI
 		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("not fully initialized yet")
 	}
 	
-	boot_res, err := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+	ha_res, err := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	host, port, err := boot_res.ServiceHostPort(myServiceInfo.Database)
+	host, port, err := ha_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
@@ -274,12 +274,12 @@ RETRY: // maybe not needed now
 }
 
 func (handler *Cassandra_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	boot_res, err := getCassandraResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
+	ha_res, err := getCassandraResources_HA (myServiceInfo.Url, myServiceInfo.Database)
 	if err != nil {
 		return err
 	}
 	
-	host, port, err := boot_res.ServiceHostPort(myServiceInfo.Database)
+	host, port, err := ha_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
 		return err
 	}
@@ -536,7 +536,7 @@ CHECK_POD_STATE_3:
 	//time.Sleep(15 * time.Minute) // wait ha pods fully initialized
 	{
 		inited, err := checkIfCassandraPodsFullyInited (
-			serviceInfo.Database, job.bootResources.service.Spec.Selector,
+			serviceInfo.Database, ha_res.service.Spec.Selector,
 			"", default_root_user, default_root_password)
 		if err != nil {
 			logger.Error("checkIfCassandraPodsFullyInited 2", err)
@@ -560,7 +560,7 @@ RETRY_CREATE_NEW_USER:
 	
 	// ... 
 	
-	host, port, err := job.bootResources.ServiceHostPort(serviceInfo.Database)
+	host, port, err := ha_res.ServiceHostPort(serviceInfo.Database)
 	if err != nil {
 		logger.Error("get ServiceHostPort", err)
 		return
@@ -799,7 +799,7 @@ type cassandraResources_HA struct {
 //	//return "http://" + net.JoinHostPort(host, port), host, port
 //}
 
-func (bootRes *cassandraResources_Boot) ServiceHostPort(serviceBrokerNamespace string) (string, int, error) {
+func (bootRes *cassandraResources_HA) ServiceHostPort(serviceBrokerNamespace string) (string, int, error) {
 	
 	//client_port := oshandler.GetServicePortByName(&masterRes.service, "client")
 	//if client_port == nil {
