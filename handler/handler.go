@@ -141,6 +141,18 @@ func CassandraImage() string {
 	return cassandraImage
 }
 
+func TensorFlowImage() string {
+	return tensorflowImage
+}
+
+func NiFiImage() string {
+	return nifiImage
+}
+
+func KettleImage() string {
+	return kettleImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 var etcdImage string
@@ -149,6 +161,9 @@ var redisImage string
 var kafkaImage string
 var stormImage string
 var cassandraImage string
+var tensorflowImage string
+var nifiImage string
+var kettleImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -165,7 +180,8 @@ func init() {
 	kafkaImage = getenv("KAFKAIMAGE")
 	stormImage = getenv("STORMIMAGE")
 	cassandraImage = getenv("CASSANDRAIMAGE")
+	tensorflowImage = getenv("TENSORFLOWIMAGE")
+	nifiImage = getenv("NIFIIMAGE")
+	kettleImage = getenv("KETTLEIMAGE")
 }
-
-
 

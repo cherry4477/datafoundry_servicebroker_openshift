@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    servicebroker: sb-instanceid-tensorflow
+  name: sb-instanceid-tnsrflw
+spec:
+  replicas: 1
+  selector:
+    servicebroker: sb-instanceid-tensorflow
+  template:
+    metadata:
+      labels:
+        servicebroker: sb-instanceid-tensorflow
+    spec:
+      containers:
+      - image: http://tensorflow-image-place-holder/tensorflow-openshift-orchestration
+        name: sb-instanceid-tnsrflw
+        resources:
+          limits:
+            cpu: 0.1
+        env:
+          - name: a
+            value: b
+        ports:
+        - containerPort: 8888
+---
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-tnsrflw
+  labels:
+    servicebroker: sb-instanceid-tensorflow
+spec:
+  host: sb-instanceid-tensorflow.endpoint-postfix-place-holder
+  port:
+    targetPort: web
+  to:
+    kind: Service
+    name: sb-instanceid-tnsrflw
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    servicebroker: sb-instanceid-tensorflow
+  name: sb-instanceid-tnsrflw
+spec:
+  ports:
+  - port: 8888
+    name: web
+  selector:
+    servicebroker: sb-instanceid-tensorflow

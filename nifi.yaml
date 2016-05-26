@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    servicebroker: sb-instanceid-nifi
+  name: sb-instanceid-nifi
+spec:
+  replicas: 1
+  selector:
+    servicebroker: sb-instanceid-nifi
+  template:
+    metadata:
+      labels:
+        servicebroker: sb-instanceid-nifi
+    spec:
+      containers:
+      - image: http://nifi-image-place-holder/nifi-openshift-orchestration
+        name: sb-instanceid-nifi
+        resources:
+          limits:
+            cpu: 0.1
+        env:
+          - name: a
+            value: b
+        ports:
+        - containerPort: 8000
+---
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-nifi
+  labels:
+    servicebroker: sb-instanceid-nifi
+spec:
+  host: sb-instanceid-nifi.endpoint-postfix-place-holder
+  port:
+    targetPort: web
+  to:
+    kind: Service
+    name: sb-instanceid-nifi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    servicebroker: sb-instanceid-nifi
+  name: sb-instanceid-nifi
+spec:
+  ports:
+  - port: 8000
+    name: web
+  selector:
+    servicebroker: sb-instanceid-nifi
