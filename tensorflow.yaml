@@ -19,9 +19,6 @@ spec:
         resources:
           limits:
             cpu: 0.1
-        env:
-          - name: a
-            value: b
         ports:
         - containerPort: 8888
 ---

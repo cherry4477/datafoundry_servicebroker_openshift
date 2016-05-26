@@ -123,7 +123,7 @@ func (handler *NiFi_Handler) DoProvision(instanceID string, details brokerapi.Pr
 	serviceInfo.User = nifiUser
 	serviceInfo.Password = nifiPassword
 	
-	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.routeAdmin.Spec.Host, "80")
+	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -254,8 +254,8 @@ func loadNiFiResources_Master(instanceID, nifiUser, nifiPassword string, res *ni
 	yamlTemplates := NiFiTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(nifiUser), -1)	
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(nifiPassword), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(nifiUser), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(nifiPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -265,18 +265,16 @@ func loadNiFiResources_Master(instanceID, nifiUser, nifiPassword string, res *ni
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.rc).
-		Decode(&res.routeAdmin).
-		//Decode(&res.routeMQ).
+		Decode(&res.route).
 		Decode(&res.service)
 	
 	return decoder.Err
 }
 
 type nifiResources_Master struct {
-	rc         kapi.ReplicationController
-	routeAdmin routeapi.Route
-	//routeMQ    routeapi.Route
-	service    kapi.Service
+	rc      kapi.ReplicationController
+	route   routeapi.Route
+	service kapi.Service
 }
 	
 func createNiFiResources_Master (instanceId, serviceBrokerNamespace, nifiUser, nifiPassword string) (*nifiResources_Master, error) {
@@ -294,8 +292,7 @@ func createNiFiResources_Master (instanceId, serviceBrokerNamespace, nifiUser, n
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
 		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
-		OPost(prefix + "/routes", &input.routeAdmin, &output.routeAdmin).
-		//OPost(prefix + "/routes", &input.routeMQ, &output.routeMQ).
+		OPost(prefix + "/routes", &input.route, &output.route).
 		KPost(prefix + "/services", &input.service, &output.service)
 	
 	if osr.Err != nil {
@@ -319,8 +316,7 @@ func getNiFiResources_Master (instanceId, serviceBrokerNamespace, nifiUser, nifi
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
 		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
-		OGet(prefix + "/routes/" + input.routeAdmin.Name, &output.routeAdmin).
-		//OGet(prefix + "/routes/" + input.routeMQ.Name, &output.routeMQ).
+		OGet(prefix + "/routes/" + input.route.Name, &output.route).
 		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
 	if osr.Err != nil {
@@ -334,8 +330,7 @@ func destroyNiFiResources_Master (masterRes *nifiResources_Master, serviceBroker
 	// todo: add to retry queue on fail
 
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
-	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeAdmin.Name)}()
-	//go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeMQ.Name)}()
+	go func() {odel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
 }
 
