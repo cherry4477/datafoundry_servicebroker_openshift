@@ -1,25 +1,25 @@
+
 apiVersion: v1
-kind: ReplicationController
+kind: DeploymentConfig
 metadata:
   labels:
-    servicebroker: sb-instanceid-kettle
+    app: sb-instanceid-kettle
   name: sb-instanceid-kettle
 spec:
   replicas: 1
   selector:
-    servicebroker: sb-instanceid-kettle
+    app: sb-instanceid-kettle
+  strategy:
+    resources: {}
   template:
     metadata:
       labels:
-        servicebroker: sb-instanceid-kettle
+        app: sb-instanceid-kettle
     spec:
       containers:
       - image: http://kettle-image-place-holder/kettle-openshift-orchestration
         imagePullPolicy: Always
         name: sb-instanceid-kettle
-        resources:
-          limits:
-            cpu: 0.1
         ports:
         - containerPort: 8181
           protocol: TCP
@@ -27,8 +27,9 @@ spec:
         terminationMessagePath: /dev/termination-log
       dnsPolicy: ClusterFirst
       restartPolicy: Always
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
+  test: false
+  triggers:
+  - type: ConfigChange
 ---
 apiVersion: v1
 kind: Route

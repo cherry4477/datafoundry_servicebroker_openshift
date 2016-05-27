@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"net"
+	//"net"
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	"strconv"
@@ -123,7 +123,7 @@ func (handler *NiFi_Handler) DoProvision(instanceID string, details brokerapi.Pr
 	serviceInfo.User = nifiUser
 	serviceInfo.Password = nifiPassword
 	
-	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	serviceSpec.DashboardURL = fmt.Sprintf("http://%s/nifi/", output.route.Spec.Host)
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -151,6 +151,8 @@ func (handler *NiFi_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInf
 	}
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
+	
+	// todo: check if http get dashboard request is ok
 	
 	if ok (&master_res.rc) {
 		return brokerapi.LastOperation{
@@ -184,9 +186,9 @@ func (handler *NiFi_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindin
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	mq_port := oshandler.GetServicePortByName(&master_res.service, "mq")
+	mq_port := oshandler.GetServicePortByName(&master_res.service, "web")
 	if mq_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("web port not found")
 	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)

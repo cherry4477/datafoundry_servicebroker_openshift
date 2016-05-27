@@ -184,9 +184,9 @@ func (handler *TensorFlow_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	mq_port := oshandler.GetServicePortByName(&master_res.service, "mq")
+	mq_port := oshandler.GetServicePortByName(&master_res.service, "web")
 	if mq_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("web port not found")
 	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)

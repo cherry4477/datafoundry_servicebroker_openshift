@@ -29,7 +29,7 @@ import (
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	routeapi "github.com/openshift/origin/route/api/v1"
-	deployapi "github.com/openshift/origin/deploy/api/v1"
+	//deployapi "github.com/openshift/origin/deploy/api/v1"
 	
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
@@ -152,7 +152,7 @@ func (handler *Kettle_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceI
 	}
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
-	
+	/*
 	rcs, err := oshandler.GetReplicationControllersByLabels(myServiceInfo.Database, master_res.dc.Spec.Selector)
 	if err != nil {
 		return brokerapi.LastOperation{
@@ -166,8 +166,12 @@ func (handler *Kettle_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceI
 			Description: fmt.Sprintf("Error: number of rcs (%d) is not 1.", len(rcs)),
 		}, nil
 	}
+	rc := &rcs[0]
+	*/
 	
-	if ok (&rcs[0]) {
+	rc := &master_res.rc
+	
+	if ok (rc) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -199,9 +203,9 @@ func (handler *Kettle_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bind
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	mq_port := oshandler.GetServicePortByName(&master_res.service, "mq")
+	mq_port := oshandler.GetServicePortByName(&master_res.service, "web")
 	if mq_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("mq port not found")
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("web port not found")
 	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
@@ -279,8 +283,8 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		//Decode(&res.rc).
-		Decode(&res.dc).
+		Decode(&res.rc).
+		//Decode(&res.dc).
 		Decode(&res.route).
 		Decode(&res.service)
 	
@@ -288,8 +292,8 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 }
 
 type kettleResources_Master struct {
-	//rc      kapi.ReplicationController
-	dc      deployapi.DeploymentConfig
+	rc      kapi.ReplicationController
+	//dc      deployapi.DeploymentConfig
 	route   routeapi.Route
 	service kapi.Service
 }
@@ -308,8 +312,8 @@ func createKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUse
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		//KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
-		OPost(prefix + "/deploymentconfigs", &input.dc, &output.dc).
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
+		//OPost(prefix + "/deploymentconfigs", &input.dc, &output.dc).
 		OPost(prefix + "/routes", &input.route, &output.route).
 		KPost(prefix + "/services", &input.service, &output.service)
 	
@@ -333,8 +337,8 @@ func getKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUser, 
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		//KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
-		OGet(prefix + "/deploymentconfigs/" + input.dc.Name, &output.dc).
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
+		//OGet(prefix + "/deploymentconfigs/" + input.dc.Name, &output.dc).
 		OGet(prefix + "/routes/" + input.route.Name, &output.route).
 		KGet(prefix + "/services/" + input.service.Name, &output.service)
 	
@@ -348,8 +352,8 @@ func getKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUser, 
 func destroyKettleResources_Master (masterRes *kettleResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	//go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
-	go func() {odel (serviceBrokerNamespace, "deploymentconfigs", masterRes.dc.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
+	//go func() {odel (serviceBrokerNamespace, "deploymentconfigs", masterRes.dc.Name)}()
 	go func() {odel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
 }
