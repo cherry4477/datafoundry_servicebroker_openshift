@@ -144,10 +144,15 @@ func (handler *Kettle_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceI
 	//	return true
 	//}
 	ok := func(rc *kapi.ReplicationController) bool {
+	println("rc =", rc)
+	println("rc.Name =", rc.Name)
+	println("rc.Spec.Replicas =", rc.Spec.Replicas)
+	println("rc.Status.Replicas =", rc.Status.Replicas)
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
 		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
+	println("n =", n)
 		return n >= *rc.Spec.Replicas
 	}
 	

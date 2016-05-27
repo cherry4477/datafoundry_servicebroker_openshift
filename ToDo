@@ -1,11 +1,3 @@
-curl http://www.gtlib.gatech.edu/pub/apache/zookeeper/zookeeper-3.4.6/zookeeper-3.4.6.tar.gz -o zookeeper-3.4.6.tar.gz
-tar xzf zookeeper-3.4.6.tar.gz
-cd zookeeper-3.4.6
-cp conf/zoo_sample.cfg conf/zoo.cfg
-./bin/zkServer.sh start
-cd ..
 
-
-etcd-outer-boot
->  etcd-client-port
-  > port: 80 -> 2379
+sometimes, the real resource name will change to rc-name-n, which is different from "rc-name" in yaml.
+so, ...
