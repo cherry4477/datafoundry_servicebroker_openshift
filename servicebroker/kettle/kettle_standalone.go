@@ -553,6 +553,7 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
 	if osr.Err != nil {
+		logger.Error("statRunningPodsByLabels", osr.Err)
 		return 0, osr.Err
 	}
 	
@@ -561,7 +562,7 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 		
-		println("\n pods.Items[", i, "].Status.Phase =", pod.Status.Phase, "\n")
+		println("\n pods.Items[", i, "].Name =", pod.Name, ", Status.Phase =", pod.Status.Phase, "\n")
 		
 		if pod.Status.Phase == kapi.PodRunning {
 			nrunnings ++

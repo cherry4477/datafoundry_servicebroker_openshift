@@ -236,7 +236,7 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 		osr.Err = errors.New(string(data))
 	} else {
 		if into != nil {
-			//println("into data = ", string(data), "\n")
+			println("into data = ", string(data), "\n")
 		
 			osr.Err = json.Unmarshal(data, into)
 		}
