@@ -545,9 +545,9 @@ type watchReplicationControllerStatus struct {
 
 func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
 	
-	println("to list replicationcontrollers in", serviceBrokerNamespace)
+	println("to list pods in", serviceBrokerNamespace)
 	
-	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers"
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
 	
 	pods := kapi.PodList{}
 	
