@@ -350,6 +350,22 @@ func GetPodPortByName(pod *kapi.Pod, name string) *kapi.ContainerPort {
 	return nil
 }
 
+func GetReplicationControllersByLabels(serviceBrokerNamespace string, labels map[string]string) ([]kapi.ReplicationController, error) {
+	
+	println("to list pods in", serviceBrokerNamespace)
+	
+	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	
+	rcs := kapi.ReplicationControllerList{}
+	
+	osr := NewOpenshiftREST(OC()).KList(uri, labels, &rcs)
+	if osr.Err != nil {
+		return nil, osr.Err
+	}
+	
+	return rcs.Items, osr.Err
+}
+
 //===============================================================
 // 
 //===============================================================

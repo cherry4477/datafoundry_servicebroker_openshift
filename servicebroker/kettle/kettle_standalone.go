@@ -153,9 +153,21 @@ func (handler *Kettle_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceI
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	// todo: get rc by label
+	rcs, err := oshandler.GetReplicationControllersByLabels(myServiceInfo.Database, master_res.dc.Spec.Selector)
+	if err != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: "Error: " + err.Error(),
+		}, nil
+	}
+	if len(rcs) != 1 {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: fmt.Sprintf("Error: number of rcs (%d) is not 1.", len(rcs)),
+		}, nil
+	}
 	
-	if ok (&master_res.rc) {
+	if ok (&rcs[0]) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -524,9 +536,9 @@ type watchReplicationControllerStatus struct {
 
 func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
 	
-	println("to list pods in", serviceBrokerNamespace)
+	println("to list replicationcontrollers in", serviceBrokerNamespace)
 	
-	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
+	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers"
 	
 	pods := kapi.PodList{}
 	

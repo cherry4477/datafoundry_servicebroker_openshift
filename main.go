@@ -30,6 +30,9 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/cassandra"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kettle"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/nifi"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/tensorflow"
 )
 
 type myServiceBroker struct {
