@@ -101,8 +101,8 @@ func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	kettleUser := oshandler.NewElevenLengthID()
-	kettlePassword := oshandler.GenGUID()
+	kettleUser := "cluster" // oshandler.NewElevenLengthID()
+	kettlePassword := "cluster" // oshandler.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
@@ -208,13 +208,13 @@ func (handler *Kettle_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bind
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	mq_port := oshandler.GetServicePortByName(&master_res.service, "web")
-	if mq_port == nil {
+	web_port := oshandler.GetServicePortByName(&master_res.service, "web")
+	if web_port == nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("web port not found")
 	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(mq_port.Port)
+	port := strconv.Itoa(web_port.Port)
 	//host := master_res.routeMQ.Spec.Host
 	//port := "80"
 	
