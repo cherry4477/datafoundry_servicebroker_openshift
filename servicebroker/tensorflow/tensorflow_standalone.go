@@ -254,8 +254,8 @@ func loadTensorFlowResources_Master(instanceID, tensorflowUser, tensorflowPasswo
 	yamlTemplates := TensorFlowTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(tensorflowUser), -1)	
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(tensorflowPassword), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user*****"), []byte(tensorflowUser), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(tensorflowPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))

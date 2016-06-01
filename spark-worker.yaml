@@ -17,7 +17,7 @@ spec:
             - name: SPARK_MASTER
               value: sb-instanceid-sparkms.local-service-postfix-place-holder
             - name: SPARK_SECRET
-              value: test-1234
+              value: pass*****
           image: index.alauda.cn/asiainfoldp/spark
           command: ["/start-worker"]
           ports:

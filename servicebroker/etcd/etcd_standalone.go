@@ -618,7 +618,7 @@ func loadEtcdResources_HA(instanceID, rootPassword string, res *etcdResources_HA
 	yamlTemplates := EtcdTemplateData_HA
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(rootPassword), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(rootPassword), -1)	
 	
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))

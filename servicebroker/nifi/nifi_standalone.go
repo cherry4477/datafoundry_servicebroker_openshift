@@ -256,8 +256,8 @@ func loadNiFiResources_Master(instanceID, nifiUser, nifiPassword string, res *ni
 	yamlTemplates := NiFiTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(nifiUser), -1)	
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(nifiPassword), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user*****"), []byte(nifiUser), -1)	
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(nifiPassword), -1)	
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))

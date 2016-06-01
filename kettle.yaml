@@ -19,8 +19,8 @@ spec:
         name: sb-instanceid-kettle
         args:
         - /start.sh
-        - user-1234
-        - test-1234
+        - user*****
+        - pass*****
         resources:
           limits:
             cpu: 0.1

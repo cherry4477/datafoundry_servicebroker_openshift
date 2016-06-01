@@ -245,8 +245,8 @@ func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword str
 	yamlTemplates := RabbitmqTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(rabbitmqUser), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(rabbitmqPassword), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user*****"), []byte(rabbitmqUser), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(rabbitmqPassword), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))

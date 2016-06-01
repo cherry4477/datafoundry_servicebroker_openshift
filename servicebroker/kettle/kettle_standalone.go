@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"net"
+	//"net"
 	"github.com/pivotal-cf/brokerapi"
 	//"time"
 	"strconv"
@@ -124,7 +124,7 @@ func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.
 	serviceInfo.User = kettleUser
 	serviceInfo.Password = kettlePassword
 	
-	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	serviceSpec.DashboardURL = fmt.Sprintf("http://%s:%s@%s", kettleUser, kettlePassword, output.route.Spec.Host)
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -278,8 +278,8 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 	yamlTemplates := KettleTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(kettleUser), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(kettlePassword), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user*****"), []byte(kettleUser), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(kettlePassword), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
