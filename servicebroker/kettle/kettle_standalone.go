@@ -101,8 +101,8 @@ func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	kettleUser := "cluster" // oshandler.NewElevenLengthID()
-	kettlePassword := "cluster" // oshandler.GenGUID()
+	kettleUser := oshandler.NewElevenLengthID()
+	kettlePassword := oshandler.GenGUID()
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
@@ -278,8 +278,8 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 	yamlTemplates := KettleTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(kettleUser), -1)	
-	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(kettlePassword), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("user-1234"), []byte(kettleUser), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("test-1234"), []byte(kettlePassword), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))

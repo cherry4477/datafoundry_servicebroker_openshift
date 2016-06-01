@@ -17,6 +17,10 @@ spec:
       - image: http://kettle-image-place-holder/kettle-openshift-orchestration
         imagePullPolicy: Always
         name: sb-instanceid-kettle
+        args:
+        - /start.sh
+        - user-1234
+        - test-1234
         resources:
           limits:
             cpu: 0.1
