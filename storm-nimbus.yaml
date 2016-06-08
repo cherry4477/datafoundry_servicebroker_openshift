@@ -29,6 +29,7 @@ spec:
       containers:
       - name: zookeeper
         image: http://storm-image-place-holder/storm-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         env:
         - name: CONFIGURE_ZOOKEEPER
           value: "true"

@@ -103,7 +103,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 		//haResources:    nil,
 	})
 	
-	serviceSpec.DashboardURL = "http://not-available-now"
+	serviceSpec.DashboardURL = ""
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -550,6 +550,16 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 		if err != nil {
 			return err
 		}
+		
+		etcdboot_image := oshandler.EtcdbootImage()
+		etcdboot_image = strings.TrimSpace(etcdboot_image)
+		if len(etcdboot_image) > 0 {
+			EtcdTemplateData_Boot = bytes.Replace(
+				EtcdTemplateData_Boot, 
+				[]byte("http://etcd-boot-image-place-holder/etcd-boot-openshift-orchestration"), 
+				[]byte(etcdboot_image), 
+				-1)
+		}
 		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
@@ -560,6 +570,8 @@ func loadEtcdResources_Boot(instanceID string, res *etcdResources_Boot) error {
 				-1)
 		}
 	}
+	
+	
 	
 	// todo: max length of res names in kubernetes is 24
 	

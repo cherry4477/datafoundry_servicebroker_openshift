@@ -18,7 +18,8 @@ spec:
               value: sb-instanceid-sparkms.local-service-postfix-place-holder
             - name: SPARK_SECRET
               value: pass*****
-          image: index.alauda.cn/asiainfoldp/zepplin
+          image: http://zepplin-image-place-holder/zepplin-openshift-orchestration
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           resources:

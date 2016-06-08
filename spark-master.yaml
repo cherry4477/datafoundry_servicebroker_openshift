@@ -18,7 +18,8 @@ spec:
               value: sb-instanceid-sparkms.local-service-postfix-place-holder
             - name: SPARK_SECRET
               value: pass*****
-          image: index.alauda.cn/asiainfoldp/spark
+          image: http://spark-image-place-holder/spark-openshift-orchestration
+          imagePullPolicy: IfNotPresent
           command: ["/start-master"]
           ports:
             - containerPort: 7077

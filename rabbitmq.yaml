@@ -14,7 +14,8 @@ spec:
         servicebroker: sb-instanceid-rabbitmq
     spec:
       containers:
-      - image: rabbitmq:3.6.1-management
+      - image: http://rabbitmq-image-place-holder/rabbitmq-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         name: sb-instanceid-rbbtmq
         resources:
           limits:

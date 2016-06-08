@@ -229,6 +229,15 @@ func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword str
 		if err != nil {
 			return err
 		}
+		rabbitmq_image := oshandler.RabbitmqImage()
+		rabbitmq_image = strings.TrimSpace(rabbitmq_image)
+		if len(rabbitmq_image) > 0 {
+			RabbitmqTemplateData_Master = bytes.Replace(
+				RabbitmqTemplateData_Master, 
+				[]byte("http://rabbitmq-image-place-holder/rabbitmq-openshift-orchestration"), 
+				[]byte(rabbitmq_image), 
+				-1)
+		}
 		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
@@ -239,6 +248,8 @@ func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword str
 				-1)
 		}
 	}
+	
+	
 	
 	// ...
 	

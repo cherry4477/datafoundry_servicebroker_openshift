@@ -711,6 +711,9 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	return nrunnings, nil
 }
 
+// https://hub.docker.com/r/mbabineau/zookeeper-exhibitor/
+// https://hub.docker.com/r/netflixoss/exhibitor/
+
 // todo: 
 // set ACL: https://godoc.org/github.com/samuel/go-zookeeper/zk#Conn.SetACL
 // github.com/samuel/go-zookeeper/zk 

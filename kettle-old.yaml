@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - image: http://kettle-image-place-holder/kettle-openshift-orchestration
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: sb-instanceid-kettle
         ports:
         - containerPort: 8181

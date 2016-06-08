@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - image: http://nifi-image-place-holder/nifi-openshift-orchestration
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: sb-instanceid-nifi
         resources:
           limits:

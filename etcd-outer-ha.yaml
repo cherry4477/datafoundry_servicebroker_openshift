@@ -25,7 +25,7 @@ spec:
         - sb-instanceid-etcd
         - pass*****
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: etcd1
         ports:
         - containerPort: 2379
@@ -79,7 +79,7 @@ spec:
         - sb-instanceid-etcd
         - pass*****
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: etcd3
         ports:
         - containerPort: 2379
@@ -134,7 +134,7 @@ spec:
         - sb-instanceid-etcd
         - pass*****
         image: http://etcd-image-place-holder/etcd-openshift-orchestration
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: etcd3
         ports:
         - containerPort: 2379

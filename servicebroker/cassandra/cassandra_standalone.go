@@ -100,7 +100,7 @@ func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details b
 		//haResources:    nil,
 	})
 	
-	serviceSpec.DashboardURL = "http://not-available-now"
+	serviceSpec.DashboardURL = ""
 	
 	return serviceSpec, serviceInfo, nil
 }

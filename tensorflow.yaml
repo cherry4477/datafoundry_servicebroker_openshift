@@ -15,6 +15,7 @@ spec:
     spec:
       containers:
       - image: http://tensorflow-image-place-holder/tensorflow-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         name: sb-instanceid-tnsrflw
         resources:
           limits:

@@ -462,6 +462,16 @@ func loadSparkResources_Master(instanceID, serviceBrokerNamespace, sparkSecret s
 		if err != nil {
 			return err
 		}
+		
+		spark_image := oshandler.SparkImage()
+		spark_image = strings.TrimSpace(spark_image)
+		if len(spark_image) > 0 {
+			SparkTemplateData_Master = bytes.Replace(
+				SparkTemplateData_Master, 
+				[]byte("http://spark-image-place-holder/spark-openshift-orchestration"), 
+				[]byte(spark_image), 
+				-1)
+		}
 		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
@@ -506,6 +516,16 @@ func loadSparkResources_Workers(instanceID, serviceBrokerNamespace, sparkSecret 
 		if err != nil {
 			return err
 		}
+		
+		spark_image := oshandler.SparkImage()
+		spark_image = strings.TrimSpace(spark_image)
+		if len(spark_image) > 0 {
+			SparkTemplateData_Workers = bytes.Replace(
+				SparkTemplateData_Workers, 
+				[]byte("http://spark-image-place-holder/spark-openshift-orchestration"), 
+				[]byte(spark_image), 
+				-1)
+		}
 	}
 	
 	// todo: max length of res names in kubernetes is 24
@@ -540,6 +560,16 @@ func loadSparkResources_Zeppelin(instanceID, serviceBrokerNamespace, sparkSecret
 		SparkTemplateData_Zeppelin, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
+		}
+		
+		zepplin_image := oshandler.ZepplinImage()
+		zepplin_image = strings.TrimSpace(zepplin_image)
+		if len(zepplin_image) > 0 {
+			SparkTemplateData_Zeppelin = bytes.Replace(
+				SparkTemplateData_Zeppelin, 
+				[]byte("http://zepplin-image-place-holder/zepplin-openshift-orchestration"), 
+				[]byte(zepplin_image), 
+				-1)
 		}
 		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)

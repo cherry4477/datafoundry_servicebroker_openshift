@@ -32,6 +32,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           image: http://cassandra-image-place-holder/cassandra-openshift-orchestration
+          imagePullPolicy: IfNotPresent
           name: sb-instanceid-cssndr0
           ports:
             - containerPort: 9042

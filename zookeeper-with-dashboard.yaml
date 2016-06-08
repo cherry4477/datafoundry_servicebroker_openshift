@@ -15,6 +15,8 @@ metadata:
   name: sb-instanceid-zk-1
 spec:
   ports:
+    - name: exhibitor
+      port: 8080
     - name: client
       port: 2181
     - name: followers
@@ -31,6 +33,8 @@ metadata:
   name: sb-instanceid-zk-2
 spec:
   ports:
+    - name: exhibitor
+      port: 8080
     - name: client
       port: 2181
     - name: followers
@@ -47,6 +51,8 @@ metadata:
   name: sb-instanceid-zk-3
 spec:
   ports:
+    - name: exhibitor
+      port: 8080
     - name: client
       port: 2181
     - name: followers
@@ -89,6 +95,7 @@ spec:
             - name: ZOO_PASSWORD
               value: "super:password-place-holder"
           ports:
+            - containerPort: 8080
             - containerPort: 2181
             - containerPort: 2888
             - containerPort: 3888
@@ -130,6 +137,7 @@ spec:
             - name: ZOO_PASSWORD
               value: "super:password-place-holder"
           ports:
+            - containerPort: 8080
             - containerPort: 2181
             - containerPort: 2888
             - containerPort: 3888
@@ -171,6 +179,7 @@ spec:
             - name: ZOO_PASSWORD
               value: "super:password-place-holder"
           ports:
+            - containerPort: 8080
             - containerPort: 2181
             - containerPort: 2888
             - containerPort: 3888

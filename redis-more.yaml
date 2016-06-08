@@ -28,6 +28,7 @@ spec:
       containers:
       - name: redis
         image: http://redis-image-place-holder/redis-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         env:
           - name: SENTINEL_HOST
             value: sb-instanceid-redis
@@ -64,6 +65,7 @@ spec:
       containers:
       - name: sentinel
         image: http://redis-image-place-holder/redis-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         env:
           - name: SENTINEL
             value: "true"

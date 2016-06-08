@@ -121,6 +121,10 @@ func EtcdImage() string {
 	return etcdImage
 }
 
+func EtcdbootImage() string {
+	return etcdbootImage
+}
+
 func ZookeeperImage() string {
 	return zookeeperImage
 }
@@ -153,9 +157,24 @@ func KettleImage() string {
 	return kettleImage
 }
 
+func RabbitmqImage() string {
+	return rabbitmqImage
+}
+
+func SparkImage() string {
+	return sparkImage
+}
+
+func ZepplinImage() string {
+	return zepplinImage
+}
+
+
 var theOC *OpenshiftClient
 var endpointSuffix string
+
 var etcdImage string
+var etcdbootImage string
 var zookeeperImage string
 var redisImage string
 var kafkaImage string
@@ -164,6 +183,9 @@ var cassandraImage string
 var tensorflowImage string
 var nifiImage string
 var kettleImage string
+var rabbitmqImage string
+var sparkImage string
+var zepplinImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -175,6 +197,7 @@ func init() {
 	
 	endpointSuffix = getenv("ENDPOINTSUFFIX")
 	etcdImage = getenv("ETCDIMAGE")
+	etcdbootImage = getenv("ETCDBOOTIMAGE")
 	zookeeperImage = getenv("ZOOKEEPERIMAGE")
 	redisImage = getenv("REDISIMAGE")
 	kafkaImage = getenv("KAFKAIMAGE")
@@ -183,5 +206,8 @@ func init() {
 	tensorflowImage = getenv("TENSORFLOWIMAGE")
 	nifiImage = getenv("NIFIIMAGE")
 	kettleImage = getenv("KETTLEIMAGE")
+	rabbitmqImage = getenv("RABBITMQIMAGE")
+	sparkImage = getenv("SPARKIMAGE")
+	zepplinImage = getenv("ZEPPLINIMAGE")
 }
 

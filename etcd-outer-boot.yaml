@@ -58,7 +58,7 @@ spec:
     - etcd0=http://sb-instanceid-etcd0:2380
     - -initial-cluster-state
     - new
-    image: quay.io/coreos/etcd:latest
+    image: http://etcd-boot-image-place-holder/etcd-boot-openshift-orchestration
     imagePullPolicy: IfNotPresent
     name: etcd0
     ports:

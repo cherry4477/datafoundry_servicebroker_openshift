@@ -30,6 +30,7 @@ spec:
       containers:
       - name: kafka
         image: http://kafka-image-place-holder/kafka-openshift-orchestration
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9092
         env:
