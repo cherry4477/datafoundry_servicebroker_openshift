@@ -129,8 +129,16 @@ func ZookeeperImage() string {
 	return zookeeperImage
 }
 
+func ZookeeperExhibitorImage() string {
+	return zookeeperexhibitorImage
+}
+
 func RedisImage() string {
 	return redisImage
+}
+
+func RedisPhpAdminImage() string {
+	return redisphpadminImage
 }
 
 func KafkaImage() string {
@@ -176,7 +184,9 @@ var endpointSuffix string
 var etcdImage string
 var etcdbootImage string
 var zookeeperImage string
+var zookeeperexhibitorImage string
 var redisImage string
+var redisphpadminImage string
 var kafkaImage string
 var stormImage string
 var cassandraImage string
@@ -199,7 +209,9 @@ func init() {
 	etcdImage = getenv("ETCDIMAGE")
 	etcdbootImage = getenv("ETCDBOOTIMAGE")
 	zookeeperImage = getenv("ZOOKEEPERIMAGE")
+	zookeeperexhibitorImage = getenv("ZOOKEEPEREXHIBITORIMAGE")
 	redisImage = getenv("REDISIMAGE")
+	redisphpadminImage = getenv("REDISPHPADMINIMAGE")
 	kafkaImage = getenv("KAFKAIMAGE")
 	stormImage = getenv("STORMIMAGE")
 	cassandraImage = getenv("CASSANDRAIMAGE")

@@ -352,6 +352,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 var ZookeeperTemplateData_Master []byte = nil
 
 func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
+	/*
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
 		if err != nil {
@@ -368,6 +369,27 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 				ZookeeperTemplateData_Master, 
 				[]byte("http://zookeeper-image-place-holder/zookeeper-openshift-orchestration"), 
 				[]byte(zookeeper_image), 
+				-1)
+		}
+	}
+	*/
+	
+	if ZookeeperTemplateData_Master == nil {
+		f, err := os.Open("zookeeper-with-dashboard.yaml")
+		if err != nil {
+			return err
+		}
+		ZookeeperTemplateData_Master, err = ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		zookeeper_exhibitor_image := oshandler.ZookeeperExhibitorImage()
+		zookeeper_exhibitor_image = strings.TrimSpace(zookeeper_exhibitor_image)
+		if len(zookeeper_exhibitor_image) > 0 {
+			ZookeeperTemplateData_Master = bytes.Replace(
+				ZookeeperTemplateData_Master, 
+				[]byte("http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration"), 
+				[]byte(zookeeper_exhibitor_image), 
 				-1)
 		}
 	}
