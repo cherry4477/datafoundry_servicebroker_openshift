@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"bufio"
 	//"io"
+	"os"
 	"io/ioutil"
 	"crypto/tls"
 	"net/http"
@@ -27,7 +28,24 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	//"github.com/ghodss/yaml"
+	
+	"github.com/pivotal-golang/lager"
 )
+
+//==============================================================
+// 
+//==============================================================
+
+func init() {
+	logger = lager.NewLogger("OpenShift")
+	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
+}
+
+var logger lager.Logger
+
+//==============================================================
+// 
+//==============================================================
 
 type OpenshiftClient struct {
 	host    string
@@ -236,7 +254,7 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 		osr.Err = errors.New(string(data))
 	} else {
 		if into != nil {
-			println("into data = ", string(data), "\n")
+			//println("into data = ", string(data), "\n")
 		
 			osr.Err = json.Unmarshal(data, into)
 		}

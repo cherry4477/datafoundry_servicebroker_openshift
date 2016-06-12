@@ -571,20 +571,3 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	
 	return nrunnings, nil
 }
-
-// todo: 
-
-/*
-bin/zkCli.sh 127.0.0.1:2181
-bin/zkCli.sh -server sb-instanceid-zk:2181
-
-echo conf|nc localhost 2181
-echo cons|nc localhost 2181
-echo ruok|nc localhost 2181
-echo srst|nc localhost 2181
-echo crst|nc localhost 2181
-echo dump|nc localhost 2181
-echo srvr|nc localhost 2181
-echo stat|nc localhost 2181
-echo mntr|nc localhost 2181
-*/

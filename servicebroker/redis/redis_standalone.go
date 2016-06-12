@@ -370,6 +370,8 @@ func (job *redisOrchestrationJob) run() {
 		}
 	}
 	
+	time.Sleep(5 * time.Second)
+	
 	// create more resources
 	
 	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
