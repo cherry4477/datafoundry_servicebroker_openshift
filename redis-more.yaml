@@ -30,6 +30,8 @@ spec:
         image: http://redis-image-place-holder/redis-openshift-orchestration
         imagePullPolicy: IfNotPresent
         env:
+          - name: CLUSTER_NAME
+            value: redis-cluster-instanceid
           - name: SENTINEL_HOST
             value: sb-instanceid-redis
           - name: SENTINEL_PORT
@@ -67,6 +69,8 @@ spec:
         image: http://redis-image-place-holder/redis-openshift-orchestration
         imagePullPolicy: IfNotPresent
         env:
+          - name: CLUSTER_NAME
+            value: redis-cluster-instanceid
           - name: SENTINEL
             value: "true"
           - name: SENTINEL_HOST

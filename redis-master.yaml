@@ -13,6 +13,8 @@ spec:
       image: http://redis-image-place-holder/redis-openshift-orchestration
       imagePullPolicy: IfNotPresent
       env:
+        - name: CLUSTER_NAME
+          value: redis-cluster-instanceid
         - name: MASTER
           value: "true"
         - name: REDIS_PASSWORD
@@ -29,6 +31,8 @@ spec:
       image: http://redis-image-place-holder/redis-openshift-orchestration
       imagePullPolicy: IfNotPresent
       env:
+        - name: CLUSTER_NAME
+          value: redis-cluster-instanceid
         - name: SENTINEL
           value: "true"
         - name: SENTINEL_HOST
