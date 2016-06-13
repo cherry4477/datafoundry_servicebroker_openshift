@@ -16,7 +16,7 @@ kind: ReplicationController
 metadata:
   name: sb-instanceid-redis
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     sb-instanceid-redis: redis
   template:
@@ -53,7 +53,7 @@ kind: ReplicationController
 metadata:
   name: sb-instanceid-redis-sentinel
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     sb-instanceid-sentinel: sentinel
   template:
