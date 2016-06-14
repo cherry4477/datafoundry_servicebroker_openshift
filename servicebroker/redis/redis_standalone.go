@@ -154,7 +154,7 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	
 	// the job may be finished or interrupted or running in another instance.
 	
-	master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	//master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
@@ -164,16 +164,18 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	//	return true
 	//}
 	ok := func(rc *kapi.ReplicationController) bool {
+		println("rc.Name =", rc.Name)
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
 		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
+		println("n =", n)
 		return n >= *rc.Spec.Replicas
 	}
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if master_res.pod.Status.Phase == kapi.PodRunning && ok (&more_res.rc) && ok (&more_res.rcSentinel) {
+	if ok (&more_res.rc) && ok (&more_res.rcSentinel) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
