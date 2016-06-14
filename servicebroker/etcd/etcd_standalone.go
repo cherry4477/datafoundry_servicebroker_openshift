@@ -191,9 +191,14 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 	// output.route.Spec.Host
 	
 	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-	if err != nil {
+	//if err != nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, err
+	//}
+	// boot_res.etcdpod can be destroyed normally
+	if boot_res.route.Name == "" {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
+	
 	//if len(boot_res.service.Spec.Ports) == 0 {
 	//	err := errors.New("no ports in boot service")
 	//	logger.Error("", err)
@@ -256,7 +261,11 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 
 func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	boot_res, err := getEtcdResources_Boot (myServiceInfo.Url, myServiceInfo.Database)
-	if err != nil {
+	//if err != nil {
+	//	return err
+	//}
+	// boot_res.etcdpod can be destroyed normally
+	if boot_res.route.Name == "" {
 		return err
 	}
 	//if len(boot_res.service.Spec.Ports) == 0 {
