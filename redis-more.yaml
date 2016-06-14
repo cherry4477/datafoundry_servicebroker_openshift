@@ -31,7 +31,7 @@ spec:
         imagePullPolicy: IfNotPresent
         env:
           - name: CLUSTER_NAME
-            value: redis-cluster-instanceid
+            value: cluster-sb-instanceid-redis
           - name: SENTINEL_HOST
             value: sb-instanceid-redis
           - name: SENTINEL_PORT
@@ -70,7 +70,7 @@ spec:
         imagePullPolicy: IfNotPresent
         env:
           - name: CLUSTER_NAME
-            value: redis-cluster-instanceid
+            value: cluster-sb-instanceid-redis
           - name: SENTINEL
             value: "true"
           - name: SENTINEL_HOST

@@ -14,7 +14,7 @@ spec:
       imagePullPolicy: IfNotPresent
       env:
         - name: CLUSTER_NAME
-          value: redis-cluster-instanceid
+          value: cluster-sb-instanceid-redis
         - name: MASTER
           value: "true"
         - name: REDIS_PASSWORD
@@ -32,7 +32,7 @@ spec:
       imagePullPolicy: IfNotPresent
       env:
         - name: CLUSTER_NAME
-          value: redis-cluster-instanceid
+          value: cluster-sb-instanceid-redis
         - name: SENTINEL
           value: "true"
         - name: SENTINEL_HOST

@@ -218,6 +218,8 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
+	// master_res may has been shutdown normally.
+	
 	more_res, err := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
@@ -228,6 +230,7 @@ func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("client port not found")
 	//}
 	
+	cluser_name := "cluster-" + more_res.serviceSentinel.Name
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", more_res.serviceSentinel.Name, myServiceInfo.Database)
 	port := strconv.Itoa(client_port.Port)
 	//host := master_res.routeMQ.Spec.Host
@@ -239,6 +242,7 @@ func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		Port:     port,
 		//Username: myServiceInfo.User,
 		Password: myServiceInfo.Password,
+		Name: cluser_name,
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
