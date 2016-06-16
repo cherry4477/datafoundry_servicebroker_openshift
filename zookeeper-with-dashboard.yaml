@@ -4,6 +4,8 @@ metadata:
   name: sb-instanceid-zk
 spec:
   ports:
+    - name: exhibitor
+      port: 8080
     - name: client
       port: 2181
   selector:
