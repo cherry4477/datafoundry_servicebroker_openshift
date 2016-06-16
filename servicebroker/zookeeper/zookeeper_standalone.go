@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	//"net"
+	"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
@@ -28,7 +28,7 @@ import (
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
-	//routeapi "github.com/openshift/origin/route/api/v1"
+	routeapi "github.com/openshift/origin/route/api/v1"
 	
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
@@ -123,7 +123,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	serviceInfo.User = zookeeperUser
 	serviceInfo.Password = zookeeperPassword
 	
-	serviceSpec.DashboardURL = ""
+	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -422,7 +422,8 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 		Decode(&res.svc3).
 		Decode(&res.rc1).
 		Decode(&res.rc2).
-		Decode(&res.rc3)
+		Decode(&res.rc3).
+		Decode(&res.route)
 	
 	return decoder.Err
 }
@@ -436,6 +437,8 @@ type ZookeeperResources_Master struct {
 	rc1   kapi.ReplicationController
 	rc2   kapi.ReplicationController
 	rc3   kapi.ReplicationController
+	
+	route   routeapi.Route
 }
 
 func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespace string) (string, string, error) {
@@ -471,7 +474,8 @@ func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookee
 		KPost(prefix + "/services", &input.svc3, &output.svc3).
 		KPost(prefix + "/replicationcontrollers", &input.rc1, &output.rc1).
 		KPost(prefix + "/replicationcontrollers", &input.rc2, &output.rc2).
-		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3)
+		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3).
+		OPost(prefix + "/routes", &input.route, &output.route)
 	
 	if osr.Err != nil {
 		logger.Error("createZookeeperResources_Master", osr.Err)
@@ -504,7 +508,9 @@ func getZookeeperResources_Master(serviceBrokerNamespace string, input, output *
 		KGet(prefix + "/services/" + input.svc3.Name, &output.svc3).
 		KGet(prefix + "/replicationcontrollers/" + input.rc1.Name, &output.rc1).
 		KGet(prefix + "/replicationcontrollers/" + input.rc2.Name, &output.rc2).
-		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3)
+		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3).
+		// old bsi has no route, so get route may be error
+		OGet(prefix + "/routes/" + input.route.Name, &output.route) 
 	
 	if osr.Err != nil {
 		logger.Error("getZookeeperResources_Master", osr.Err)
@@ -523,6 +529,7 @@ func DestroyZookeeperResources_Master (masterRes *ZookeeperResources_Master, ser
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc1)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc2)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc3)}()
+	go func() {odel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
 }
 
 //===============================================================
