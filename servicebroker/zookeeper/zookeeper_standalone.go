@@ -383,6 +383,15 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 		if err != nil {
 			return err
 		}
+		endpoint_postfix := oshandler.EndPointSuffix()
+		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		if len(endpoint_postfix) > 0 {
+			ZookeeperTemplateData_Master = bytes.Replace(
+				ZookeeperTemplateData_Master, 
+				[]byte("endpoint-postfix-place-holder"), 
+				[]byte(endpoint_postfix), 
+				-1)
+		}
 		zookeeper_exhibitor_image := oshandler.ZookeeperExhibitorImage()
 		zookeeper_exhibitor_image = strings.TrimSpace(zookeeper_exhibitor_image)
 		if len(zookeeper_exhibitor_image) > 0 {
