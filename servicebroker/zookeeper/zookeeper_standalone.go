@@ -9,7 +9,7 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"net"
+	//"net"
 	"github.com/pivotal-cf/brokerapi"
 	"time"
 	"strconv"
@@ -123,7 +123,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	serviceInfo.User = zookeeperUser
 	serviceInfo.Password = zookeeperPassword
 	
-	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 	
 	return serviceSpec, serviceInfo, nil
 }
@@ -392,13 +392,14 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 				[]byte(endpoint_postfix), 
 				-1)
 		}
-		zookeeper_exhibitor_image := oshandler.ZookeeperExhibitorImage()
-		zookeeper_exhibitor_image = strings.TrimSpace(zookeeper_exhibitor_image)
-		if len(zookeeper_exhibitor_image) > 0 {
+		//zookeeper_image := oshandler.ZookeeperExhibitorImage()
+		zookeeper_image := oshandler.ZookeeperImage()
+		zookeeper_image = strings.TrimSpace(zookeeper_image)
+		if len(zookeeper_image) > 0 {
 			ZookeeperTemplateData_Master = bytes.Replace(
 				ZookeeperTemplateData_Master, 
 				[]byte("http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration"), 
-				[]byte(zookeeper_exhibitor_image), 
+				[]byte(zookeeper_image), 
 				-1)
 		}
 	}
