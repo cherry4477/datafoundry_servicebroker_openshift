@@ -399,6 +399,8 @@ func (job *redisOrchestrationJob) run() {
 		
 		if n < *rc.Spec.Replicas {
 			time.Sleep(10 * time.Second)
+		} else {
+			break
 		}
 	}
 	
