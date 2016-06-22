@@ -16,7 +16,7 @@ kind: ReplicationController
 metadata:
   name: sb-instanceid-redis
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     sb-instanceid-redis: redis
   template:
@@ -49,23 +49,19 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1
 kind: ReplicationController
 metadata:
   name: sb-instanceid-redis-sentinel
 spec:
-  replicas: 2
+  replicas: 3
   selector:
-    sb-instanceid-redis-sentinel: sentinel
+    sb-instanceid-sentinel: sentinel
   template:
     metadata:
       labels:
-        sb-instanceid-redis-sentinel: sentinel
+        sb-instanceid-sentinel: sentinel
         servicebroker: sb-instanceid-redis
     spec:
       containers:
@@ -85,7 +81,3 @@ spec:
             value: pass*****
         ports:
           - containerPort: 26379
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      securityContext: {}
-      terminationGracePeriodSeconds: 30

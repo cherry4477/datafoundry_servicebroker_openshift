@@ -466,7 +466,7 @@ CHECK_POD_STATE_0:
 		println("n = ", n, ", *job.bootResources.rc.Spec.Replicas = ", *job.bootResources.rc.Spec.Replicas)
 		
 		if n < *job.bootResources.rc.Spec.Replicas {
-			time.Sleep(10 * time.Second)
+			time.Sleep(20 * time.Second)
 			goto CHECK_POD_STATE_0
 		}
 	}

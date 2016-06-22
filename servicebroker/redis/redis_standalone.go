@@ -319,6 +319,7 @@ type watchPodStatus struct {
 	Object kapi.Pod `json:"object"`
 }
 
+/*
 func (job *redisOrchestrationJob) run() {
 	serviceInfo := job.serviceInfo
 	pod := job.masterResources.pod
@@ -382,6 +383,35 @@ func (job *redisOrchestrationJob) run() {
 	
 	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
 }
+*/
+
+func (job *redisOrchestrationJob) run() {
+	serviceInfo := job.serviceInfo
+	//pod := job.masterResources.pod
+	rc := &job.masterResources.rc
+	
+	for {
+		if job.cancelled { return }
+		
+		n, _ := statRunningPodsByLabels (serviceInfo.Database, rc.Labels)
+			
+		println("n = ", n, ", *job.masterResources.rc.Spec.Replicas = ", *rc.Spec.Replicas)
+		
+		if n < *rc.Spec.Replicas {
+			time.Sleep(10 * time.Second)
+		}
+	}
+	
+	println("redis master pod is running now")
+	
+	time.Sleep(5 * time.Second)
+	
+	if job.cancelled { return }
+	
+	// create more resources
+	
+	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+}
 
 //=======================================================================
 // 
@@ -424,7 +454,8 @@ func loadRedisResources_Master(instanceID, redisPassword string, res *redisResou
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.pod)
+		//Decode(&res.pod)
+		Decode(&res.rc)
 	
 	return decoder.Err
 }
@@ -474,7 +505,8 @@ func loadRedisResources_More(instanceID, redisPassword string, res *redisResourc
 }
 
 type redisResources_Master struct {
-	pod      kapi.Pod
+	//pod      kapi.Pod
+	rc kapi.ReplicationController
 }
 
 type redisResources_More struct {
@@ -497,7 +529,8 @@ func createRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassw
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/pods", &input.pod, &output.pod)
+		//KPost(prefix + "/pods", &input.pod, &output.pod)
+		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc)
 	
 	if osr.Err != nil {
 		logger.Error("createRedisResources_Master", osr.Err)
@@ -519,7 +552,8 @@ func getRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/pods/" + input.pod.Name, &output.pod)
+		//KGet(prefix + "/pods/" + input.pod.Name, &output.pod)
+		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc)
 	
 	if osr.Err != nil {
 		logger.Error("getRedisResources_Master", osr.Err)
@@ -531,7 +565,8 @@ func getRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword
 func destroyRedisResources_Master (masterRes *redisResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "pods", masterRes.pod.Name)}()
+	//go func() {kdel (serviceBrokerNamespace, "pods", masterRes.pod.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
 }
 	
 func (job *redisOrchestrationJob) createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) error {
@@ -597,12 +632,12 @@ func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword s
 	return &output, osr.Err
 }
 
-func destroyRedisResources_More (masterRes *redisResources_More, serviceBrokerNamespace string) {
+func destroyRedisResources_More (moreRes *redisResources_More, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.serviceSentinel.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rcSentinel)}()
+	go func() {kdel (serviceBrokerNamespace, "services", moreRes.serviceSentinel.Name)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rc)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rcSentinel)}()
 }
 
 //===============================================================
