@@ -20,6 +20,8 @@ spec:
             limits:
               cpu: 1
           env:
+            - name: cluster_name
+              value: cluster-instanceid
             - name: MAX_HEAP_SIZE
               value: 512M
             - name: HEAP_NEWSIZE
@@ -42,6 +44,11 @@ spec:
           volumeMounts:
             - mountPath: /cassandra_data
               name: data
+          livenessProbe:
+            exec:
+              command:
+              - /bin/bash
+              - /status_check.sh
       volumes:
         - name: data
           emptyDir: {}

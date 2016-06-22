@@ -261,10 +261,15 @@ func (myBroker *myServiceBroker) Provision(
 	//存储隐藏信息_info
 	tmpval, _ = json.Marshal(myServiceInfo)
 	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/_info", string(tmpval))
-	
+
 	//创建绑定目录
 	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/binding", "", &client.SetOptions{Dir: true})
-
+	if err != nil {
+		logger.Error("Can not create banding directory of  "+instanceID+" in etcd", err) //todo都应该改为日志key
+		return brokerapi.ProvisionedServiceSpec{}, err
+	} else {
+		logger.Debug("Successful create banding directory of  "+instanceID+" in etcd", nil)
+	}
 	//完成所有操作后，返回DashboardURL和是否异步的标志
 	logger.Info("Successful create instance " + instanceID)
 	return provsiondetail, nil
@@ -330,7 +335,6 @@ func (myBroker *myServiceBroker) Deprovision(instanceID string, details brokerap
 	var servcie_id, plan_id string
 	//从etcd中取得参数。
 	for i := 0; i < len(resp.Node.Nodes); i++ {
-
 		if !resp.Node.Nodes[i].Dir {
 			switch strings.ToLower(resp.Node.Nodes[i].Key) {
 			case strings.ToLower(resp.Node.Key) + "/service_id":
@@ -412,7 +416,12 @@ func (myBroker *myServiceBroker) Bind(instanceID, bindingID string, details brok
 
 	//从etcd中取得参数。
 	resp, err = etcdapi.Get(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID, &client.GetOptions{Recursive: true}) //改为环境变量
-
+	if err != nil {
+		logger.Error("Can not get instance information from etcd", err) //所有这些出错消息最好命名为常量，放到开始的时候
+		return brokerapi.Binding{}, brokerapi.ErrInstanceDoesNotExist
+	} else {
+		logger.Debug("Successful get instance information from etcd.")
+	}
 	for i := 0; i < len(resp.Node.Nodes); i++ {
 		if !resp.Node.Nodes[i].Dir {
 			switch strings.ToLower(resp.Node.Nodes[i].Key) {
@@ -643,9 +652,6 @@ var etcdapi client.KeysAPI
 var servcieBrokerName string = "openshift" // also used in init-etcd.sh 
 var etcdEndPoint, etcdUser, etcdPassword string
 var serviceBrokerPort string
-var mongoUrl string
-var mongoAdminUser string
-var mongoAdminPassword string
 
 func main() {
 	//初始化参数，参数应该从环境变量中获取
@@ -666,7 +672,7 @@ func main() {
 		Endpoints: []string{etcdEndPoint},
 		Transport: client.DefaultTransport,
 		// set timeout per request to fail fast when the target endpoint is unavailable
-		HeaderTimeoutPerRequest: time.Second,
+		HeaderTimeoutPerRequest: time.Second * 5,
 		Username:                etcdUser,
 		Password:                etcdPassword,
 	}
