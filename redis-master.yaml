@@ -10,6 +10,7 @@ spec:
     metadata:
       labels:
         sb-instanceid-redis-master: master
+        sb-instanceid-redis-sentinel-svc: sentinel
         servicebroker: sb-instanceid-redis
       name: sb-instanceid-redisbt
       #name: sb-instanceid-redisboot
