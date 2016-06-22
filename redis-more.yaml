@@ -9,7 +9,7 @@ spec:
     - port: 26379
       targetPort: 26379
   selector:
-    sb-instanceid-sentinel: sentinel
+    sb-instanceid-redis-sentinel: sentinel
 ---
 apiVersion: v1
 kind: ReplicationController
