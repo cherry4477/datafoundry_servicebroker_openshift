@@ -172,49 +172,12 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 	println("etcd addr: ", etcd_addr)
 	etcd_addrs := []string{etcd_addr}
 	
-	etcd_client, err := newAuthrizedEtcdClient (etcd_addrs, "root", myServiceInfo.Password)
-	if err != nil {
-		logger.Error("create etcd authrized client", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-
-	newusername := oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
-	newpassword := oshandler.GenGUID()
-	
-	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
-	
-	err = etcd_userapi.AddUser(context.Background(), newusername, newpassword)
-	if err != nil {
-		logger.Error("create new etcd user", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	
-	_, err = etcd_userapi.GrantUser(context.Background(), newusername, []string{EtcdBindRole})
-	if err != nil {
-		logger.Error("grant new etcd user", err)
-		
-		err2 := etcd_userapi.RemoveUser(context.Background(), newusername)
-		if err2 != nil {
-			logger.Error("remove new etcd user", err2)
-		}
-		
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	
-	// etcd bug: need to change password to make the user applied
-	// todo: may this bug is already fixed now.
-	_, err = etcd_userapi.ChangePassword(context.Background(), newusername, newpassword)
-	if err != nil {
-		logger.Error("change new user password", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-	
 	mycredentials := oshandler.Credentials{
 		Uri:      etcd_addr,
 		Hostname: host,
 		Port:     port,
-		Username: newusername,
-		Password: newpassword,
+		Username: myServiceInfo.User,
+		Password: myServiceInfo.Password,
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
@@ -223,38 +186,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 }
 
 func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	ha_res, err := getEtcdResources_HA (
-		myServiceInfo.Url, myServiceInfo.Database, 
-		myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password)
-	//if err != nil {
-	//	return err
-	//}
-	if ha_res.route.Name == "" {
-		return err
-	}
 	
-	etcd_addr, _, _ := ha_res.endpoint()
-	println("etcd addr: ", etcd_addr)
-	etcd_addrs := []string{etcd_addr}
-	
-	etcd_client, err := newAuthrizedEtcdClient (etcd_addrs, "root", myServiceInfo.Password)
-	if err != nil {
-		logger.Error("create etcd authrized client", err)
-		return err
-	}
-	
-	etcd_userapi := etcd.NewAuthUserAPI(etcd_client)
-	_, err = etcd_userapi.RevokeUser(context.Background(), mycredentials.Username, []string{EtcdBindRole})
-	if err != nil {
-		logger.Error("revoke role in unbinding", err)
-		// return err
-	}
-	
-	err = etcd_userapi.RemoveUser(context.Background(), mycredentials.Username)
-	if err != nil {
-		logger.Error("remove user", err)
-		return err
-	}
 	
 	return nil
 }
