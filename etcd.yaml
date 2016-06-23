@@ -1,0 +1,283 @@
+#需要替换intanceid 实例的具体名字
+#需要替换#ETCDROOTPASSWORD# etcd管理员的密码
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd
+spec:
+  ports:
+  - name: etcd-client-port
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  selector:
+    servicebroker: instanceid-etcd
+
+---
+
+#Route to client
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-etcd
+spec:
+  host: sb-instanceid-etcd.endpoint-postfix-place-holder
+  port:
+    targetPort: etcd-client-port
+  to:
+    kind: Service
+    name: sb-instanceid-etcd
+
+---
+
+
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd1
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd1
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd1
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - bash 
+        - /usr/bin/etcd-join.sh
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - etcd1
+        - http://sb-instanceid-etcd1:2380
+        - sb-instanceid-etcd
+        - #ETCDROOTPASSWORD#
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
+        imagePullPolicy: Always
+        name: etcd1
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - /usr/bin/cluster_status.sh
+            - #ETCDROOTPASSWORD#
+            - http://sb-instanceid-etcd0:2380
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd1
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd1
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd2
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd2
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd2
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - bash 
+        - /usr/bin/etcd-join.sh
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - etcd2
+        - http://sb-instanceid-etcd2:2380
+        - sb-instanceid-etcd
+        - #ETCDROOTPASSWORD#
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
+        imagePullPolicy: Always
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - /usr/bin/cluster_status.sh
+            - #ETCDROOTPASSWORD#
+            - http://sb-instanceid-etcd0:2380
+        name: etcd3
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd2
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd2
+
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd3
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd3
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd3
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - bash 
+        - /usr/bin/etcd-join.sh
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - etcd3
+        - http://sb-instanceid-etcd3:2380
+        - sb-instanceid-etcd
+        - #ETCDROOTPASSWORD#
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - /usr/bin/cluster_status.sh
+            - #ETCDROOTPASSWORD#
+            - http://sb-instanceid-etcd0:2380
+        imagePullPolicy: Always
+        name: etcd3
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd3
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd3
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-etcd0
+spec:
+  replicas: 1
+  selector:
+    servicebroker_etcd_node: instanceid-etcd0
+  template:
+    metadata:
+      labels:
+        servicebroker_etcd_node: instanceid-etcd0
+        servicebroker: instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - bash
+        - /usr/bin/etcd-init.sh
+        - #ETCDROOTPASSWORD#
+        - http://sb-instanceid-etcd0:2380
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - sb-instanceid-etcd
+        - #ETCDUSERNAME#
+        - #ETCDUSERPASSWORD#
+        - etcd0
+        image: http://etcd-image-place-holder/etcd-openshift-orchestration
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - /usr/bin/cluster_status.sh
+            - #ETCDROOTPASSWORD#
+            - http://sb-instanceid-etcd0:2380
+        imagePullPolicy: Always
+        name: etcd0
+        ports:
+        - containerPort: 2379
+          name: client
+          protocol: TCP
+        - containerPort: 2380
+          name: server
+          protocol: TCP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-etcd0
+spec:
+  ports:
+  - name: client
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: server
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    servicebroker_etcd_node: instanceid-etcd0
+
+
+
