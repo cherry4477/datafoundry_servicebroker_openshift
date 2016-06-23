@@ -23,7 +23,7 @@ import (
 	
 	"github.com/pivotal-golang/lager"
 	etcd "github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
+	//"golang.org/x/net/context"
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
@@ -170,7 +170,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 	
 	etcd_addr, host, port := ha_res.endpoint()
 	println("etcd addr: ", etcd_addr)
-	etcd_addrs := []string{etcd_addr}
+	//etcd_addrs := []string{etcd_addr}
 	
 	mycredentials := oshandler.Credentials{
 		Uri:      etcd_addr,
