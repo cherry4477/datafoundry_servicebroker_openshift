@@ -165,6 +165,10 @@ func KettleImage() string {
 	return kettleImage
 }
 
+func SimpleFileUplaoderImage() string {
+	return simplefileuplaoderImage
+}
+
 func RabbitmqImage() string {
 	return rabbitmqImage
 }
@@ -193,6 +197,7 @@ var cassandraImage string
 var tensorflowImage string
 var nifiImage string
 var kettleImage string
+var simplefileuplaoderImage string
 var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
@@ -218,6 +223,7 @@ func init() {
 	tensorflowImage = getenv("TENSORFLOWIMAGE")
 	nifiImage = getenv("NIFIIMAGE")
 	kettleImage = getenv("KETTLEIMAGE")
+	simplefileuplaoderImage = getenv("SIMPLEFILEUPLOADERIMAGE")
 	rabbitmqImage = getenv("RABBITMQIMAGE")
 	sparkImage = getenv("SPARKIMAGE")
 	zepplinImage = getenv("ZEPPLINIMAGE")

@@ -144,15 +144,10 @@ func (handler *Kettle_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceI
 	//	return true
 	//}
 	ok := func(rc *kapi.ReplicationController) bool {
-	println("rc =", rc)
-	println("rc.Name =", rc.Name)
-	println("rc.Spec.Replicas =", rc.Spec.Replicas)
-	println("rc.Status.Replicas =", rc.Status.Replicas)
 		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
 			return false
 		}
 		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
-	println("n =", n)
 		return n >= *rc.Spec.Replicas
 	}
 	
@@ -271,6 +266,15 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 				[]byte(kettle_image), 
 				-1)
 		}
+		uploader_image := oshandler.SimpleFileUplaoderImage()
+		uploader_image = strings.TrimSpace(uploader_image)
+		if len(uploader_image) > 0 {
+			KettleTemplateData_Master = bytes.Replace(
+				KettleTemplateData_Master, 
+				[]byte("http://simple-file-uploader-image-place-holder/simple-file-uploader-openshift-orchestration"), 
+				[]byte(uploader_image), 
+				-1)
+		}
 	}
 	
 	// ...
@@ -291,16 +295,21 @@ func loadKettleResources_Master(instanceID, kettleUser, kettlePassword string, r
 		Decode(&res.rc).
 		//Decode(&res.dc).
 		Decode(&res.route).
-		Decode(&res.service)
+		Decode(&res.routeSfu).
+		Decode(&res.service).
+		Decode(&res.serviceSfu)
 	
 	return decoder.Err
 }
 
 type kettleResources_Master struct {
-	rc      kapi.ReplicationController
-	//dc      deployapi.DeploymentConfig
-	route   routeapi.Route
-	service kapi.Service
+	rc kapi.ReplicationController
+	//dc deployapi.DeploymentConfig
+	
+	route      routeapi.Route
+	routeSfu   routeapi.Route // for simple file uploader
+	service    kapi.Service
+	serviceSfu kapi.Service // for simple file uploader
 }
 	
 func createKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUser, kettlePassword string) (*kettleResources_Master, error) {
@@ -320,7 +329,9 @@ func createKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUse
 		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
 		//OPost(prefix + "/deploymentconfigs", &input.dc, &output.dc).
 		OPost(prefix + "/routes", &input.route, &output.route).
-		KPost(prefix + "/services", &input.service, &output.service)
+		OPost(prefix + "/routes", &input.routeSfu, &output.route).
+		KPost(prefix + "/services", &input.service, &output.service).
+		KPost(prefix + "/services", &input.serviceSfu, &output.service)
 	
 	if osr.Err != nil {
 		logger.Error("createKettleResources_Master", osr.Err)
@@ -345,7 +356,9 @@ func getKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUser, 
 		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
 		//OGet(prefix + "/deploymentconfigs/" + input.dc.Name, &output.dc).
 		OGet(prefix + "/routes/" + input.route.Name, &output.route).
-		KGet(prefix + "/services/" + input.service.Name, &output.service)
+		OGet(prefix + "/routes/" + input.routeSfu.Name, &output.routeSfu).
+		KGet(prefix + "/services/" + input.service.Name, &output.service).
+		KGet(prefix + "/services/" + input.serviceSfu.Name, &output.serviceSfu)
 	
 	if osr.Err != nil {
 		logger.Error("getKettleResources_Master", osr.Err)
@@ -360,7 +373,9 @@ func destroyKettleResources_Master (masterRes *kettleResources_Master, serviceBr
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
 	//go func() {odel (serviceBrokerNamespace, "deploymentconfigs", masterRes.dc.Name)}()
 	go func() {odel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
+	go func() {odel (serviceBrokerNamespace, "routes", masterRes.routeSfu.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
+	go func() {kdel (serviceBrokerNamespace, "services", masterRes.serviceSfu.Name)}()
 }
 
 //===============================================================
