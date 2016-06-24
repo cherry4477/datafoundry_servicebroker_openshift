@@ -214,7 +214,7 @@ func (handler *Kettle_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bind
 	//port := "80"
 	
 	mycredentials := oshandler.Credentials{
-		Uri:      "",
+		Uri:      fmt.Sprintf("File Uploader URL: http://%s", master_res.routeSfu.Spec.Host),
 		Hostname: host,
 		Port:     port,
 		Username: myServiceInfo.User,
@@ -329,9 +329,9 @@ func createKettleResources_Master (instanceId, serviceBrokerNamespace, kettleUse
 		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc).
 		//OPost(prefix + "/deploymentconfigs", &input.dc, &output.dc).
 		OPost(prefix + "/routes", &input.route, &output.route).
-		OPost(prefix + "/routes", &input.routeSfu, &output.route).
+		OPost(prefix + "/routes", &input.routeSfu, &output.routeSfu).
 		KPost(prefix + "/services", &input.service, &output.service).
-		KPost(prefix + "/services", &input.serviceSfu, &output.service)
+		KPost(prefix + "/services", &input.serviceSfu, &output.serviceSfu)
 	
 	if osr.Err != nil {
 		logger.Error("createKettleResources_Master", osr.Err)
