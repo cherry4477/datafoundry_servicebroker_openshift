@@ -184,9 +184,9 @@ func (handler *PySpider_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 	
-	web_port := oshandler.GetServicePortByName(&master_res.service, "web")
+	web_port := oshandler.GetServicePortByName(&master_res.service, "5000-tcp")
 	if web_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("web port not found")
+		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("5000-tcp port not found")
 	}
 	
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
