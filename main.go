@@ -33,6 +33,7 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kettle"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/nifi"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/tensorflow"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/pyspider"
 )
 
 type myServiceBroker struct {

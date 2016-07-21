@@ -181,6 +181,9 @@ func ZepplinImage() string {
 	return zepplinImage
 }
 
+func PySpiderImage() string {
+	return pyspiderImage
+}
 
 var theOC *OpenshiftClient
 var endpointSuffix string
@@ -201,6 +204,7 @@ var simplefileuplaoderImage string
 var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
+var pyspiderImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -227,5 +231,6 @@ func init() {
 	rabbitmqImage = getenv("RABBITMQIMAGE")
 	sparkImage = getenv("SPARKIMAGE")
 	zepplinImage = getenv("ZEPPLINIMAGE")
+	pyspiderImage = getenv("PYSPIDERIMAGE")
 }
 
