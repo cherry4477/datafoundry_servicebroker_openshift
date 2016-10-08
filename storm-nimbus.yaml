@@ -27,6 +27,7 @@ spec:
         service-broker: sb-instanceid-storm
     spec:
       containers:
+      # why call zookeeper here? call nimbus better.
       - name: zookeeper
         image: http://storm-image-place-holder/storm-openshift-orchestration
         imagePullPolicy: IfNotPresent

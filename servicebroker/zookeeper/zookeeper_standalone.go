@@ -771,3 +771,18 @@ echo srvr|nc localhost 2181
 echo stat|nc localhost 2181
 echo mntr|nc localhost 2181
 */
+
+/* need this? 
+
+# zoo.cfg
+
+# Enable regular purging of old data and transaction logs every 24 hours
+autopurge.purgeInterval=24
+autopurge.snapRetainCount=5
+
+The last two autopurge.* settings are very important for production systems. 
+They instruct ZooKeeper to regularly remove (old) data and transaction logs. 
+The default ZooKeeper configuration does not do this on its own, 
+and if you do not set up regular purging ZooKeeper will quickly run out of disk space.
+
+*/

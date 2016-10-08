@@ -577,13 +577,22 @@ func (myBroker *myServiceBroker) Update(instanceID string, details brokerapi.Upd
 
 //定义工具函数
 func etcdget(key string) (*client.Response, error) {
+	n := 5
+	
+RETRY:
 	resp, err := etcdapi.Get(context.Background(), key, nil)
 	if err != nil {
 		logger.Error("Can not get "+key+" from etcd", err)
+		n --
+		if n > 0 {
+			goto RETRY
+		}
+		
+		return nil, err
 	} else {
 		logger.Debug("Successful get " + key + " from etcd. value is " + resp.Node.Value)
+		return resp, nil
 	}
-	return resp, err
 }
 
 func etcdset(key string, value string) (*client.Response, error) {
