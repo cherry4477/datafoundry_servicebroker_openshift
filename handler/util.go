@@ -5,9 +5,41 @@ import (
 	"encoding/json"
 	"time"
 	"fmt"
+	"net/http"
+	"crypto/tls"
+	"bytes"
 	
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 )
+
+func request (timeout time.Duration, method, url, bearerToken string, body []byte) (*http.Response, error) {
+	var req *http.Request
+	var err error
+	if len(body) == 0 {
+		req, err = http.NewRequest(method, url, nil)
+	} else {
+		req, err = http.NewRequest(method, url, bytes.NewReader(body))
+	}
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	//for k, v := range headers {
+	//	req.Header.Add(k, v)
+	//}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer " + bearerToken)
+	
+	transCfg := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: transCfg,
+		Timeout: timeout,
+	}
+	return client.Do(req)
+}
 
 type watchPodStatus struct {
 	// The type of watch update contained in the message
