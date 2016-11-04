@@ -4,7 +4,7 @@ import (
 	"errors"
 	"encoding/json"
 	"time"
-	"fmt"
+	//"fmt"
 	"net/http"
 	"crypto/tls"
 	"bytes"
@@ -40,6 +40,83 @@ func request (timeout time.Duration, method, url, bearerToken string, body []byt
 	}
 	return client.Do(req)
 }
+
+//===================================================
+
+type watchPvcStatus struct {
+	// The type of watch update contained in the message
+	Type string `json:"type"`
+	// Pod details
+	Object kapi.PersistentVolumeClaim `json:"object"`
+}
+
+func WaitUntilPvcIsBound(pvc *kapi.PersistentVolumeClaim, stopWatching <-chan struct{}) error {
+	select {
+	case <- stopWatching:
+		return errors.New("cancelled by calleer")
+	default:
+	}
+	
+	uri := "/namespaces/" + pvc.Namespace + "/pods/" + pvc.Name
+	statuses, cancel, err := OC().KWatch (uri)
+	if err != nil {
+		return err
+	}
+	defer close(cancel)
+	
+	getPvcChan := make(chan *kapi.PersistentVolumeClaim, 1)
+	go func() {
+		// the pvc may be already bound initially.
+		// so simulate this get request result as a new watch event.
+		
+		select {
+		case <- stopWatching:
+			return
+		case <- time.After(3 * time.Second):
+			pvc := &kapi.PersistentVolumeClaim{}
+			osr := NewOpenshiftREST(OC()).KGet(uri, pvc)
+			if osr.Err == nil {
+				getPvcChan <- pvc
+			}
+		}
+	}()
+	
+	for {
+		var pvc *kapi.PersistentVolumeClaim
+		select {
+		case <- stopWatching:
+			return errors.New("cancelled by calleer")
+		case pvc = <- getPvcChan:
+		case status, _ := <- statuses:
+			if status.Err != nil {
+				return status.Err
+			}
+			
+			var wps watchPvcStatus
+			if err := json.Unmarshal(status.Info, &wps); err != nil {
+				return err
+			}
+			
+			pvc = &wps.Object
+		}
+		
+		if pvc.Status.Phase != kapi.ClaimPending {
+			//println("watch pvc phase: ", pvc.Status.Phase)
+			
+			if pvc.Status.Phase != kapi.ClaimBound {
+				return errors.New("pvc phase is neither pending nor bound: " + string(pvc.Status.Phase))
+			}
+			
+			break
+		}
+	}
+	
+	return nil
+}
+
+
+
+/*
 
 type watchPodStatus struct {
 	// The type of watch update contained in the message
@@ -390,3 +467,4 @@ RETRY:
 	
 	return nil
 }
+*/
