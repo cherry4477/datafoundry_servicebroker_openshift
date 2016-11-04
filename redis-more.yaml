@@ -48,7 +48,8 @@ spec:
           name: data
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: "pvcname*****"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       securityContext: {}

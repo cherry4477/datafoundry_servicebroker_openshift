@@ -43,6 +43,18 @@ func request (timeout time.Duration, method, url, bearerToken string, body []byt
 
 //===================================================
 
+func InstancePvcName(instanceId string) string {
+	return "v" + instanceId // DON'T CHANGE
+}
+
+// todo: 20 is for redis plan
+// in db
+func BackingServiceDiskSize(details brokerapi.ProvisionDetails) int {
+	return 20
+}
+
+//===================================================
+
 type watchPvcStatus struct {
 	// The type of watch update contained in the message
 	Type string `json:"type"`

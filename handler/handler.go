@@ -11,6 +11,11 @@ import (
 	"os"
 )
 
+const (
+	VolumeType_EmptyDir = ""
+	VolumeType_PVC      = "pvc"
+)
+
 type ServiceInfo struct {
 	Service_name   string `json:"service_name"`
 	Plan_name      string `json:"plan_name"`
@@ -20,6 +25,8 @@ type ServiceInfo struct {
 	Database       string `json:"database,omitempty"`
 	User           string `json:"user"`
 	Password       string `json:"password"`
+
+	Volume_type    string `json:"volume_type"` // "" | "pvc"
 }
 
 type Credentials struct {

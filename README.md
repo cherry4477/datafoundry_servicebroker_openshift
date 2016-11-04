@@ -1,6 +1,13 @@
 # datafoundry_servicebroker_openshift
 
-need golang 1.6 to build and run
+need golang 1.6+ to build and run
+
+# about instance id
+
+bsi的实例id都通过NewThirteenLengthID生成。
+
+目前，因为
+for limited fields stored in ETCD, now 
 
 # install
 

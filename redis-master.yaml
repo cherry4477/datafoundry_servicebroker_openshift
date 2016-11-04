@@ -52,7 +52,8 @@ spec:
             - containerPort: 26379
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: "pvcname*****"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       securityContext: {}

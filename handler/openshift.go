@@ -48,6 +48,19 @@ var logger lager.Logger
 // 
 //==============================================================
 
+type E string
+func(e E) Error() {
+	return string(e)
+}
+
+const (
+	NotFound = E("not found")
+)
+
+//==============================================================
+// 
+//==============================================================
+
 type OpenshiftClient struct {
 	host    string
 	//authUrl string
@@ -239,7 +252,9 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	
 	//println("22222 len(data) = ", len(data), " , res.StatusCode = ", res.StatusCode)
 	
-	if res.StatusCode < 200 || res.StatusCode >= 400 {
+	if res.StatusCode == 404 {
+		osr.Err = NotFound
+	} else if res.StatusCode < 200 || res.StatusCode >= 400 {
 		osr.Err = errors.New(string(data))
 	} else {
 		if into != nil {
