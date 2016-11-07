@@ -49,7 +49,7 @@ var logger lager.Logger
 //==============================================================
 
 type E string
-func(e E) Error() {
+func(e E) Error() string {
 	return string(e)
 }
 

@@ -27,6 +27,13 @@ type ServiceInfo struct {
 	Password       string `json:"password"`
 
 	Volume_type    string `json:"volume_type"` // "" | "pvc"
+	Volume_size    int    `json:"volume_type"`
+	//Connections    int    `json:"connections"`
+}
+
+type PlanInfo struct {
+	Volume_size    int    `json:"volume_type"`
+	Connections    int    `json:"connections"`
 }
 
 type Credentials struct {
@@ -39,7 +46,7 @@ type Credentials struct {
 }
 
 type HandlerDriver interface {
-	DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
+	DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
 	DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error)
 	DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error)
 	DoBind(myServiceInfo *ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, Credentials, error)

@@ -229,8 +229,19 @@ func (myBroker *myServiceBroker) Provision(
 		return brokerapi.ProvisionedServiceSpec{}, errors.New("Internal Error!!")
 	}
 
+	volumeSize, connections, err := findServicePlanInfo(details.ServiceID, details.PlanID)
+	if err != nil {
+		logger.Error("findServicePlanInfo service "+service_name+" plan "+plan_name, err)
+		return brokerapi.ProvisionedServiceSpec{}, errors.New("Internal Error!!")
+	}
+
+	planInfo := handler.PlanInfo {
+		Volume_size: volumeSize,
+		Connections: connections,
+	}
+
 	//执行handler中的命令
-	provsiondetail, myServiceInfo, err = myHandler.DoProvision(instanceID, details, asyncAllowed)
+	provsiondetail, myServiceInfo, err = myHandler.DoProvision(instanceID, details, planInfo, asyncAllowed)
 
 	//如果出错
 	if err != nil {
@@ -628,6 +639,39 @@ func findServicePlanNameInCatalog(service_id, plan_id string) string {
 		return ""
 	}
 	return resp.Node.Value
+}
+func findServicePlanInfo(service_id, plan_id string) (volumeSize, connections int, err error) {
+	resp, err := etcdget("/servicebroker/" + servcieBrokerName + "/catalog/" + service_id + "/plan/" + plan_id + "/metadata")
+	if err != nil {
+		return
+	}
+
+	type PlanMetaData struct {
+		Bullets []string `json:"bullets,omitempty"`
+	}
+	// metadata '{"bullets":["20 GB of Disk","20 connections"],"displayName":"Shared and Free" }'
+
+	var meta PlanMetaData
+	err = json.Unmarshal([]byte(resp.Node.Value, &meta)
+	if err != nil {
+		return
+	}
+
+	for _, info := range meta.Bullets {
+		if index := strings.Index(info, " GB of Disk") > 0 {
+			volumeSize, err = strconv.Atoi(info[:index])
+			if err != nil {
+				return
+			}
+		} else if index := strings.Index(info, " connections") > 0 {
+			connections, err = strconv.Atoi(info[:index])
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
 }
 
 func getmd5string(s string) string {
