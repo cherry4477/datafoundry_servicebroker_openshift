@@ -79,6 +79,10 @@ func CreateVolumn(volumnName string, size int) error {
 
 	url := DfProxyApiPrefix() + "/namespaces/" + oc.Namespace() + "/volumes"
 
+//router.POST("/lapi/v1/namespaces/:namespace/volumes", CreateVolume)
+println("CreateVolumn: http://datafoundry.test.app.dataos.io/lapi/v1/namespaces/:namespace/volumes", )
+println("CreateVolumn:", url)
+
 	options := &VolumnCreateOptions{
 		volumnName,
 		size,
