@@ -125,7 +125,7 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 	// ...
 	go func() {
 		startRedisCreatePvcVolumnJob(&redisCreatePvcVolumnJob{
-			volumeName:  oshandler.InstancePvcName(instanceID),
+			volumeName:  oshandler.InstancePvcName(serviceInfo.Url),
 			volumeSize:  planInfo.Volume_size,
 			serviceInfo: &serviceInfo,
 		})
@@ -313,9 +313,10 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		// ...
 
 		if myServiceInfo.Volume_type == oshandler.VolumeType_PVC {
-			println("to destroy volumn:", myServiceInfo.Url)
-
 			pvcName := oshandler.InstancePvcName(myServiceInfo.Url)
+
+			println("to destroy volumn. pvc=", pvcName)
+
 			err := oshandler.DeleteVolumn(pvcName)
 			if err != nil {
 
