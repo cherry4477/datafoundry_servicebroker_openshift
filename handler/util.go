@@ -4,7 +4,7 @@ import (
 	"errors"
 	"encoding/json"
 	"time"
-	//"fmt"
+	"fmt"
 	"net/http"
 	"crypto/tls"
 	"bytes"
@@ -58,20 +58,21 @@ type watchPvcStatus struct {
 	Object kapi.PersistentVolumeClaim `json:"object"`
 }
 
-func WaitUntilPvcIsBound(pvc *kapi.PersistentVolumeClaim, stopWatching <-chan struct{}) error {
+func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}) error {
 	select {
 	case <- stopWatching:
 		return errors.New("cancelled by calleer")
 	default:
 	}
 	
-	uri := "/namespaces/" + pvc.Namespace + "/pods/" + pvc.Name
+	uri := "/namespaces/" + namespace + "/pods/" + pvcName
 	statuses, cancel, err := OC().KWatch (uri)
 	if err != nil {
 		return err
 	}
 	defer close(cancel)
 	
+println("000")
 	getPvcChan := make(chan *kapi.PersistentVolumeClaim, 1)
 	go func() {
 		// the pvc may be already bound initially.
@@ -83,13 +84,17 @@ func WaitUntilPvcIsBound(pvc *kapi.PersistentVolumeClaim, stopWatching <-chan st
 		case <- time.After(3 * time.Second):
 			pvc := &kapi.PersistentVolumeClaim{}
 			osr := NewOpenshiftREST(OC()).KGet(uri, pvc)
+fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
 			if osr.Err == nil {
 				getPvcChan <- pvc
 			}
 		}
 	}()
 	
+println("111")
+
 	for {
+println("222")
 		var pvc *kapi.PersistentVolumeClaim
 		select {
 		case <- stopWatching:
@@ -107,6 +112,10 @@ func WaitUntilPvcIsBound(pvc *kapi.PersistentVolumeClaim, stopWatching <-chan st
 			
 			pvc = &wps.Object
 		}
+
+		// assert pvc != nil
+
+fmt.Println("WaitUntilPvcIsBound, pvc.Phase=", pvc.Status.Phase, ", pvc=", *pvc)
 		
 		if pvc.Status.Phase != kapi.ClaimPending {
 			//println("watch pvc phase: ", pvc.Status.Phase)

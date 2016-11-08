@@ -439,6 +439,7 @@ func (job *redisCreatePvcVolumnJob) run() {
 	}
 
 	// get pvc
+	/*
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	pvc := &kapi.PersistentVolumeClaim{}
 	osr.KGet("/namespaces/" + job.serviceInfo.Database + "/persistentvolumeclaims/" + job.volumeName, &pvc)
@@ -450,12 +451,13 @@ func (job *redisCreatePvcVolumnJob) run() {
 
 		return
 	}
+	*/
 
 	println("WaitUntilPvcIsBound ...")
 
 	// watch pvc until bound
 
-	err = oshandler.WaitUntilPvcIsBound(pvc, job.cancelChan)
+	err = oshandler.WaitUntilPvcIsBound(job.serviceInfo.Database, job.volumeName, job.cancelChan)
 	if err != nil {
 		println(" redis WaitUntilPvcIsBound error: ", err)
 
