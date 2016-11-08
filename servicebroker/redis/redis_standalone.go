@@ -312,6 +312,9 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 
 		// ...
 
+		println("   myServiceInfo.Volume_type:", myServiceInfo.Volume_type)
+		println("   myServiceInfo.Volume_size:", myServiceInfo.Volume_size)
+		
 		if myServiceInfo.Volume_type == oshandler.VolumeType_PVC {
 			pvcName := oshandler.InstancePvcName(myServiceInfo.Url)
 

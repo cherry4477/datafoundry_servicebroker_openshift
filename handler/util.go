@@ -65,7 +65,7 @@ func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}
 	default:
 	}
 	
-	uri := "/namespaces/" + namespace + "/pods/" + pvcName
+	uri := "/namespaces/" + namespace + "/persistentvolumeclaims/" + pvcName
 	statuses, cancel, err := OC().KWatch (uri)
 	if err != nil {
 		return err
@@ -87,6 +87,8 @@ println("000")
 fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
 			if osr.Err == nil {
 				getPvcChan <- pvc
+			} else {
+				getPvcChan <- nil
 			}
 		}
 	}()
@@ -111,6 +113,11 @@ println("222")
 			}
 			
 			pvc = &wps.Object
+		}
+
+		if pvc == nil {
+			// get return 404 from above goroutine
+			return errors.New("pvc not found")
 		}
 
 		// assert pvc != nil
