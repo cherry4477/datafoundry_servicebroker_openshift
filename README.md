@@ -17,6 +17,7 @@ oc new-app --name servicebroker-openshift https://github.com/asiainfoLDP/datafou
     -e  OPENSHIFTADDR="..."  \
     -e  OPENSHIFTUSER="...."   \
     -e  OPENSHIFTPASS="..."  \
+    -e  DATAFOUNDRYPROXYADDR="..." \
     -e  SBNAMESPACE="servicebrokers-openshift"   \
     -e  ETCDIMAGE="servicebrokers-openshift/etcd-openshift-orchestration"   \
     -e  ZOOKEEPERIMAGE="servicebrokers-openshift/zookeeper-openshift-orchestration"   \

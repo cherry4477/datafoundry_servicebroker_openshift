@@ -6,6 +6,7 @@ import (
 	"time"
 	"io/ioutil"
 	"errors"
+	"fmt"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -25,7 +26,8 @@ func DfProxyApiPrefix() string {
 const DfRequestTimeout = time.Duration(8) * time.Second
 
 func dfRequest(method, url, bearerToken string, bodyParams interface{}, into interface{}) (err error) {
-	
+println("dfRequest 000")
+
 	var body []byte
 	if bodyParams != nil {
 		body, err = json.Marshal(bodyParams)
@@ -35,25 +37,31 @@ func dfRequest(method, url, bearerToken string, bodyParams interface{}, into int
 	}
 	
 	res, err := request(DfRequestTimeout, method, url, bearerToken, body)
+println("dfRequest 111, err=", err)
 	if err != nil {
 		return
 	}
 	defer res.Body.Close()
 	
 	data, err := ioutil.ReadAll(res.Body)
+println("dfRequest 222, err=", err)
 	if err != nil {
 		return
 	}
 	
 	//println("22222 len(data) = ", len(data), " , res.StatusCode = ", res.StatusCode)
 	
+println("dfRequest 333, res.StatusCode=", res.StatusCode)
+
 	if res.StatusCode < 200 || res.StatusCode >= 400 {
 		err = errors.New(string(data))
+println("dfRequest 444, err=", err)
 	} else {
 		if into != nil {
 			//println("into data = ", string(data), "\n")
 		
 			err = json.Unmarshal(data, into)
+println("dfRequest 555, err=", err)
 		}
 	}
 	
@@ -80,6 +88,8 @@ func CreateVolumn(volumnName string, size int) error {
 			},
 		},
 	}
+
+fmt.Println("CreateVolumn: options=", options)
 	
 	err := dfRequest("POST", url, oc.BearerToken(), options, nil)
 
