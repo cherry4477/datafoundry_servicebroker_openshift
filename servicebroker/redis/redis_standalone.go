@@ -124,11 +124,9 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 	
 	// ...
 	go func() {
-		pvcSize := oshandler.BackingServiceDiskSize(details)
-
 		startRedisCreatePvcVolumnJob(&redisCreatePvcVolumnJob{
 			volumeName:  oshandler.InstancePvcName(instanceID),
-			volumeSize:  pvcSize,
+			volumeSize:  planInfo.Volume_size,
 			serviceInfo: &serviceInfo,
 		})
 	}()
@@ -294,7 +292,7 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		
 		// ...
 		
-		println("to destroy resources")
+		println("to destroy resources:", myServiceInfo.Url)
 		
 		more_res, _ := getRedisResources_More (
 				myServiceInfo.Url, 
@@ -311,6 +309,18 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 				myServiceInfo.Volume_type == oshandler.VolumeType_PVC,
 			)
 		destroyRedisResources_Master (master_res, myServiceInfo.Database)
+
+		// ...
+
+		if myServiceInfo.Volume_type == oshandler.VolumeType_PVC {
+			println("to destroy volumn:", myServiceInfo.Url)
+
+			pvcName := oshandler.InstancePvcName(myServiceInfo.Url)
+			err := oshandler.DeleteVolumn(pvcName)
+			if err != nil {
+
+			}
+		}
 	}()
 	
 	return brokerapi.IsAsync(false), nil
@@ -417,6 +427,9 @@ func (job *redisCreatePvcVolumnJob) cancel() {
 }
 
 func (job *redisCreatePvcVolumnJob) run() {
+	println("startRedisCreatePvcVolumnJob ...")
+
+	println("CreateVolumn ...")
 
 	err := oshandler.CreateVolumn(job.volumeName, job.volumeSize)
 	if err != nil {
@@ -437,6 +450,8 @@ func (job *redisCreatePvcVolumnJob) run() {
 		return
 	}
 
+	println("WaitUntilPvcIsBound ...")
+
 	// watch pvc until bound
 
 	err = oshandler.WaitUntilPvcIsBound(pvc, job.cancelChan)
@@ -448,6 +463,10 @@ func (job *redisCreatePvcVolumnJob) run() {
 
 		return
 	}
+
+	println("volume created ...")
+
+	println("createRedisResources_Master ...")
 
 	// create master res
 
@@ -537,6 +556,9 @@ type watchPodStatus struct {
 }
 
 func (job *redisOrchestrationJob) run() {
+
+	println("startRedisOrchestrationJob ...")
+
 	serviceInfo := job.serviceInfo
 	//pod := job.masterResources.pod
 	rc := &job.masterResources.rc
@@ -562,6 +584,8 @@ func (job *redisOrchestrationJob) run() {
 	if job.cancelled { return }
 	
 	// create more resources
+	
+	println("createRedisResources_More ...")
 	
 	job.createRedisResources_More (
 			serviceInfo.Url, 

@@ -9,7 +9,7 @@ import (
 	"crypto/tls"
 	"bytes"
 	
-	"github.com/pivotal-cf/brokerapi"
+	//"github.com/pivotal-cf/brokerapi"
 	
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -47,12 +47,6 @@ func request (timeout time.Duration, method, url, bearerToken string, body []byt
 
 func InstancePvcName(instanceId string) string {
 	return "v" + instanceId // DON'T CHANGE
-}
-
-// todo: 20 is for redis plan
-// in db
-func BackingServiceDiskSize(details brokerapi.ProvisionDetails) int {
-	return 20
 }
 
 //===================================================

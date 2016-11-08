@@ -77,8 +77,8 @@ func New(name string) (*Handler, error) {
 	return &Handler{driver: handler}, nil
 }
 
-func (handler *Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
-	return handler.driver.DoProvision(instanceID, details, asyncAllowed)
+func (handler *Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
+	return handler.driver.DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Handler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {

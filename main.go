@@ -652,18 +652,19 @@ func findServicePlanInfo(service_id, plan_id string) (volumeSize, connections in
 	// metadata '{"bullets":["20 GB of Disk","20 connections"],"displayName":"Shared and Free" }'
 
 	var meta PlanMetaData
-	err = json.Unmarshal([]byte(resp.Node.Value, &meta)
+	err = json.Unmarshal([]byte(resp.Node.Value), &meta)
 	if err != nil {
 		return
 	}
 
 	for _, info := range meta.Bullets {
-		if index := strings.Index(info, " GB of Disk") > 0 {
+		info = strings.ToLower(info)
+		if index := strings.Index(info, " gb of disk"); index > 0 {
 			volumeSize, err = strconv.Atoi(info[:index])
 			if err != nil {
 				return
 			}
-		} else if index := strings.Index(info, " connections") > 0 {
+		} else if index := strings.Index(info, " connection"); index > 0 {
 			connections, err = strconv.Atoi(info[:index])
 			if err != nil {
 				return
