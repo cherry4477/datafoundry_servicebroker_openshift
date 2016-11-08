@@ -72,7 +72,6 @@ func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}
 	}
 	defer close(cancel)
 	
-println("000")
 	getPvcChan := make(chan *kapi.PersistentVolumeClaim, 1)
 	go func() {
 		// the pvc may be already bound initially.
@@ -84,7 +83,7 @@ println("000")
 		case <- time.After(3 * time.Second):
 			pvc := &kapi.PersistentVolumeClaim{}
 			osr := NewOpenshiftREST(OC()).KGet(uri, pvc)
-fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
+//fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
 			if osr.Err == nil {
 				getPvcChan <- pvc
 			} else {
@@ -92,11 +91,8 @@ fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
 			}
 		}
 	}()
-	
-println("111")
 
 	for {
-println("222")
 		var pvc *kapi.PersistentVolumeClaim
 		select {
 		case <- stopWatching:

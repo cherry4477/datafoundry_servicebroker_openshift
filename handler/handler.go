@@ -27,7 +27,7 @@ type ServiceInfo struct {
 	Password       string `json:"password"`
 
 	Volume_type    string `json:"volume_type"` // "" | "pvc"
-	Volume_size    int    `json:"volume_type"`
+	Volume_size    int    `json:"volume_size"`
 	//Connections    int    `json:"connections"`
 }
 
