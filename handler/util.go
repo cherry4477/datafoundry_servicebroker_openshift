@@ -4,7 +4,7 @@ import (
 	"errors"
 	"encoding/json"
 	"time"
-	"fmt"
+	//"fmt"
 	"net/http"
 	"crypto/tls"
 	"bytes"
@@ -118,7 +118,7 @@ func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}
 
 		// assert pvc != nil
 
-fmt.Println("WaitUntilPvcIsBound, pvc.Phase=", pvc.Status.Phase, ", pvc=", *pvc)
+//fmt.Println("WaitUntilPvcIsBound, pvc.Phase=", pvc.Status.Phase, ", pvc=", *pvc)
 		
 		if pvc.Status.Phase != kapi.ClaimPending {
 			//println("watch pvc phase: ", pvc.Status.Phase)

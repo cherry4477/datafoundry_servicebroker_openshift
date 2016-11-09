@@ -597,7 +597,7 @@ func (job *redisOrchestrationJob) run() {
 			serviceInfo.Url, 
 			serviceInfo.Database, 
 			serviceInfo.Password,
-			serviceInfo.Service_name == oshandler.VolumeType_PVC,
+			serviceInfo.Volume_type == oshandler.VolumeType_PVC,
 		)
 }
 
