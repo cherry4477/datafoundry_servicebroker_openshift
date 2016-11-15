@@ -78,6 +78,11 @@ func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceI
 // 
 //==============================================================
 
+func PvcName(instanceId string) string {
+	return "zkp" + instanceId // DON'T CHANGE
+}
+
+
 type Zookeeper_Handler struct{
 }
 
@@ -85,6 +90,84 @@ func newZookeeperHandler() *Zookeeper_Handler {
 	return &Zookeeper_Handler{}
 }
 
+func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	//初始化到openshift的链接
+	
+	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
+	serviceInfo := oshandler.ServiceInfo{}
+	
+	//if asyncAllowed == false {
+	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
+	//}
+	serviceSpec.IsAsync = true
+	
+	//instanceIdInTempalte   := instanceID // todo: ok?
+	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
+	//serviceBrokerNamespace := ServiceBrokerNamespace
+	serviceBrokerNamespace := oshandler.OC().Namespace()
+	zookeeperUser := "super" // oshandler.NewElevenLengthID()
+	zookeeperPassword := oshandler.GenGUID()
+	
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
+	
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.User = zookeeperUser
+	serviceInfo.Password = zookeeperPassword
+
+	serviceInfo.Volume_type = oshandler.VolumeType_PVC
+	serviceInfo.Volume_size = planInfo.Volume_size
+	
+	// ...
+	go func() {
+		// create volume
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			PvcName(serviceInfo.Url),
+			planInfo.Volume_size,
+			&serviceInfo,
+		)
+
+		err := <- result
+		if err != nil {
+			logger.Error("zookeeper create volume", err)
+			return
+		}
+
+		println("createRedisResources_Master ...")
+
+		// todo: consider if DoDeprovision is called now, ...
+
+		// create master res
+	
+		output, err := CreateZookeeperResources_Master(
+				serviceInfo.Url, 
+				serviceInfo.Database, 
+				serviceInfo.User, 
+				serviceInfo.Password,
+				serviceInfo.Volume_type == oshandler.VolumeType_PVC,
+		)
+
+		if err != nil {
+			println(" redis createRedisResources_Master error: ", err)
+			logger.Error("redis createRedisResources_Master error", err)
+
+			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
+			oshandler.DeleteVolumn(PvcName(serviceInfo.Url))
+			
+			return
+		}
+	}()
+
+	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	
+	return serviceSpec, serviceInfo, nil
+}
+
+/*
 func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
@@ -127,6 +210,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	
 	return serviceSpec, serviceInfo, nil
 }
+*/
 
 func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
@@ -351,7 +435,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 
 var ZookeeperTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
+func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, pvcVolume bool, res *ZookeeperResources_Master) error {
 	/*
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
@@ -375,7 +459,15 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	*/
 	
 	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper-with-dashboard.yaml")
+
+		var templateFile string
+		if pvcVolume {
+			templateFile = "zookeeper-with-dashboard-pvc.yaml"
+		} else {
+			templateFile = "zookeeper-with-dashboard-emptydir.yaml"
+		}
+
+		f, err := os.Open(templateFile)
 		if err != nil {
 			return err
 		}
@@ -406,6 +498,10 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	
 	// ...
 	
+	// ...
+
+	pvcName := PvcName(instanceID)
+	
 	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
 	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
 	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
@@ -419,6 +515,10 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
+	if pvcVolume {
+		yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****"), []byte(pvcName), -1)
+	}
+
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
 	//println()

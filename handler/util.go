@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
-	"encoding/json"
+	//"errors"
+	//"encoding/json"
 	"time"
 	//"fmt"
 	"net/http"
@@ -11,7 +11,7 @@ import (
 	
 	//"github.com/pivotal-cf/brokerapi"
 	
-	kapi "k8s.io/kubernetes/pkg/api/v1"
+	//kapi "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func request (timeout time.Duration, method, url, bearerToken string, body []byte) (*http.Response, error) {
@@ -45,94 +45,12 @@ func request (timeout time.Duration, method, url, bearerToken string, body []byt
 
 //===================================================
 
-func InstancePvcName(instanceId string) string {
-	return "v" + instanceId // DON'T CHANGE
-}
+// now this function is moved to each service broker folder
+//func InstancePvcName(instanceId string) string {
+//	return "v" + instanceId // DON'T CHANGE
+//}
 
 //===================================================
-
-type watchPvcStatus struct {
-	// The type of watch update contained in the message
-	Type string `json:"type"`
-	// Pod details
-	Object kapi.PersistentVolumeClaim `json:"object"`
-}
-
-func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}) error {
-	select {
-	case <- stopWatching:
-		return errors.New("cancelled by calleer")
-	default:
-	}
-	
-	uri := "/namespaces/" + namespace + "/persistentvolumeclaims/" + pvcName
-	statuses, cancel, err := OC().KWatch (uri)
-	if err != nil {
-		return err
-	}
-	defer close(cancel)
-	
-	getPvcChan := make(chan *kapi.PersistentVolumeClaim, 1)
-	go func() {
-		// the pvc may be already bound initially.
-		// so simulate this get request result as a new watch event.
-		
-		select {
-		case <- stopWatching:
-			return
-		case <- time.After(3 * time.Second):
-			pvc := &kapi.PersistentVolumeClaim{}
-			osr := NewOpenshiftREST(OC()).KGet(uri, pvc)
-//fmt.Println("WaitUntilPvcIsBound, get pvc, osr.Err=", osr.Err)
-			if osr.Err == nil {
-				getPvcChan <- pvc
-			} else {
-				getPvcChan <- nil
-			}
-		}
-	}()
-
-	for {
-		var pvc *kapi.PersistentVolumeClaim
-		select {
-		case <- stopWatching:
-			return errors.New("cancelled by calleer")
-		case pvc = <- getPvcChan:
-		case status, _ := <- statuses:
-			if status.Err != nil {
-				return status.Err
-			}
-			
-			var wps watchPvcStatus
-			if err := json.Unmarshal(status.Info, &wps); err != nil {
-				return err
-			}
-			
-			pvc = &wps.Object
-		}
-
-		if pvc == nil {
-			// get return 404 from above goroutine
-			return errors.New("pvc not found")
-		}
-
-		// assert pvc != nil
-
-//fmt.Println("WaitUntilPvcIsBound, pvc.Phase=", pvc.Status.Phase, ", pvc=", *pvc)
-		
-		if pvc.Status.Phase != kapi.ClaimPending {
-			//println("watch pvc phase: ", pvc.Status.Phase)
-			
-			if pvc.Status.Phase != kapi.ClaimBound {
-				return errors.New("pvc phase is neither pending nor bound: " + string(pvc.Status.Phase))
-			}
-			
-			break
-		}
-	}
-	
-	return nil
-}
 
 
 
