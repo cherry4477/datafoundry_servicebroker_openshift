@@ -8,7 +8,7 @@ import (
 	"errors"
 	//"fmt"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
-	"fmt"
+	//"fmt"
 	"sync"
 )
 
@@ -98,6 +98,116 @@ func DeleteVolumn(volumnName string) error {
 	return err
 }
 
+//=======================================================================
+// 
+//=======================================================================
+
+func DeleteVolumns(volumes []Volume) <-chan error {
+	return nil
+}
+
+//=======================================================================
+// 
+//=======================================================================
+
+// todo: it is best to save jobs in mysql firstly, ...
+// now, when the server instance is terminated, jobs are lost.
+
+var pvcVolumnCreatingJobs = map[string]*CreatePvcVolumnJob{}
+var pvcVolumnCreatingJobsMutex sync.Mutex
+
+func GetCreatePvcVolumnJob (jobName string) *CreatePvcVolumnJob {
+	pvcVolumnCreatingJobsMutex.Lock()
+	job := pvcVolumnCreatingJobs[jobName]
+	pvcVolumnCreatingJobsMutex.Unlock()
+	
+	return job
+}
+
+func StartCreatePvcVolumnJob (
+		jobName   string,
+		namespace string,
+		volumes   []Volume,
+		) <-chan error {
+	
+	job := &CreatePvcVolumnJob {
+		namespace: namespace,
+		volumes: volumes,
+	}
+
+	c := make(chan error)
+	
+	pvcVolumnCreatingJobsMutex.Lock()
+	defer pvcVolumnCreatingJobsMutex.Unlock()
+	
+	if pvcVolumnCreatingJobs[jobName] == nil {
+		pvcVolumnCreatingJobs[jobName] = job
+		go func() {
+			job.run(c)
+			
+			pvcVolumnCreatingJobsMutex.Lock()
+			delete(pvcVolumnCreatingJobs, jobName)
+			pvcVolumnCreatingJobsMutex.Unlock()
+		}()
+	}
+
+	return c
+}
+
+type CreatePvcVolumnJob struct {
+	cancelled bool
+	cancelChan chan struct{}
+	cancelMetex sync.Mutex
+	
+	namespace string
+	volumes   []Volume
+}
+
+func (job *CreatePvcVolumnJob) Cancel() {
+	job.cancelMetex.Lock()
+	defer job.cancelMetex.Unlock()
+	
+	if ! job.cancelled {
+		job.cancelled = true
+		close (job.cancelChan)
+	}
+}
+
+func (job *CreatePvcVolumnJob) run(c chan<- error) {
+	println("startCreatePvcVolumnJob ...")
+
+	println("CreateVolumn", job.volumes, "...")
+
+/*
+	err := CreateVolumn(job.volumeName, job.volumeSize)
+	if err != nil {
+		println("CreateVolumn", job.volumeName, "esrror: ", err)
+		c <- fmt.Errorf("CreateVolumn error: ", err)
+		return
+	}
+
+	println("WaitUntilPvcIsBound", job.volumeName, "...")
+
+	// watch pvc until bound
+
+	err = WaitUntilPvcIsBound(namespace, job.volumeName, job.cancelChan)
+	if err != nil {
+		println("WaitUntilPvcIsBound", job.volumeName, "error: ", err)
+
+		println("DeleteVolumn", job.volumeName, "...")
+
+		// todo: on error
+		DeleteVolumn(job.volumeName)
+
+		c <- fmt.Errorf("WaitUntilPvcIsBound", job.volumeName, "error: ", err)
+
+		return
+	}
+*/
+
+	c <- nil
+}
+
 //====================
 
 type watchPvcStatus struct {
@@ -181,109 +291,6 @@ func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}
 	}
 	
 	return nil
-}
-
-//=======================================================================
-// 
-//=======================================================================
-
-// todo: it is best to save jobs in mysql firstly, ...
-// now, when the server instance is terminated, jobs are lost.
-
-var pvcVolumnCreatingJobs = map[string]*CreatePvcVolumnJob{}
-var pvcVolumnCreatingJobsMutex sync.Mutex
-
-func GetCreatePvcVolumnJob (instanceId string) *CreatePvcVolumnJob {
-	pvcVolumnCreatingJobsMutex.Lock()
-	job := pvcVolumnCreatingJobs[instanceId]
-	pvcVolumnCreatingJobsMutex.Unlock()
-	
-	return job
-}
-
-func StartCreatePvcVolumnJob (
-		volumeName string, 
-		volumeSize int, 
-		serviceInfo *ServiceInfo,
-		) <-chan error {
-	
-	job := &CreatePvcVolumnJob {
-		volumeName: volumeName,
-		volumeSize: volumeSize,
-		serviceInfo: serviceInfo,
-	}
-
-	c := make(chan error)
-	
-	pvcVolumnCreatingJobsMutex.Lock()
-	defer pvcVolumnCreatingJobsMutex.Unlock()
-	
-	if pvcVolumnCreatingJobs[volumeName] == nil {
-		pvcVolumnCreatingJobs[volumeName] = job
-		go func() {
-			job.run(c)
-			
-			pvcVolumnCreatingJobsMutex.Lock()
-			delete(pvcVolumnCreatingJobs, volumeName)
-			pvcVolumnCreatingJobsMutex.Unlock()
-		}()
-	}
-
-	return c
-}
-
-type CreatePvcVolumnJob struct {
-	cancelled bool
-	cancelChan chan struct{}
-	cancelMetex sync.Mutex
-	
-	volumeName  string
-	volumeSize  int
-	serviceInfo *ServiceInfo
-
-}
-
-func (job *CreatePvcVolumnJob) Cancel() {
-	job.cancelMetex.Lock()
-	defer job.cancelMetex.Unlock()
-	
-	if ! job.cancelled {
-		job.cancelled = true
-		close (job.cancelChan)
-	}
-}
-
-func (job *CreatePvcVolumnJob) run(c chan<- error) {
-	println("startCreatePvcVolumnJob ...")
-
-	println("CreateVolumn", job.volumeName, "...")
-
-	err := CreateVolumn(job.volumeName, job.volumeSize)
-	if err != nil {
-		println("CreateVolumn", job.volumeName, "esrror: ", err)
-		c <- fmt.Errorf("CreateVolumn error: ", err)
-		return
-	}
-
-	println("WaitUntilPvcIsBound", job.volumeName, "...")
-
-	// watch pvc until bound
-
-	err = WaitUntilPvcIsBound(job.serviceInfo.Database, job.volumeName, job.cancelChan)
-	if err != nil {
-		println("WaitUntilPvcIsBound", job.volumeName, "error: ", err)
-
-		println("DeleteVolumn", job.volumeName, "...")
-
-		// todo: on error
-		DeleteVolumn(job.volumeName)
-
-		c <- fmt.Errorf("WaitUntilPvcIsBound", job.volumeName, "error: ", err)
-
-		return
-	}
-
-	c <- nil
 }
 
 

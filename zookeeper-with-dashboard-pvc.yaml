@@ -79,13 +79,8 @@ spec:
     spec:
       volumes:
         - name: data
-          emptyDir: {}
-        - name: wal
-          emptyDir:
-            medium: Memory
-
-问题: zookeeper nodes 共享一个卷？ 
-
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer1"
       containers:
         - name: server
           image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration
@@ -107,8 +102,10 @@ spec:
           volumeMounts:
             - mountPath: /zookeeper/data
               name: data
+              subPath: data
             - mountPath: /zookeeper/wal
-              name: wal
+              name: data
+              subPath: wal
 ---
 apiVersion: v1
 kind: ReplicationController
@@ -124,10 +121,8 @@ spec:
     spec:
       volumes:
         - name: data
-          emptyDir: {}
-        - name: wal
-          emptyDir:
-            medium: Memory
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer2"
       containers:
         - name: server
           image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration
@@ -166,10 +161,8 @@ spec:
     spec:
       volumes:
         - name: data
-          emptyDir: {}
-        - name: wal
-          emptyDir:
-            medium: Memory
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer3"
       containers:
         - name: server
           image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration

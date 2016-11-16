@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	VolumeType_EmptyDir = ""
-	VolumeType_PVC      = "pvc"
+	VolumeType_EmptyDir = ""    // DON'T change
+	VolumeType_PVC      = "pvc" // DON'T change
 )
 
 type ServiceInfo struct {
@@ -26,10 +26,20 @@ type ServiceInfo struct {
 	User           string `json:"user"`
 	Password       string `json:"password"`
 
-	Volume_type    string   `json:"volume_type"` // "" | "pvc"
-	Volume_size    int      `json:"volume_size"`
-	//Connections    int    `json:"connections"`
+	// following fileds 
+	//Volume_type    string   `json:"volume_type"` // "" | "pvc"
+	//Volume_size    int      `json:"volume_size"`
+	// 
+	// will be replaced by
+	Volumes []Volume `json:"volumes,omitempty"`
 }
+
+type Volume struct{
+	Volume_size int    `json:"volume_size"`
+	Volume_name string `json:"volume_name"`
+}
+
+//==================
 
 type PlanInfo struct {
 	Volume_size    int    `json:"volume_type"`

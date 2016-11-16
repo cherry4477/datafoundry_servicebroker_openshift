@@ -78,9 +78,34 @@ func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceI
 // 
 //==============================================================
 
-func PvcName(instanceId string) string {
-	return "zkp" + instanceId // DON'T CHANGE
+func volumeBaseName(instanceId string) string {
+	return "zkp-" + instanceId
 }
+
+func peerPvcName0(volumes []oshandler.Volume) string {
+	if len(volumes) > 0 {
+		return volumes[0].Volume_name
+	}
+	return ""
+}
+
+func peerPvcName1(volumes []oshandler.Volume) string {
+	if len(volumes) > 1 {
+		return volumes[1].Volume_name
+	}
+	return ""
+}
+
+func peerPvcName2(volumes []oshandler.Volume) string {
+	if len(volumes) > 2 {
+		return volumes[2].Volume_name
+	}
+	return ""
+}
+
+//==============================================================
+// 
+//==============================================================
 
 
 type Zookeeper_Handler struct{
@@ -108,6 +133,24 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	zookeeperUser := "super" // oshandler.NewElevenLengthID()
 	zookeeperPassword := oshandler.GenGUID()
 	
+	volumeBaseName := volumeBaseName(instanceIdInTempalte)
+	volumes := []oshandler.Volume{
+		// one master volume
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-0",
+		},
+		// two slave volumes
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-2",
+		},
+	}
+	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
@@ -118,17 +161,16 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	serviceInfo.User = zookeeperUser
 	serviceInfo.Password = zookeeperPassword
 
-	serviceInfo.Volume_type = oshandler.VolumeType_PVC
-	serviceInfo.Volume_size = planInfo.Volume_size
+	serviceInfo.Volumes = volumes
 	
 	// ...
 	go func() {
 		// create volume
 
 		result := oshandler.StartCreatePvcVolumnJob(
-			PvcName(serviceInfo.Url),
-			planInfo.Volume_size,
-			&serviceInfo,
+			volumeBaseName,
+			serviceInfo.Database,
+			serviceInfo.Volumes,
 		)
 
 		err := <- result
@@ -148,7 +190,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 				serviceInfo.Database, 
 				serviceInfo.User, 
 				serviceInfo.Password,
-				serviceInfo.Volume_type == oshandler.VolumeType_PVC,
+				volumes,
 		)
 
 		if err != nil {
@@ -156,7 +198,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 			logger.Error("redis createRedisResources_Master error", err)
 
 			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
-			oshandler.DeleteVolumn(PvcName(serviceInfo.Url))
+			oshandler.DeleteVolumns(volumes)
 			
 			return
 		}
@@ -260,6 +302,10 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 	//	return brokerapi.IsAsync(false), err
 	//}
 	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+
+	println("to destroy volumes:", myServiceInfo.Volumes)
+
+	oshandler.DeleteVolumns(myServiceInfo.Volumes)
 	
 	return brokerapi.IsAsync(false), nil
 }
@@ -435,7 +481,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 
 var ZookeeperTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, pvcVolume bool, res *ZookeeperResources_Master) error {
+func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume, res *ZookeeperResources_Master) error {
 	/*
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
@@ -461,7 +507,7 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	if ZookeeperTemplateData_Master == nil {
 
 		var templateFile string
-		if pvcVolume {
+		if len(volumes) > 0 {
 			templateFile = "zookeeper-with-dashboard-pvc.yaml"
 		} else {
 			templateFile = "zookeeper-with-dashboard-emptydir.yaml"
@@ -500,7 +546,9 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	
 	// ...
 
-	pvcName := PvcName(instanceID)
+	peerPvcName0 := peerPvcName0(volumes)
+	peerPvcName1 := peerPvcName1(volumes)
+	peerPvcName2 := peerPvcName2(volumes)
 	
 	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
 	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
@@ -515,8 +563,10 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
 	
-	if pvcVolume {
-		yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****"), []byte(pvcName), -1)
+	if len(volumes) > 0 {
+		yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer1"), []byte(peerPvcName0), -1)
+		yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer2"), []byte(peerPvcName1), -1)
+		yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer3"), []byte(peerPvcName2), -1)
 	}
 
 	//println("========= Boot yamlTemplates ===========")
@@ -564,7 +614,7 @@ func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespa
 	return host, port, nil
 }
 	
-func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
+func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume) (*ZookeeperResources_Master, error) {
 	var input ZookeeperResources_Master
 	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
 	if err != nil {

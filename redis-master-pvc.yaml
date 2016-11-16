@@ -53,7 +53,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: "pvcname*****"
+            claimName: "pvcname*****master"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       securityContext: {}
