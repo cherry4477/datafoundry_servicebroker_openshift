@@ -118,7 +118,7 @@ func (handler *Storm_Handler) DoProvision(instanceID string, details brokerapi.P
 	//	return serviceSpec, serviceInfo, err
 	//}
 	// nimbus zookeeper
-	output, err := zookeeper.CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+	output, err := zookeeper.CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, nil)
 	if err != nil {
 		zookeeper.DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
 		
@@ -211,7 +211,7 @@ func (handler *Storm_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		
 		println("to destroy zookeeper resources")
 		
-		zookeeper_res, _ := zookeeper.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password)
+		zookeeper_res, _ := zookeeper.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
 		zookeeper.DestroyZookeeperResources_Master (zookeeper_res, myServiceInfo.Database)
 		
 		// ...
@@ -231,7 +231,7 @@ func (handler *Storm_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 func (handler *Storm_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	zookeeper_res, err := zookeeper.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password)
+	zookeeper_res, err := zookeeper.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
@@ -342,9 +342,9 @@ func (job *stormOrchestrationJob) cancel() {
 func (job *stormOrchestrationJob) run() {
 	println("-- stormOrchestrationJob start --")
 	
-	result, cancel, err := zookeeper.WatchZookeeperOrchestration (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password)
+	result, cancel, err := zookeeper.WatchZookeeperOrchestration (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
 	if err != nil {
-		zookeeper_res, _ := zookeeper.GetZookeeperResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password)
+		zookeeper_res, _ := zookeeper.GetZookeeperResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
 		zookeeper.DestroyZookeeperResources_Master (zookeeper_res, job.serviceInfo.Database)
 		return
 	}

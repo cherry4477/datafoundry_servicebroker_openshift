@@ -6,7 +6,8 @@ import (
 	"time"
 	"io/ioutil"
 	"errors"
-	//"fmt"
+	"strings"
+	"fmt"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	//"fmt"
 	"sync"
@@ -102,7 +103,14 @@ func DeleteVolumn(volumnName string) error {
 // 
 //=======================================================================
 
+// todo: need improving
 func DeleteVolumns(volumes []Volume) <-chan error {
+	println("DeleteVolumns", volumes, "...")
+
+	for _, vol := range volumes {
+		go DeleteVolumn(vol.Volume_name)
+	}
+
 	return nil
 }
 
@@ -176,7 +184,65 @@ func (job *CreatePvcVolumnJob) Cancel() {
 func (job *CreatePvcVolumnJob) run(c chan<- error) {
 	println("startCreatePvcVolumnJob ...")
 
-	println("CreateVolumn", job.volumes, "...")
+	println("CreateVolumns", job.volumes, "...")
+
+	errChan := make(chan error, len(job.volumes))
+
+	var wg sync.WaitGroup
+	wg.Add(len(job.volumes))
+	for _, vol := range job.volumes {
+		go func(name string, size int) {
+			// ...
+
+			println("CreateVolumn: name=", name, ", size=", size)
+
+			err := CreateVolumn(name, size)
+			if err != nil {
+				println("CreateVolumn error:", err.Error())
+
+				errChan <- err
+				return
+			}
+
+			// ...
+
+			println("WaitUntilPvcIsBound: name=", name)
+
+			err = WaitUntilPvcIsBound(name, name, job.cancelChan)
+			if err != nil {
+				println("WaitUntilPvcIsBound", name, "error: ", err.Error())
+
+				// caller will do the deletions.
+				//println("DeleteVolumn", name, "...")/
+				// todo: on error
+				//DeleteVolumn(name)
+
+				c <- fmt.Errorf("WaitUntilPvcIsBound", name, "error: ", err)
+				return
+			}
+
+			// ...
+
+			println("CreateVolumn succeeded: name=", name, ", size=", size)
+
+			wg.Done()
+
+		}(vol.Volume_name, vol.Volume_size)
+	}
+	wg.Wait()
+	close(errChan)
+
+	if len(errChan) == 0 {
+		c <- nil
+		return
+	}
+
+
+	errs := make([]string, 0, len(job.volumes))
+	for err := range errChan {
+		errs = append(errs, err.Error())
+	}
+	c <- errors.New(strings.Join(errs, "\n"))
 
 /*
 	err := CreateVolumn(job.volumeName, job.volumeSize)
