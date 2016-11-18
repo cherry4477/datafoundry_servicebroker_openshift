@@ -257,8 +257,17 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
 	// assume in provisioning
+
+
+	volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+	if volumeJob != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 	
-	// the job may be finished or interrupted or running in another instance.
+	// ...
 	
 	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 	
@@ -293,19 +302,35 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 
 func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// ...
-	
-	println("to destroy resources")
-	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
-	// under current frame, it is not a good idea to return here
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
-	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
 
-	println("to destroy volumes:", myServiceInfo.Volumes)
+	go func() {
+		// ...
+		volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+		if volumeJob != nil {
+			volumeJob.Cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url)) {
+					break
+				}
+			}
+		}
+	
+		println("to destroy master resources")
+		
+		master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+		// under current frame, it is not a good idea to return here
+		//if err != nil {
+		//	return brokerapi.IsAsync(false), err
+		//}
+		DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
 
-	oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+		println("to destroy volumes:", myServiceInfo.Volumes)
+
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
