@@ -18,11 +18,11 @@ metadata:
 spec:
   replicas: 1
   selector:
-    sb-instanceid-redis: redis
+    sb-instanceid-redis: redis1
   template:
     metadata:
       labels:
-        sb-instanceid-redis: redis
+        sb-instanceid-redis: redis1
         servicebroker: sb-instanceid-redis
     spec:
       containers:
@@ -62,11 +62,11 @@ metadata:
 spec:
   replicas: 1
   selector:
-    sb-instanceid-redis: redis
+    sb-instanceid-redis: redis2
   template:
     metadata:
       labels:
-        sb-instanceid-redis: redis
+        sb-instanceid-redis: redis2
         servicebroker: sb-instanceid-redis
     spec:
       containers:
