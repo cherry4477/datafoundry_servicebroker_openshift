@@ -139,6 +139,8 @@ func StartCreatePvcVolumnJob (
 		) <-chan error {
 	
 	job := &CreatePvcVolumnJob {
+		cancelChan: make(chan struct{}),
+
 		namespace: namespace,
 		volumes: volumes,
 	}
@@ -192,6 +194,9 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 	wg.Add(len(job.volumes))
 	for _, vol := range job.volumes {
 		go func(name string, size int) {
+
+			defer wg.Done()
+
 			// ...
 
 			println("CreateVolumn: name=", name, ", size=", size)
@@ -208,7 +213,7 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 
 			println("WaitUntilPvcIsBound: name=", name)
 
-			err = WaitUntilPvcIsBound(name, name, job.cancelChan)
+			err = WaitUntilPvcIsBound(job.namespace, name, job.cancelChan)
 			if err != nil {
 				println("WaitUntilPvcIsBound", name, "error: ", err.Error())
 
@@ -224,8 +229,6 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 			// ...
 
 			println("CreateVolumn succeeded: name=", name, ", size=", size)
-
-			wg.Done()
 
 		}(vol.Volume_name, vol.Volume_size)
 	}
