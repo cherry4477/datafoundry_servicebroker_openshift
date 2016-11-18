@@ -38,7 +38,7 @@ import (
 // 
 //==============================================================
 
-const StormServcieBrokerName_Standalone = "Storm_standalone"
+const StormServcieBrokerName_Standalone = "Storm_volumes_standalone"
 
 func init() {
 	oshandler.Register(StormServcieBrokerName_Standalone, &Storm_freeHandler{})
