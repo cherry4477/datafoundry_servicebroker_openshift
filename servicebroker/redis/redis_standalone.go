@@ -199,7 +199,7 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 			logger.Error("redis createRedisResources_Master error", err)
 
 			destroyRedisResources_Master(output, serviceInfo.Database)
-			oshandler.DeleteVolumns(volumes)
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
 			
 			return 
 		}
@@ -418,7 +418,7 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 
 		println("to destroy volumes:", myServiceInfo.Volumes)
 
-		oshandler.DeleteVolumns(myServiceInfo.Volumes)
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
 	}()
 	
 	return brokerapi.IsAsync(false), nil

@@ -198,7 +198,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 			logger.Error("redis createRedisResources_Master error", err)
 
 			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
-			oshandler.DeleteVolumns(volumes)
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
 			
 			return
 		}
@@ -305,7 +305,7 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 
 	println("to destroy volumes:", myServiceInfo.Volumes)
 
-	oshandler.DeleteVolumns(myServiceInfo.Volumes)
+	oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
 	
 	return brokerapi.IsAsync(false), nil
 }

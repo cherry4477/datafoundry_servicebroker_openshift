@@ -69,10 +69,10 @@ type VolumnCreateOptions struct {
 	kapi.ObjectMeta `json:"metadata,omitempty"`
 }
 
-func CreateVolumn(volumnName string, size int) error {
+func CreateVolumn(namespace, volumnName string, size int) error {
 	oc := OC()
 
-	url := DfProxyApiPrefix() + "/namespaces/" + oc.Namespace() + "/volumes"
+	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes"
 
 	options := &VolumnCreateOptions{
 		volumnName,
@@ -89,10 +89,10 @@ func CreateVolumn(volumnName string, size int) error {
 	return err
 }
 
-func DeleteVolumn(volumnName string) error {
+func DeleteVolumn(namespace, volumnName string) error {
 	oc := OC()
 
-	url := DfProxyApiPrefix() + "/namespaces/" + oc.Namespace() + "/volumes/" + volumnName
+	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes/" + volumnName
 	
 	err := dfRequest("DELETE", url, oc.BearerToken(), nil, nil)
 	
@@ -104,11 +104,11 @@ func DeleteVolumn(volumnName string) error {
 //=======================================================================
 
 // todo: need improving
-func DeleteVolumns(volumes []Volume) <-chan error {
+func DeleteVolumns(namespace string, volumes []Volume) <-chan error {
 	println("DeleteVolumns", volumes, "...")
 
 	for _, vol := range volumes {
-		go DeleteVolumn(vol.Volume_name)
+		go DeleteVolumn(namespace, vol.Volume_name)
 	}
 
 	return nil
@@ -201,7 +201,7 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 
 			println("CreateVolumn: name=", name, ", size=", size)
 
-			err := CreateVolumn(name, size)
+			err := CreateVolumn(job.namespace, name, size)
 			if err != nil {
 				println("CreateVolumn error:", err.Error())
 
@@ -215,14 +215,14 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 
 			err = WaitUntilPvcIsBound(job.namespace, name, job.cancelChan)
 			if err != nil {
-				println("WaitUntilPvcIsBound", name, "error: ", err.Error())
+				println("WaitUntilPvcIsBound", job.namespace, name, "error: ", err.Error())
 
 				// caller will do the deletions.
 				//println("DeleteVolumn", name, "...")/
 				// todo: on error
 				//DeleteVolumn(name)
 
-				c <- fmt.Errorf("WaitUntilPvcIsBound", name, "error: ", err)
+				c <- fmt.Errorf("WaitUntilPvcIsBound (%s, %s), error: %s", job.namespace, name, err)
 				return
 			}
 
@@ -239,7 +239,6 @@ func (job *CreatePvcVolumnJob) run(c chan<- error) {
 		c <- nil
 		return
 	}
-
 
 	errs := make([]string, 0, len(job.volumes))
 	for err := range errChan {
