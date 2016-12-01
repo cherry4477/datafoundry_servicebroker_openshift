@@ -30,3 +30,4 @@ docker-compose*
 datafoundry_servicebroker*
 dev*
 
+.idea/
