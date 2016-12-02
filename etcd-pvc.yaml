@@ -299,16 +299,14 @@ spec:
 ---
 
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Route
-  metadata:
-    creationTimestamp: null
-    labels:
-      etcd: product
-    name: sb-instanceid-etcd
-  spec:
-    host: sb-instanceid-etcd.endpoint-postfix-place-holder
-    to:
-      kind: Service
-      name: sb-instanceid-etcd0
+kind: Route
+metadata:
+  creationTimestamp: null
+  labels:
+    etcd: product
+  name: sb-instanceid-etcd
+spec:
+  host: sb-instanceid-etcd.endpoint-postfix-place-holder
+  to:
+    kind: Service
+    name: sb-instanceid-etcd0
