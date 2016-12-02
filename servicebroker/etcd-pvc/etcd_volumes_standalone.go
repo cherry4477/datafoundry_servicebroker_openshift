@@ -309,7 +309,7 @@ func loadEtcdResources_HA(instanceID, rootPassword, user, password string, volum
 			return err
 		}
 
-		etcd_image := oshandler.EtcdImage()
+		etcd_image := oshandler.EtcdVolumeImage()
 		etcd_image = strings.TrimSpace(etcd_image)
 		if len(etcd_image) > 0 {
 			EtcdTemplateData_HA = bytes.Replace(
