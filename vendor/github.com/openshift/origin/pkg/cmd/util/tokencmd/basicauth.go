@@ -8,9 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
 	//"github.com/golang/glog"
-
 	//"github.com/openshift/origin/pkg/cmd/util"
 )
 
