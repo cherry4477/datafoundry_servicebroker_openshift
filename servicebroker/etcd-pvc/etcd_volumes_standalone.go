@@ -191,11 +191,11 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
 		}
-		if dc == nil || dc.Name == "" || dc.Spec.Replicas == nil || podCount < *dc.Spec.Replicas {
+		if dc == nil || dc.Name == "" || dc.Spec.Replicas == 0 || podCount < dc.Spec.Replicas {
 			return false
 		}
 		n, _ := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
-		return n >= *dc.Spec.Replicas
+		return n >= dc.Spec.Replicas
 	}
 
 	ha_res, _ := getEtcdResources_HA(
@@ -426,10 +426,10 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 		OGet(prefix+"/deploymentconfigs/"+input.etcddc1.Name, &output.etcddc1).
 		OGet(prefix+"/deploymentconfigs/"+input.etcddc2.Name, &output.etcddc2).
 		OGet(prefix+"/deploymentconfigs/"+input.etcddc3.Name, &output.etcddc3).
-		KGet(prefix+"/services/"+input.etcdsvc1, &output.etcdsvc1).
-		KGet(prefix+"/services/"+input.etcdsvc2, &output.etcdsvc2).
-		KGet(prefix+"/services/"+input.etcdsvc3, &output.etcdsvc3).
-		KGet(prefix+"/services/"+input.etcdsvc0, &output.etcdsvc0).
+		KGet(prefix+"/services/"+input.etcdsvc1.Name, &output.etcdsvc1).
+		KGet(prefix+"/services/"+input.etcdsvc2.Name, &output.etcdsvc2).
+		KGet(prefix+"/services/"+input.etcdsvc3.Name, &output.etcdsvc3).
+		KGet(prefix+"/services/"+input.etcdsvc0.Name, &output.etcdsvc0).
 		OGet(prefix+"/routes/"+input.route.Name, &output.route)
 
 	if osr.Err != nil {
