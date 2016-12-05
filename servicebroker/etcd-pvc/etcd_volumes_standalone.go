@@ -172,6 +172,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 			return
 		}
 
+		println("create etcd Resources done")
 	}()
 
 	serviceSpec.DashboardURL = ""
@@ -181,8 +182,15 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 
-	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
+	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
+	if volumeJob != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 
+	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
 	ok := func(dc *dcapi.DeploymentConfig) bool {
 		labels := make(map[string]string)
 		labels["run"] = dc.Name
@@ -219,11 +227,39 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 
 func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 
-	ha_res, _ := getEtcdResources_HA(
-		myServiceInfo.Url, myServiceInfo.Database,
-		myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+	go func() {
+		// ...
+		volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
+		if volumeJob != nil {
+			volumeJob.Cancel()
 
-	destroyEtcdResources_HA(ha_res, myServiceInfo.Database)
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url)) {
+					break
+				}
+			}
+		}
+
+		println("to destroy master resources")
+
+		ha_res, _ := getEtcdResources_HA(
+			myServiceInfo.Url, myServiceInfo.Database,
+			myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+		// under current frame, it is not a good idea to return here
+		//if err != nil {
+		//	return brokerapi.IsAsync(false), err
+		//}
+		destroyEtcdResources_HA(ha_res, myServiceInfo.Database)
+		println("destroy master resources done")
+
+		println("to destroy volumes:", myServiceInfo.Volumes)
+
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+		println("to destroy volumes done")
+
+	}()
 
 	return brokerapi.IsAsync(false), nil
 }
