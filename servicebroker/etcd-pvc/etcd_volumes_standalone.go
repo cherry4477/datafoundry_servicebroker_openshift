@@ -478,9 +478,9 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() { odel(serviceBrokerNamespace, "DeploymentConfig", haRes.etcddc1.Name) }()
-	go func() { odel(serviceBrokerNamespace, "DeploymentConfig", haRes.etcddc2.Name) }()
-	go func() { odel(serviceBrokerNamespace, "DeploymentConfig", haRes.etcddc3.Name) }()
+	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.etcddc1.Name) }()
+	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.etcddc2.Name) }()
+	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.etcddc3.Name) }()
 
 	go func() { kdel(serviceBrokerNamespace, "services", haRes.etcdsvc1.Name) }()
 	go func() { kdel(serviceBrokerNamespace, "services", haRes.etcdsvc2.Name) }()
