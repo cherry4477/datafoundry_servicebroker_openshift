@@ -489,7 +489,10 @@ func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace str
 
 	go func() { odel(serviceBrokerNamespace, "routes", haRes.route.Name) }()
 
-	statRunningRCByLabels(serviceBrokerNamespace, haRes.etcddc1.Labels)
+	fmt.Println("----->haRes.etcddc1.Labels", haRes.etcddc1.Labels)
+	lables := make(map[string]string)
+	lables["etcd"]  = "product"
+	statRunningRCByLabels(serviceBrokerNamespace, lables)
 
 	//go func() {kdel_rc(serviceBrokerNamespace, )}
 }
