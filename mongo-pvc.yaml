@@ -1,0 +1,175 @@
+#3 mongodb instances consist a replica set : "mongo-instanceid-replset"
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-mongo-0
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  clusterIP: None
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongo-svc-port
+  selector:
+    name: sb-instanceid-mongo0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-mongo-1
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  clusterIP: None
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongo-svc-port
+  selector:
+    name: sb-instanceid-mongo1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-mongo-2
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  clusterIP: None
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongo-svc-port
+  selector:
+    name: sb-instanceid-mongo2
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-mongo0
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  replicas: 1
+  selector:
+    name: sb-instanceid-mongo0
+  template:
+    metadata:
+      labels:
+        name: sb-instanceid-mongo0
+    spec:
+      containers:
+      - name: sb-instanceid-mongo0
+        image: http://mongo-image-place-holder/mongo-with-volumes-orchestration
+        livenessProbe:
+          initialDelaySeconds: 50
+          timeoutSeconds: 10
+          tcpSocket:
+            port: 27017
+        env:
+          - name: mongo_node_name
+            value: sb-instanceid-mongo
+          - name: mongo_nodes_number
+            value: "3"
+          - name: mongo_replica_set_name
+            value: mongo-instanceid-replset
+            # don't change the above line, it is used in code
+            #todo: #ADMINUSER#:#ADMINPASSWORD#
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-replica-storage0
+          mountPath: /data/db
+      volumes:
+      - name: mongo-replica-storage0
+        persistentVolumeClaim:
+          claimName: "pvcname*****node0"
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-mongo1
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  replicas: 1
+  selector:
+    name: sb-instanceid-mongo1
+  template:
+    metadata:
+      labels:
+        name: sb-instanceid-mongo1
+    spec:
+      containers:
+      - name: sb-instanceid-mongo1
+        image: http://mongo-image-place-holder/mongo-with-volumes-orchestration
+        livenessProbe:
+          initialDelaySeconds: 50
+          timeoutSeconds: 10
+          tcpSocket:
+            port: 27017
+        env:
+          - name: mongo_node_name
+            value: sb-instanceid-mongo
+          - name: mongo_nodes_number
+            value: "3"
+          - name: mongo_replica_set_name
+            value: mongo-instanceid-replset
+            # don't change the above line, it is used in code
+            #todo: #ADMINUSER#:#ADMINPASSWORD#
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-replica-storage1
+          mountPath: /data/db
+      volumes:
+      - name: mongo-replica-storage1
+        persistentVolumeClaim:
+          claimName: "pvcname*****node1"
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-mongo2
+  labels:
+    name: sb-instanceid-mongo
+spec:
+  replicas: 1
+  selector:
+    name: sb-instanceid-mongo2
+  template:
+    metadata:
+      labels:
+        name: sb-instanceid-mongo2
+    spec:
+      containers:
+      - name: sb-instanceid-mongo2
+        image: http://mongo-image-place-holder/mongo-with-volumes-orchestration
+        livenessProbe:
+          initialDelaySeconds: 50
+          timeoutSeconds: 10
+          tcpSocket:
+            port: 27017
+        env:
+          - name: mongo_node_name
+            value: sb-instanceid-mongo
+          - name: mongo_nodes_number
+            value: "3"
+          - name: mongo_replica_set_name
+            value: mongo-instanceid-replset
+            # don't change the above line, it is used in code
+            #todo: #ADMINUSER#:#ADMINPASSWORD#
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-replica-storage2
+          mountPath: /data/db
+      volumes:
+      - name: mongo-replica-storage2
+        persistentVolumeClaim:
+          claimName: "pvcname*****node2"

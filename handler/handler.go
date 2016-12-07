@@ -209,6 +209,10 @@ func PySpiderImage() string {
 	return pyspiderImage
 }
 
+func MongoVolumeImage() string {
+	return mongoVolumeImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 
@@ -229,6 +233,7 @@ var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
 var pyspiderImage string
+var mongoVolumeImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -256,5 +261,6 @@ func init() {
 	sparkImage = getenv("SPARKIMAGE")
 	zepplinImage = getenv("ZEPPLINIMAGE")
 	pyspiderImage = getenv("PYSPIDERIMAGE")
+	mongoVolumeImage = getenv("MONGOVOLUMEIMAGE")
 }
 
