@@ -11,8 +11,9 @@ import (
 	"bufio"
 	//"io"
 	"os"
+	"sync/atomic"
 	"io/ioutil"
-	"crypto/tls"
+	//"crypto/tls"
 	"net/http"
 	neturl "net/url"
 	"encoding/base64"
@@ -47,6 +48,19 @@ var logger lager.Logger
 // 
 //==============================================================
 
+type E string
+func(e E) Error() string {
+	return string(e)
+}
+
+const (
+	NotFound = E("not found")
+)
+
+//==============================================================
+// 
+//==============================================================
+
 type OpenshiftClient struct {
 	host    string
 	//authUrl string
@@ -56,11 +70,21 @@ type OpenshiftClient struct {
 	namespace   string
 	username    string
 	password    string
-	bearerToken string
+	//bearerToken string
+	bearerToken atomic.Value
 }
 
 func (oc *OpenshiftClient) Namespace() string {
 	return oc.namespace
+}
+
+func (oc *OpenshiftClient) BearerToken() string {
+	//return oc.bearerToken
+	return oc.bearerToken.Load().(string)
+}
+
+func (oc *OpenshiftClient) setBearerToken(token string) {
+	oc.bearerToken.Store(token)
 }
 
 func newOpenshiftClient(host, username, password, defaultNamespace string) *OpenshiftClient {
@@ -75,6 +99,7 @@ func newOpenshiftClient(host, username, password, defaultNamespace string) *Open
 		username:  username,
 		password:  password,
 	}
+	oc.bearerToken.Store("")
 	
 	go oc.updateBearerToken()
 	
@@ -95,7 +120,8 @@ func (oc *OpenshiftClient) updateBearerToken () {
 			time.Sleep(15 * time.Second)
 		} else {
 			//clientConfig.BearerToken = token
-			oc.bearerToken = token
+			//oc.bearerToken = token
+			oc.setBearerToken(token)
 			
 			println("RequestToken token: ", token)
 			
@@ -105,37 +131,13 @@ func (oc *OpenshiftClient) updateBearerToken () {
 }
 
 func (oc *OpenshiftClient) request (method string, url string, body []byte, timeout time.Duration) (*http.Response, error) {
-	token := oc.bearerToken
+	//token := oc.bearerToken
+	token := oc.BearerToken()
 	if token == "" {
 		return nil, errors.New("token is blank")
 	}
-	
-	var req *http.Request
-	var err error
-	if len(body) == 0 {
-		req, err = http.NewRequest(method, url, nil)
-	} else {
-		req, err = http.NewRequest(method, url, bytes.NewReader(body))
-	}
-	
-	if err != nil {
-		return nil, err
-	}
-	
-	//for k, v := range headers {
-	//	req.Header.Add(k, v)
-	//}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer " + token)
-	
-	transCfg := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Transport: transCfg,
-		Timeout: timeout,
-	}
-	return client.Do(req)
+
+	return request (timeout, method, url, token, body)
 }
 
 type WatchStatus struct {
@@ -250,7 +252,9 @@ func (osr *OpenshiftREST) doRequest (method, url string, bodyParams interface{},
 	
 	//println("22222 len(data) = ", len(data), " , res.StatusCode = ", res.StatusCode)
 	
-	if res.StatusCode < 200 || res.StatusCode >= 400 {
+	if res.StatusCode == 404 {
+		osr.Err = NotFound
+	} else if res.StatusCode < 200 || res.StatusCode >= 400 {
 		osr.Err = errors.New(string(data))
 	} else {
 		if into != nil {

@@ -1,0 +1,206 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk
+spec:
+  ports:
+    - name: exhibitor
+      port: 8080
+    - name: client
+      port: 2181
+  selector:
+    service-broker: sb-instanceid-zk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-1
+spec:
+  ports:
+    - name: exhibitor
+      port: 8080
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-2
+spec:
+  ports:
+    - name: exhibitor
+      port: 8080
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-zk-3
+spec:
+  ports:
+    - name: exhibitor
+      port: 8080
+    - name: client
+      port: 2181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    service-broker: sb-instanceid-zk
+    sb-instanceid-zk: "3"
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-1
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "1"
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer1"
+      containers:
+        - name: server
+          image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYID
+              value: "1"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 8080
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+              subPath: data
+            - mountPath: /zookeeper/wal
+              name: data
+              subPath: wal
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "2"
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer2"
+      containers:
+        - name: server
+          image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYID
+              value: "2"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 8080
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+              subPath: data
+            - mountPath: /zookeeper/wal
+              name: data
+              subPath: wal
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-zk-3
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service-broker: sb-instanceid-zk
+        sb-instanceid-zk: "3"
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "pvcname*****peer3"
+      containers:
+        - name: server
+          image: http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYID
+              value: "3"
+            - name: SERVERS
+              value: "sb-instanceid-zk-1.local-service-postfix-place-holder,sb-instanceid-zk-2.local-service-postfix-place-holder,sb-instanceid-zk-3.local-service-postfix-place-holder"
+            - name: JVMFLAGS
+              value: "-Xmx2G"
+            - name: ZOO_PASSWORD
+              value: "super:password-place-holder"
+          ports:
+            - containerPort: 8080
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            - mountPath: /zookeeper/data
+              name: data
+              subPath: data
+            - mountPath: /zookeeper/wal
+              name: data
+              subPath: wal
+---
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-zk
+  labels:
+    servicebroker: sb-instanceid-zookeeper
+spec:
+  host: sb-instanceid-zookeeper.endpoint-postfix-place-holder
+  port:
+    targetPort: exhibitor
+  to:
+    kind: Service
+    name: sb-instanceid-zk

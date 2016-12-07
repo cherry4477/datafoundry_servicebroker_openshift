@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type Spark_freeHandler struct{}
 
-func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newSparkHandler(1).DoProvision(instanceID, details, asyncAllowed)
+func (handler *Spark_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newSparkHandler(1).DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Spark_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -78,8 +78,8 @@ func (handler *Spark_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 
 type Spark_haHandler struct{}
 
-func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newSparkHandler(3).DoProvision(instanceID, details, asyncAllowed)
+func (handler *Spark_haHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newSparkHandler(3).DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Spark_haHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -112,7 +112,7 @@ func newSparkHandler(numWorkers int) *Spark_Handler {
 		}
 }
 
-func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Spark_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
