@@ -489,6 +489,9 @@ func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace str
 
 	go func() { odel(serviceBrokerNamespace, "routes", haRes.route.Name) }()
 
+	statRunningRCByLabels(serviceBrokerNamespace, haRes.etcddc1.Labels)
+
+	//go func() {kdel_rc(serviceBrokerNamespace, )}
 }
 
 //===============================================================
@@ -697,6 +700,29 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	}
 
 	return nrunnings, nil
+}
+
+func statRunningRCByLabels(serviceBrokerNamespace string, labels map[string]string) ([]kapi.ReplicationController, error) {
+	println("to list RC in", serviceBrokerNamespace)
+
+	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers"
+
+	rcs := kapi.ReplicationControllerList{}
+
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &rcs)
+	if osr.Err != nil {
+		fmt.Println("get rc list err:", osr.Err)
+		return nil, osr.Err
+	}
+
+	rcNames := make([]string, 0)
+	for _, rc := range rcs.Items {
+		rcNames = append(rcNames,rc.Name)
+
+	}
+
+	fmt.Println("-------->rcnames:", rcNames)
+	return rcs.Items, nil
 }
 
 // todo:
