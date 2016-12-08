@@ -213,6 +213,10 @@ func PySpiderImage() string {
 	return pyspiderImage
 }
 
+func ElasticsearchVolumeImage() string {
+	return elasticsearchVolumeImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 
@@ -234,6 +238,7 @@ var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
 var pyspiderImage string
+var elasticsearchVolumeImage string
 
 func init() {
 	theOC = newOpenshiftClient(
@@ -262,4 +267,5 @@ func init() {
 	zepplinImage = getenv("ZEPPLINIMAGE")
 	pyspiderImage = getenv("PYSPIDERIMAGE")
 	etcdVolumeImage = getenv("ETCDVOLUMEIMAGE")
+	elasticsearchVolumeImage = getenv("ELASTICSEARCHVOLUMEIMAGE")
 }

@@ -37,10 +37,10 @@ import (
 //
 //==============================================================
 
-const EtcdServcieBrokerName_Volume_Standalone = "ETCD_volumes_standalone"
+const EtcdServcieBrokerName_Volume_Standalone = "Elasticsearch_volumes_standalone"
 
 func init() {
-	oshandler.Register(EtcdServcieBrokerName_Volume_Standalone, &Etcd_sampleHandler{})
+	oshandler.Register(EtcdServcieBrokerName_Volume_Standalone, &Elasticsearch_handler{})
 
 	logger = lager.NewLogger(EtcdServcieBrokerName_Volume_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
@@ -49,7 +49,7 @@ func init() {
 var logger lager.Logger
 
 func volumeBaseName(instanceId string) string {
-	return "etcd-" + instanceId
+	return "elasticsearch-" + instanceId
 }
 
 func peerPvcName0(volumes []oshandler.Volume) string {
@@ -77,15 +77,11 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 //
 //==============================================================
 
-const EtcdBindRole = "binduser"
-
-const EtcdGeneralUser = "etcduser"
-
 //const ServiceBrokerNamespace = "default" // use oshandler.OC().Namespace instead
 
-type Etcd_sampleHandler struct{}
+type Elasticsearch_handler struct{}
 
-func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Elasticsearch_handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -96,13 +92,8 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	//}
 	serviceSpec.IsAsync = true
 
-	//instanceIdInTempalte   := instanceID // todo: ok?
 	instanceIdInTempalte := strings.ToLower(oshandler.NewThirteenLengthID())
-	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	rootPassword := oshandler.GenGUID()
-	etcduser := EtcdGeneralUser //oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
-	etcdPassword := oshandler.GenGUID()
 
 	volumeBaseName := volumeBaseName(instanceIdInTempalte)
 	volumes := []oshandler.Volume{
@@ -131,9 +122,6 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.Admin_password = rootPassword
-	serviceInfo.User = etcduser
-	serviceInfo.Password = etcdPassword
 
 	serviceInfo.Volumes = volumes
 
@@ -158,13 +146,12 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 		// create master res
 
-		output, err := createEtcdResources_HA(
-			instanceIdInTempalte, serviceBrokerNamespace,
-			rootPassword, etcduser, etcdPassword, volumes)
+		output, err := createESResources_HA(
+			instanceIdInTempalte, serviceBrokerNamespace, volumes)
 
 		if err != nil {
-			println("etcd createEtcdResources_HA error: ", err)
-			logger.Error("etcd createEtcdResources_HA error", err)
+			println("etcd createESResources_HA error: ", err)
+			logger.Error("etcd createESResources_HA error", err)
 
 			destroyEtcdResources_HA(output, serviceBrokerNamespace)
 			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
@@ -180,7 +167,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	return serviceSpec, serviceInfo, nil
 }
 
-func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Elasticsearch_handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 
 	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
 	if volumeJob != nil {
@@ -225,7 +212,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 	}
 }
 
-func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Elasticsearch_handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 
 	go func() {
 		// ...
@@ -264,7 +251,7 @@ func (handler *Etcd_sampleHandler) DoDeprovision(myServiceInfo *oshandler.Servic
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+func (handler *Elasticsearch_handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// output.route.Spec.Host
 
 	ha_res, err := getEtcdResources_HA(
@@ -301,7 +288,7 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+func (handler *Elasticsearch_handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 
 	return nil
 }
@@ -334,7 +321,7 @@ func newAuthrizedEtcdClient(etcdEndPoints []string, etcdUser, etcdPassword strin
 
 var EtcdTemplateData_HA []byte = nil
 
-func loadEtcdResources_HA(instanceID, rootPassword, user, password string, volumes []oshandler.Volume, res *etcdResources_HA) error {
+func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcdResources_HA) error {
 	if EtcdTemplateData_HA == nil {
 		f, err := os.Open("etcd-pvc.yaml")
 		if err != nil {
@@ -372,9 +359,6 @@ func loadEtcdResources_HA(instanceID, rootPassword, user, password string, volum
 	yamlTemplates := EtcdTemplateData_HA
 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDROOTPASSWORD#"), []byte(rootPassword), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDUSERNAME#"), []byte(user), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDUSERPASSWORD#"), []byte(password), -1)
 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace0"), []byte(peerPvcName0), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace1"), []byte(peerPvcName1), -1)
@@ -417,9 +401,9 @@ func (haRes *etcdResources_HA) endpoint() (string, string, string) {
 	return "http://" + net.JoinHostPort(host, port), host, port
 }
 
-func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
+func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
 	var input etcdResources_HA
-	err := loadEtcdResources_HA(instanceId, rootPassword, user, password, volumes, &input)
+	err := loadESResources_HA(instanceId, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +424,7 @@ func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, us
 		OPost(prefix+"/routes", &input.route, &output.route)
 
 	if osr.Err != nil {
-		logger.Error("createEtcdResources_HA", osr.Err)
+		logger.Error("createESResources_HA", osr.Err)
 	}
 
 	return &output, nil
@@ -450,7 +434,7 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 	var output etcdResources_HA
 
 	var input etcdResources_HA
-	err := loadEtcdResources_HA(instanceId, rootPassword, user, password, volumes, &input)
+	err := loadESResources_HA(instanceId, volumes, &input)
 	if err != nil {
 		return &output, err
 	}

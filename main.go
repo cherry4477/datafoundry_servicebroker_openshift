@@ -35,6 +35,7 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/tensorflow"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
 
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/elasticsearch_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd-pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis_pvc"

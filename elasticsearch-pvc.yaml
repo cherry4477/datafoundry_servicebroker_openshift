@@ -1,0 +1,199 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "3"
+  creationTimestamp: null
+  labels:
+    node: es1
+  name: sb-instanceid-es1
+spec:
+  replicas: 1
+  selector:
+    node: es1
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: es
+        node: es1
+    spec:
+      containers:
+      - args:
+        - -Des.cluster.name=elasticsearch-cluster
+        - -Des.node.name=node-1
+        - -Des.discovery.zen.ping.multicast.enabled=false
+        - -Des.discovery.zen.ping_timeout=120s
+        - -Des.discovery.zen.minimum_master_nodes=2
+        - -Des.client.transport.ping_timeout=60s
+        - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
+        image: "iamge-replace"
+        imagePullPolicy: IfNotPresent
+        name: sb-instanceid-es1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: storage
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: elastic-storage-1
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "3"
+  creationTimestamp: null
+  labels:
+    node: es2
+  name: sb-instanceid-es2
+spec:
+  replicas: 1
+  selector:
+    node: es2
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: es
+        node: es2
+    spec:
+      containers:
+      - args:
+        - -Des.cluster.name=elasticsearch-cluster
+        - -Des.node.name=node-2
+        - -Des.discovery.zen.ping.multicast.enabled=false
+        - -Des.discovery.zen.ping_timeout=120s
+        - -Des.discovery.zen.minimum_master_nodes=2
+        - -Des.client.transport.ping_timeout=60s
+        - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
+        image: "iamge-replace"
+        imagePullPolicy: IfNotPresent
+        name: sb-instanceid-es2
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: storage
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: elastic-storage-2
+
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "6"
+  creationTimestamp: null
+  labels:
+    node: es3
+  name: sb-instanceid-es3
+spec:
+  replicas: 1
+  selector:
+    node: es3
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: es
+        node: es3
+    spec:
+      containers:
+      - args:
+        - -Des.cluster.name=elasticsearch-cluster
+        - -Des.node.name=node-3
+        - -Des.discovery.zen.ping.multicast.enabled=false
+        - -Des.discovery.zen.ping_timeout=120s
+        - -Des.discovery.zen.minimum_master_nodes=2
+        - -Des.client.transport.ping_timeout=60s
+        - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
+        image: "iamge-replace"
+        imagePullPolicy: IfNotPresent
+        name: sb-instanceid-es3
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: storage
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: elastic-storage-3
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: es
+  name: sb-instanceid-es
+spec:
+  ports:
+  - name: port-9200
+    port: 9200
+    protocol: TCP
+    targetPort: 9200
+  - name: port-9300
+    port: 9300
+    protocol: TCP
+    targetPort: 9300
+  selector:
+    app: es
+  sessionAffinity: None
+  type: ClusterIP
