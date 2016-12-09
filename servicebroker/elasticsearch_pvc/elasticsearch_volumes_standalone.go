@@ -135,7 +135,7 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 
 		err := <-result
 		if err != nil {
-			logger.Error("etcd create volume", err)
+			logger.Error("elasticsearch create volume", err)
 			return
 		}
 
@@ -372,7 +372,10 @@ func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcd
 		Decode(&res.dc1).
 		Decode(&res.dc2).
 		Decode(&res.dc3).
-		Decode(&res.svc1)
+		Decode(&res.svc1).
+		Decode(&res.svc2).
+		Decode(&res.svc3).
+		Decode(&res.svc)
 	return decoder.Err
 }
 
@@ -382,6 +385,9 @@ type etcdResources_HA struct {
 	dc3 dcapi.DeploymentConfig
 
 	svc1 kapi.Service
+	svc2 kapi.Service
+	svc3 kapi.Service
+	svc kapi.Service
 }
 
 //func (haRes *etcdResources_HA) endpoint() (string, string, string) {
@@ -406,7 +412,10 @@ func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []o
 		OPost(prefix+"/deploymentconfigs", &input.dc1, &output.dc1).
 		OPost(prefix+"/deploymentconfigs", &input.dc2, &output.dc2).
 		OPost(prefix+"/deploymentconfigs", &input.dc3, &output.dc3).
-		KPost(prefix+"/services", &input.svc1, &output.svc1)
+		KPost(prefix+"/services", &input.svc1, &output.svc1).
+		KPost(prefix+"/services", &input.svc2, &output.svc2).
+		KPost(prefix+"/services", &input.svc3, &output.svc3).
+		KPost(prefix+"/services", &input.svc, &output.svc)
 
 	if osr.Err != nil {
 		logger.Error("createESResources_HA", osr.Err)
@@ -431,7 +440,10 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 		OGet(prefix+"/deploymentconfigs/"+input.dc1.Name, &output.dc1).
 		OGet(prefix+"/deploymentconfigs/"+input.dc2.Name, &output.dc2).
 		OGet(prefix+"/deploymentconfigs/"+input.dc3.Name, &output.dc3).
-		KGet(prefix+"/services/"+input.svc1.Name, &output.svc1)
+		KGet(prefix+"/services/"+input.svc1.Name, &output.svc1).
+		KGet(prefix+"/services/"+input.svc2.Name, &output.svc2).
+		KGet(prefix+"/services/"+input.svc3.Name, &output.svc3).
+		KGet(prefix+"/services/"+input.svc.Name, &output.svc)
 
 	if osr.Err != nil {
 		logger.Error("getEtcdResources_HA", osr.Err)
@@ -448,6 +460,9 @@ func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace str
 	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.dc3.Name) }()
 
 	go func() { kdel(serviceBrokerNamespace, "services", haRes.svc1.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", haRes.svc2.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", haRes.svc3.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", haRes.svc.Name) }()
 
 	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, haRes.dc1.Labels)
 	for _, rc := range rcs {
