@@ -139,7 +139,7 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 			return
 		}
 
-		println("create etcd Resources ...")
+		println("create Elasticsearch Resources ...")
 
 		// todo: consider if DoDeprovision is called now, ...
 
@@ -322,7 +322,7 @@ var EtcdTemplateData_HA []byte = nil
 
 func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcdResources_HA) error {
 	if EtcdTemplateData_HA == nil {
-		f, err := os.Open("etcd-pvc.yaml")
+		f, err := os.Open("elasticsearch-pvc.yaml")
 		if err != nil {
 			return err
 		}
