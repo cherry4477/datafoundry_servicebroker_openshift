@@ -36,7 +36,7 @@ spec:
         - -Des.discovery.zen.minimum_master_nodes=2
         - -Des.client.transport.ping_timeout=60s
         - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
-        image: "iamge-replace"
+        image:  http://elasticsearch-image-place-holder/elasticsearch-openshift-orchestration
         imagePullPolicy: IfNotPresent
         name: sb-instanceid-es1
         resources: {}
@@ -95,7 +95,7 @@ spec:
         - -Des.discovery.zen.minimum_master_nodes=2
         - -Des.client.transport.ping_timeout=60s
         - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
-        image: "iamge-replace"
+        image: http://elasticsearch-image-place-holder/elasticsearch-openshift-orchestration
         imagePullPolicy: IfNotPresent
         name: sb-instanceid-es2
         resources: {}
@@ -155,7 +155,7 @@ spec:
         - -Des.discovery.zen.minimum_master_nodes=2
         - -Des.client.transport.ping_timeout=60s
         - -Des.discovery.zen.ping.unicast.hosts=es1,es2,es3
-        image: "iamge-replace"
+        image: http://elasticsearch-image-place-holder/elasticsearch-openshift-orchestration
         imagePullPolicy: IfNotPresent
         name: sb-instanceid-es3
         resources: {}

@@ -336,19 +336,19 @@ func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcd
 		if len(ES_image) > 0 {
 			EtcdTemplateData_HA = bytes.Replace(
 				EtcdTemplateData_HA,
-				[]byte("iamge-replace"),
+				[]byte("http://elasticsearch-image-place-holder/elasticsearch-openshift-orchestration"),
 				[]byte(ES_image),
 				-1)
 		}
-		endpoint_postfix := oshandler.EndPointSuffix()
-		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
-		if len(endpoint_postfix) > 0 {
-			EtcdTemplateData_HA = bytes.Replace(
-				EtcdTemplateData_HA,
-				[]byte("endpoint-postfix-place-holder"),
-				[]byte(endpoint_postfix),
-				-1)
-		}
+		//endpoint_postfix := oshandler.EndPointSuffix()
+		//endpoint_postfix = strings.TrimSpace(endpoint_postfix)
+		//if len(endpoint_postfix) > 0 {
+		//	EtcdTemplateData_HA = bytes.Replace(
+		//		EtcdTemplateData_HA,
+		//		[]byte("endpoint-postfix-place-holder"),
+		//		[]byte(endpoint_postfix),
+		//		-1)
+		//}
 	}
 
 	peerPvcName0 := peerPvcName0(volumes)
