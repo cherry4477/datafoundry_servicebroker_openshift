@@ -78,7 +78,10 @@ spec:
           - name: mongo_replica_set_name
             value: mongo-instanceid-replset
             # don't change the above line, it is used in code
-            #todo: #ADMINUSER#:#ADMINPASSWORD#
+          - name: mongodb_user
+            value: "#ADMINUSER#"
+          - name: mongodb_passwd
+            value: "#ADMINPASSWORD#"
         ports:
         - containerPort: 27017
         volumeMounts:
@@ -120,7 +123,10 @@ spec:
           - name: mongo_replica_set_name
             value: mongo-instanceid-replset
             # don't change the above line, it is used in code
-            #todo: #ADMINUSER#:#ADMINPASSWORD#
+          - name: mongodb_user
+            value: "#ADMINUSER#"
+          - name: mongodb_passwd
+            value: "#ADMINPASSWORD#"
         ports:
         - containerPort: 27017
         volumeMounts:
@@ -163,7 +169,10 @@ spec:
           - name: mongo_replica_set_name
             value: mongo-instanceid-replset
             # don't change the above line, it is used in code
-            #todo: #ADMINUSER#:#ADMINPASSWORD#
+          - name: mongodb_user
+            value: "#ADMINUSER#"
+          - name: mongodb_passwd
+            value: "#ADMINPASSWORD#"
         ports:
         - containerPort: 27017
         volumeMounts:
