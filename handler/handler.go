@@ -217,6 +217,10 @@ func ElasticsearchVolumeImage() string {
 	return elasticsearchVolumeImage
 }
 
+func MongoVolumeImage() string {
+	return mongoVolumeImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 
@@ -239,6 +243,7 @@ var sparkImage string
 var zepplinImage string
 var pyspiderImage string
 var elasticsearchVolumeImage string
+var mongoVolumeImage string
 
 func init() {
 	theOC = newOpenshiftClient(
@@ -268,4 +273,5 @@ func init() {
 	pyspiderImage = getenv("PYSPIDERIMAGE")
 	etcdVolumeImage = getenv("ETCDVOLUMEIMAGE")
 	elasticsearchVolumeImage = getenv("ELASTICSEARCHVOLUMEIMAGE")
+	mongoVolumeImage = getenv("MONGOVOLUMEIMAGE")
 }
