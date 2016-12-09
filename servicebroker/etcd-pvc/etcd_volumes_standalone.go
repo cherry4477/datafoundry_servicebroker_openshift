@@ -499,7 +499,7 @@ func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace str
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}
 
-	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, haRes.etcddc2.Labels)
+	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, haRes.etcddc3.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}

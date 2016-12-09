@@ -51,7 +51,7 @@ spec:
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: elastic-storage-1
+          claimName: "pvc-name-replace0"
   test: false
   triggers:
   - type: ConfigChange
@@ -110,7 +110,7 @@ spec:
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: elastic-storage-2
+          claimName: "pvc-name-replace1"
 
   test: false
   triggers:
@@ -170,7 +170,7 @@ spec:
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: elastic-storage-3
+          claimName: "pvc-name-replace2"
   test: false
   triggers:
   - type: ConfigChange
