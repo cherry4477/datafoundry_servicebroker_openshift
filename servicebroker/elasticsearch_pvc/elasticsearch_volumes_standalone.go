@@ -29,7 +29,9 @@ import (
 	//routeapi "github.com/openshift/origin/route/api/v1"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 
+	"errors"
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
+	"strconv"
 )
 
 //==============================================================
@@ -178,9 +180,7 @@ func (handler *Elasticsearch_handler) DoLastOperation(myServiceInfo *oshandler.S
 
 	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
 	ok := func(dc *dcapi.DeploymentConfig) bool {
-		labels := make(map[string]string)
-		labels["run"] = dc.Name
-		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, labels)
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
 		if err != nil {
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
@@ -251,35 +251,24 @@ func (handler *Elasticsearch_handler) DoDeprovision(myServiceInfo *oshandler.Ser
 }
 
 func (handler *Elasticsearch_handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
-	// output.route.Spec.Host
 
-	//ha_res, err := getEtcdResources_HA(
-	//	myServiceInfo.Url, myServiceInfo.Database,
-	//	myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+	ha_res, err := getESResources_HA(
+		myServiceInfo.Url, myServiceInfo.Database,
+		myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
 
-	//if err != nil {
-	//	return brokerapi.Binding{}, oshandler.Credentials{}, err
-	//}
-	//if ha_res.route.Name == "" {
-	//	return brokerapi.Binding{}, oshandler.Credentials{}, err
-	//}
+	es_host, es_port, err := ha_res.ServiceHostPort(myServiceInfo.Database)
+	if err != nil {
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
+	es_uri := fmt.Sprintf("http://%s:%s", es_host, es_port)
 
-	//if len(boot_res.service.Spec.Ports) == 0 {
-	//	err := errors.New("no ports in boot service")
-	//	logger.Error("", err)
-	//	return brokerapi.Binding{}, Credentials{}, err
-	//}
-
-	//etcd_addr, host, port := ha_res.endpoint()
-	//println("etcd addr: ", etcd_addr)
-	////etcd_addrs := []string{etcd_addr}
-	//
 	mycredentials := oshandler.Credentials{
-		//Uri:      etcd_addr,
-		//Hostname: host,
-		//Port:     port,
-		Username: myServiceInfo.User,
-		Password: myServiceInfo.Password,
+		Uri:      es_uri,
+		Hostname: es_host,
+		Port:     es_port,
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
@@ -320,7 +309,7 @@ func newAuthrizedEtcdClient(etcdEndPoints []string, etcdUser, etcdPassword strin
 
 var ESTemplateData_HA []byte = nil
 
-func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcdResources_HA) error {
+func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *esResources_HA) error {
 	if ESTemplateData_HA == nil {
 		f, err := os.Open("elasticsearch-pvc.yaml")
 		if err != nil {
@@ -379,7 +368,7 @@ func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcd
 	return decoder.Err
 }
 
-type etcdResources_HA struct {
+type esResources_HA struct {
 	dc1 dcapi.DeploymentConfig
 	dc2 dcapi.DeploymentConfig
 	dc3 dcapi.DeploymentConfig
@@ -387,23 +376,30 @@ type etcdResources_HA struct {
 	svc1 kapi.Service
 	svc2 kapi.Service
 	svc3 kapi.Service
-	svc kapi.Service
+	svc  kapi.Service
 }
 
-//func (haRes *etcdResources_HA) endpoint() (string, string, string) {
-//	port := "80" // strconv.Itoa(bootRes.service.Spec.Ports[0].Port)
-//	host := haRes.route.Spec.Host
-//	return "http://" + net.JoinHostPort(host, port), host, port
-//}
+func (esResources_HA *esResources_HA) ServiceHostPort(serviceBrokerNamespace string) (string, string, error) {
 
-func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
-	var input etcdResources_HA
+	client_port := oshandler.GetServicePortByName(&esResources_HA.svc, "port-9200")
+	if client_port == nil {
+		return "", "", errors.New("client port not found")
+	}
+
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", esResources_HA.svc.Name, serviceBrokerNamespace)
+	port := strconv.Itoa(client_port.Port)
+
+	return host, port, nil
+}
+
+func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) (*esResources_HA, error) {
+	var input esResources_HA
 	err := loadESResources_HA(instanceId, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
 
-	var output etcdResources_HA
+	var output esResources_HA
 
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 
@@ -424,10 +420,10 @@ func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []o
 	return &output, nil
 }
 
-func getESResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
-	var output etcdResources_HA
+func getESResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*esResources_HA, error) {
+	var output esResources_HA
 
-	var input etcdResources_HA
+	var input esResources_HA
 	err := loadESResources_HA(instanceId, volumes, &input)
 	if err != nil {
 		return &output, err
@@ -452,7 +448,7 @@ func getESResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, p
 	return &output, osr.Err
 }
 
-func destroyESResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace string) {
+func destroyESResources_HA(haRes *esResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
 	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.dc1.Name) }()
