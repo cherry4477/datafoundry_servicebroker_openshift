@@ -5,12 +5,12 @@ metadata:
     openshift.io/deployment.cancelled: "3"
   creationTimestamp: null
   labels:
-    node: es1
+    node: sb-instanceid-es1
   name: sb-instanceid-es1
 spec:
   replicas: 1
   selector:
-    node: es1
+    node: sb-instanceid-es1
   strategy:
     resources: {}
     rollingParams:
@@ -24,8 +24,8 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
-        app: es
-        node: es1
+        app: sb-instanceid-es
+        node: sb-instanceid-es1
     spec:
       containers:
       - args:
@@ -64,12 +64,12 @@ metadata:
     openshift.io/deployment.cancelled: "3"
   creationTimestamp: null
   labels:
-    node: es2
+    node: sb-instanceid-es2
   name: sb-instanceid-es2
 spec:
   replicas: 1
   selector:
-    node: es2
+    node: sb-instanceid-es2
   strategy:
     resources: {}
     rollingParams:
@@ -83,8 +83,8 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
-        app: es
-        node: es2
+        app: sb-instanceid-es
+        node: sb-instanceid-es2
     spec:
       containers:
       - args:
@@ -124,12 +124,12 @@ metadata:
     openshift.io/deployment.cancelled: "6"
   creationTimestamp: null
   labels:
-    node: es3
+    node: sb-instanceid-es3
   name: sb-instanceid-es3
 spec:
   replicas: 1
   selector:
-    node: es3
+    node: sb-instanceid-es3
   strategy:
     resources: {}
     rollingParams:
@@ -143,8 +143,8 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
-        app: es
-        node: es3
+        app: sb-instanceid-es
+        node: sb-instanceid-es3
     spec:
       containers:
       - args:
@@ -181,8 +181,8 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: es
-    name: es1
+    app: sb-instanceid-es
+    name: sb-instanceid-es1
   name: sb-instanceid-es1
 spec:
   ports:
@@ -195,8 +195,8 @@ spec:
     protocol: TCP
     targetPort: 9300
   selector:
-    app: es
-    node: es1
+    app: sb-instanceid-es
+    node: sb-instanceid-es1
   sessionAffinity: None
   type: ClusterIP
 ---
@@ -206,8 +206,8 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: es
-    name: es2
+    app: sb-instanceid-es
+    name: sb-instanceid-es2
   name: sb-instanceid-es2
 spec:
   ports:
@@ -220,8 +220,8 @@ spec:
     protocol: TCP
     targetPort: 9300
   selector:
-    app: es
-    node: es2
+    app: sb-instanceid-es
+    node: sb-instanceid-es2
   sessionAffinity: None
   type: ClusterIP
 ---
@@ -231,8 +231,8 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: es
-    name: es3
+    app: sb-instanceid-es
+    name: sb-instanceid-es3
   name: sb-instanceid-es3
 spec:
   ports:
@@ -245,8 +245,8 @@ spec:
     protocol: TCP
     targetPort: 9300
   selector:
-    app: es
-    node: es3
+    app: sb-instanceid-es
+    node: sb-instanceid-es3
   sessionAffinity: None
   type: ClusterIP
 ---
@@ -256,7 +256,7 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: es
+    app: sb-instanceid-es
   name: sb-instanceid-es
 spec:
   ports:
@@ -269,6 +269,6 @@ spec:
     protocol: TCP
     targetPort: 9300
   selector:
-    app: es
+    app: sb-instanceid-es
   sessionAffinity: None
   type: ClusterIP

@@ -152,7 +152,7 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 			println("etcd createESResources_HA error: ", err)
 			logger.Error("etcd createESResources_HA error", err)
 
-			destroyEtcdResources_HA(output, serviceBrokerNamespace)
+			destroyESResources_HA(output, serviceBrokerNamespace)
 			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
 
 			return
@@ -192,7 +192,7 @@ func (handler *Elasticsearch_handler) DoLastOperation(myServiceInfo *oshandler.S
 		return n >= dc.Spec.Replicas
 	}
 
-	ha_res, _ := getEtcdResources_HA(
+	ha_res, _ := getESResources_HA(
 		myServiceInfo.Url, myServiceInfo.Database,
 		myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 
@@ -230,14 +230,14 @@ func (handler *Elasticsearch_handler) DoDeprovision(myServiceInfo *oshandler.Ser
 
 		println("to destroy master resources")
 
-		ha_res, _ := getEtcdResources_HA(
+		ha_res, _ := getESResources_HA(
 			myServiceInfo.Url, myServiceInfo.Database,
 			myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 		// under current frame, it is not a good idea to return here
 		//if err != nil {
 		//	return brokerapi.IsAsync(false), err
 		//}
-		destroyEtcdResources_HA(ha_res, myServiceInfo.Database)
+		destroyESResources_HA(ha_res, myServiceInfo.Database)
 		println("destroy master resources done")
 
 		println("to destroy volumes:", myServiceInfo.Volumes)
@@ -318,15 +318,15 @@ func newAuthrizedEtcdClient(etcdEndPoints []string, etcdUser, etcdPassword strin
 //
 //===============================================================
 
-var EtcdTemplateData_HA []byte = nil
+var ESTemplateData_HA []byte = nil
 
 func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcdResources_HA) error {
-	if EtcdTemplateData_HA == nil {
+	if ESTemplateData_HA == nil {
 		f, err := os.Open("elasticsearch-pvc.yaml")
 		if err != nil {
 			return err
 		}
-		EtcdTemplateData_HA, err = ioutil.ReadAll(f)
+		ESTemplateData_HA, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
@@ -334,8 +334,8 @@ func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcd
 		ES_image := oshandler.ElasticsearchVolumeImage()
 		ES_image = strings.TrimSpace(ES_image)
 		if len(ES_image) > 0 {
-			EtcdTemplateData_HA = bytes.Replace(
-				EtcdTemplateData_HA,
+			ESTemplateData_HA = bytes.Replace(
+				ESTemplateData_HA,
 				[]byte("http://elasticsearch-image-place-holder/elasticsearch-openshift-orchestration"),
 				[]byte(ES_image),
 				-1)
@@ -355,7 +355,7 @@ func loadESResources_HA(instanceID string, volumes []oshandler.Volume, res *etcd
 	peerPvcName1 := peerPvcName1(volumes)
 	peerPvcName2 := peerPvcName2(volumes)
 
-	yamlTemplates := EtcdTemplateData_HA
+	yamlTemplates := ESTemplateData_HA
 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 
@@ -424,7 +424,7 @@ func createESResources_HA(instanceId, serviceBrokerNamespace string, volumes []o
 	return &output, nil
 }
 
-func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
+func getESResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
 	var output etcdResources_HA
 
 	var input etcdResources_HA
@@ -452,7 +452,7 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 	return &output, osr.Err
 }
 
-func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace string) {
+func destroyESResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
 	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", haRes.dc1.Name) }()
