@@ -20,7 +20,6 @@ import (
 	"os"
 	//"sync"
 
-	etcd "github.com/coreos/etcd/client"
 	"github.com/pivotal-golang/lager"
 	//"golang.org/x/net/context"
 
@@ -279,28 +278,6 @@ func (handler *Elasticsearch_handler) DoBind(myServiceInfo *oshandler.ServiceInf
 func (handler *Elasticsearch_handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 
 	return nil
-}
-
-//=============================================================
-
-func newUnauthrizedEtcdClient(etcdEndPoints []string) (etcd.Client, error) {
-	cfg := etcd.Config{
-		Endpoints:               etcdEndPoints,
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-	}
-	return etcd.New(cfg)
-}
-
-func newAuthrizedEtcdClient(etcdEndPoints []string, etcdUser, etcdPassword string) (etcd.Client, error) {
-	cfg := etcd.Config{
-		Endpoints:               etcdEndPoints,
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-		Username:                etcdUser,
-		Password:                etcdPassword,
-	}
-	return etcd.New(cfg)
 }
 
 //===============================================================
