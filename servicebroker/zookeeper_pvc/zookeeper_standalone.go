@@ -177,7 +177,7 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 			return
 		}
 
-		println("createRedisResources_Master ...")
+		println("createZookeeperResources_Master ...")
 
 		// todo: consider if DoDeprovision is called now, ...
 
@@ -192,8 +192,8 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 		)
 
 		if err != nil {
-			println(" redis createRedisResources_Master error: ", err)
-			logger.Error("redis createRedisResources_Master error", err)
+			println(" zookeeper createZookeeperResources_Master error: ", err)
+			logger.Error("zookeeper createZookeeperResources_Master error", err)
 
 			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
 			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
