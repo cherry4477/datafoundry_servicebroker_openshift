@@ -1,7 +1,7 @@
 package kafka_pvc
 
 import (
-	"errors"
+	//"errors"
 	"fmt"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
@@ -12,7 +12,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/pivotal-cf/brokerapi"
-	"strconv"
+	//"strconv"
 	"strings"
 	"time"
 	//"crypto/sha1"
@@ -206,37 +206,36 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 
 func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	// try to get state from running job
-	job := getKafkaOrchestrationJob(myServiceInfo.Url)
-	if job != nil {
+	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName_kafka(myServiceInfo.Url))
+	if volumeJob != nil {
 		return brokerapi.LastOperation{
 			State:       brokerapi.InProgress,
-			Description: "In progress .",
+			Description: "in progress.",
 		}, nil
+	}
+
+	ok := func(dc *dcapi.DeploymentConfig) bool {
+		labels := make(map[string]string)
+		labels["run"] = dc.Name
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, labels)
+		if err != nil {
+			fmt.Println("statRunningPodsByLabels err:", err)
+			return false
+		}
+		if dc == nil || dc.Name == "" || dc.Spec.Replicas == 0 || podCount < dc.Spec.Replicas {
+			return false
+		}
+		n, _ := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
+		return n >= dc.Spec.Replicas
 	}
 
 	// assume in provisioning
 
 	// the job may be finished or interrupted or running in another instance.
 
-	master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
 
-	//ok := func(rc *kapi.ReplicationController) bool {
-	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-	//		return false
-	//	}
-	//	return true
-	//}
-	ok := func(rc *kapi.ReplicationController) bool {
-		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			return false
-		}
-		n, _ := statRunningPodsByLabels(myServiceInfo.Database, rc.Labels)
-		return n >= *rc.Spec.Replicas
-	}
-
-	//println("num_ok_rcs = ", num_ok_rcs)
-
-	if ok(&master_res.rc) {
+	if ok(&master_res.dc1) && ok(&master_res.dc2) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -247,6 +246,7 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 			Description: "In progress.",
 		}, nil
 	}
+
 }
 
 func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
@@ -275,7 +275,7 @@ func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 
 		println("to destroy kafka resources")
 
-		master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
+		master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
 		destroyKafkaResources_Master(master_res, myServiceInfo.Database)
 	}()
 
@@ -285,43 +285,43 @@ func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 
-	zookeeper_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
-	if err != nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-
-	zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
-	if err != nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, nil
-	}
-
-	master_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
-	if err != nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, err
-	}
-
-	kafka_port := oshandler.GetServicePortByName(&master_res.service, "kafka-port")
-	if kafka_port == nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("kafka-port port not found")
-	}
-
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
-	port := strconv.Itoa(kafka_port.Port)
-	//host := master_res.routeMQ.Spec.Host
-	//port := "80"
-
+	//zookeeper_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
+	//if err != nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, err
+	//}
+	//
+	//zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
+	//if err != nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, nil
+	//}
+	//
+	//master_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+	//if err != nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, err
+	//}
+	//
+	//kafka_port := oshandler.GetServicePortByName(&master_res.service, "kafka-port")
+	//if kafka_port == nil {
+	//	return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("kafka-port port not found")
+	//}
+	//
+	//host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
+	//port := strconv.Itoa(kafka_port.Port)
+	////host := master_res.routeMQ.Spec.Host
+	////port := "80"
+	//
 	mycredentials := oshandler.Credentials{
-		Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)",
-			host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
-		Hostname: host,
-		Port:     port,
+		//Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)",
+		//	host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
+		//Hostname: host,
+		//Port:     port,
 		//Username: myServiceInfo.User,
 		//Password: myServiceInfo.Password,
 		// todo: need return zookeeper password?
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
-
+	//
 	return myBinding, mycredentials, nil
 }
 
@@ -392,7 +392,7 @@ func (job *kafkaOrchestrationJob) run() {
 		zookeeper_res, _ := GetZookeeperResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
 		destroyZookeeperResources_Master(zookeeper_res, job.serviceInfo.Database)
 		//delete volumes of zookeeper
-		oshandler.DeleteVolumn(job.serviceInfo.Database, job.serviceInfo.Volumes[0:3])
+		oshandler.DeleteVolumns(job.serviceInfo.Database, job.serviceInfo.Volumes[0:3])
 		return
 	}
 

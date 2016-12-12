@@ -1,8 +1,6 @@
 package kafka_pvc
 
 import (
-	"errors"
-	"fmt"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -10,11 +8,11 @@ import (
 	//"net/http"
 	//"net"
 	"bytes"
-	"crypto/sha1"
-	"encoding/base64"
-	"encoding/json"
-	"github.com/pivotal-cf/brokerapi"
-	"strconv"
+	//"crypto/sha1"
+	//"encoding/base64"
+	//"encoding/json"
+	//"github.com/pivotal-cf/brokerapi"
+	//"strconv"
 	"strings"
 	"time"
 	//"text/template"
@@ -23,7 +21,6 @@ import (
 	"os"
 	//"sync"
 
-	"github.com/pivotal-golang/lager"
 
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	//routeapi "github.com/openshift/origin/route/api/v1"
@@ -31,6 +28,7 @@ import (
 
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 	dcapi "github.com/openshift/origin/deploy/api/v1"
+	"fmt"
 )
 
 //==============================================================
@@ -104,8 +102,8 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 }
 
 func peerPvcName3(volumes []oshandler.Volume) string {
-	if len(volumes) > 2 {
-		return volumes[2].Volume_name
+	if len(volumes) > 0 {
+		return volumes[0].Volume_name
 	}
 	return ""
 }
@@ -267,114 +265,114 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 }
 */
 
-func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+//func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+//
+//	// assume in provisioning
+//
+//	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
+//	if volumeJob != nil {
+//		return brokerapi.LastOperation{
+//			State:       brokerapi.InProgress,
+//			Description: "in progress.",
+//		}, nil
+//	}
+//
+//	// ...
+//
+//	master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+//
+//	//ok := func(rc *kapi.ReplicationController) bool {
+//	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+//	//		return false
+//	//	}
+//	//	return true
+//	//}
+//	ok := func(rc *kapi.ReplicationController) bool {
+//		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+//			return false
+//		}
+//		n, _ := statRunningPodsByLabels(myServiceInfo.Database, rc.Labels)
+//		return n >= *rc.Spec.Replicas
+//	}
+//
+//	//println("num_ok_rcs = ", num_ok_rcs)
+//
+//	if ok(&master_res.rc1) && ok(&master_res.rc2) && ok(&master_res.rc3) {
+//		return brokerapi.LastOperation{
+//			State:       brokerapi.Succeeded,
+//			Description: "Succeeded!",
+//		}, nil
+//	} else {
+//		return brokerapi.LastOperation{
+//			State:       brokerapi.InProgress,
+//			Description: "In progress.",
+//		}, nil
+//	}
+//}
 
-	// assume in provisioning
+//func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+//	// ...
+//
+//	go func() {
+//		// ...
+//		volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
+//		if volumeJob != nil {
+//			volumeJob.Cancel()
+//
+//			// wait job to exit
+//			for {
+//				time.Sleep(7 * time.Second)
+//				if nil == oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url)) {
+//					break
+//				}
+//			}
+//		}
+//
+//		println("to destroy master resources")
+//
+//		master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+//		// under current frame, it is not a good idea to return here
+//		//if err != nil {
+//		//	return brokerapi.IsAsync(false), err
+//		//}
+//		DestroyZookeeperResources_Master(master_res, myServiceInfo.Database)
+//
+//		println("to destroy volumes:", myServiceInfo.Volumes)
+//
+//		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+//	}()
+//
+//	return brokerapi.IsAsync(false), nil
+//}
 
-	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
-	if volumeJob != nil {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "in progress.",
-		}, nil
-	}
-
-	// ...
-
-	master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
-
-	//ok := func(rc *kapi.ReplicationController) bool {
-	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-	//		return false
-	//	}
-	//	return true
-	//}
-	ok := func(rc *kapi.ReplicationController) bool {
-		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-			return false
-		}
-		n, _ := statRunningPodsByLabels(myServiceInfo.Database, rc.Labels)
-		return n >= *rc.Spec.Replicas
-	}
-
-	//println("num_ok_rcs = ", num_ok_rcs)
-
-	if ok(&master_res.rc1) && ok(&master_res.rc2) && ok(&master_res.rc3) {
-		return brokerapi.LastOperation{
-			State:       brokerapi.Succeeded,
-			Description: "Succeeded!",
-		}, nil
-	} else {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "In progress.",
-		}, nil
-	}
-}
-
-func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	// ...
-
-	go func() {
-		// ...
-		volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url))
-		if volumeJob != nil {
-			volumeJob.Cancel()
-
-			// wait job to exit
-			for {
-				time.Sleep(7 * time.Second)
-				if nil == oshandler.GetCreatePvcVolumnJob(volumeBaseName(myServiceInfo.Url)) {
-					break
-				}
-			}
-		}
-
-		println("to destroy master resources")
-
-		master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
-		// under current frame, it is not a good idea to return here
-		//if err != nil {
-		//	return brokerapi.IsAsync(false), err
-		//}
-		DestroyZookeeperResources_Master(master_res, myServiceInfo.Database)
-
-		println("to destroy volumes:", myServiceInfo.Volumes)
-
-		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
-	}()
-
-	return brokerapi.IsAsync(false), nil
-}
-
-func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
-	// todo: handle errors
-
-	master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
-
-	host, port, err := master_res.ServiceHostPort(myServiceInfo.Database)
-	if err != nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, nil
-	}
-
-	mycredentials := oshandler.Credentials{
-		Uri:      "",
-		Hostname: host,
-		Port:     port,
-		Username: myServiceInfo.User,
-		Password: myServiceInfo.Password,
-	}
-
-	myBinding := brokerapi.Binding{Credentials: mycredentials}
-
-	return myBinding, mycredentials, nil
-}
-
-func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	// do nothing
-
-	return nil
-}
+//func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+//	// todo: handle errors
+//
+//	master_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+//
+//	host, port, err := master_res.ServiceHostPort(myServiceInfo.Database)
+//	if err != nil {
+//		return brokerapi.Binding{}, oshandler.Credentials{}, nil
+//	}
+//
+//	mycredentials := oshandler.Credentials{
+//		Uri:      "",
+//		Hostname: host,
+//		Port:     port,
+//		Username: myServiceInfo.User,
+//		Password: myServiceInfo.Password,
+//	}
+//
+//	myBinding := brokerapi.Binding{Credentials: mycredentials}
+//
+//	return myBinding, mycredentials, nil
+//}
+//
+//func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+//	// do nothing
+//
+//	return nil
+//}
 
 //==============================================================
 // interfaces for other service brokers which depend on zk
@@ -424,12 +422,9 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 		return
 	}
 
-	rc1 := &output.rc1
-	rc2 := &output.rc2
-	rc3 := &output.rc3
-	rc1.Status.Replicas = 0
-	rc2.Status.Replicas = 0
-	rc3.Status.Replicas = 0
+	dc1 := &output.dc1
+	dc2 := &output.dc2
+	dc3 := &output.dc3
 
 	theresult := make(chan bool)
 	result = theresult
@@ -437,22 +432,21 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	cancel = cancelled
 
 	go func() {
-		ok := func(rc *kapi.ReplicationController) bool {
-			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil {
+		ok := func(dc *dcapi.DeploymentConfig) bool {
+			podCount, err := statRunningPodsByLabels(serviceBrokerNamespace, dc.Labels)
+			if err != nil {
+				fmt.Println("statRunningPodsByLabels err:", err)
 				return false
 			}
-
-			if rc.Status.Replicas < *rc.Spec.Replicas {
-				rc.Status.Replicas, _ = statRunningPodsByLabels(serviceBrokerNamespace, rc.Labels)
-
-				println("rc = ", rc, ", rc.Status.Replicas = ", rc.Status.Replicas)
+			if dc == nil || dc.Name == "" || dc.Spec.Replicas == 0 || podCount < dc.Spec.Replicas {
+				return false
 			}
-
-			return rc.Status.Replicas >= *rc.Spec.Replicas
+			n, _ := statRunningPodsByLabels(serviceBrokerNamespace, dc.Labels)
+			return n >= dc.Spec.Replicas
 		}
 
 		for {
-			if ok(rc1) && ok(rc2) && ok(rc3) {
+			if ok(dc1) && ok(dc2) && ok(dc3) {
 				theresult <- true
 
 				//close_all()
@@ -706,13 +700,6 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	kdel (serviceBrokerNamespace, "replicationcontrollers", rc.Name)
 }
 */
-
-type watchReplicationControllerStatus struct {
-	// The type of watch update contained in the message
-	Type string `json:"type"`
-	// RC details
-	Object kapi.ReplicationController `json:"object"`
-}
 
 // https://hub.docker.com/r/mbabineau/zookeeper-exhibitor/
 // https://hub.docker.com/r/netflixoss/exhibitor/
