@@ -385,6 +385,10 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 		return
 	}
 
+	fmt.Println("----->input.dc1.Name:", input.dc1.Name)
+	fmt.Println("----->input.dc2.Name:", input.dc2.Name)
+	fmt.Println("----->input.dc3.Name:", input.dc3.Name)
+
 	/*
 		rc1 := &input.rc1
 		rc2 := &input.rc2
