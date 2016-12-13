@@ -1,128 +1,129 @@
 apiVersion: v1
-  kind: DeploymentConfig
-  metadata:
-    name: sb-instanceid-kafka1
-  spec:
-    replicas: 1
-    selector:
-      deploymentconfig: sb-instanceid-kafka1
-    template:
-      metadata:
-        labels:
-          app: sb-instanceid-kafka
-          deploymentconfig: sb-instanceid-kafka1
-      spec:
-        containers:
-        - name: kafka-1
-          image: http://kafka-image-place-holder/kafka-openshift-orchestration
-          command:
-          - bin/kafka-server-start.sh
-          args:
-          - config/server.properties
-          - --override
-          - zookeeper.connect=sb-instanceid-zk
-          - --override
-          - advertised.host.name=sb-instanceid-kafka1
-          - --override
-          - broker.id=0
-          volumeMounts:
-          - mountPath: /tmp
-            name: kafka-logs
-          ports:
-          - containerPort: 9092
-        volumes:
-        - name: kafka-logs
-          persistentVolumeClaim:
-            claimName: "kafka-pvc-name-replace1"
-    triggers:
-    - type: ConfigChange
-    - type: ImageChange
-      imageChangeParams:
-        automatic: false
-        containerNames:
-        - kafka-1
-        from:
-          kind: ImageStream
-          name: http://kafka-image-place-holder/kafka-openshift-orchestration
+kind: DeploymentConfig
+metadata:
+  name: sb-instanceid-kafka1
+spec:
+  replicas: 1
+  selector:
+    deploymentconfig: sb-instanceid-kafka1
+  template:
+    metadata:
+      labels:
+        app: sb-instanceid-kafka
+        deploymentconfig: sb-instanceid-kafka1
+    spec:
+      containers:
+      - name: kafka-1
+        image: http://kafka-image-place-holder/kafka-openshift-orchestration
+        command:
+        - bin/kafka-server-start.sh
+        args:
+        - config/server.properties
+        - --override
+        - zookeeper.connect=sb-instanceid-zk
+        - --override
+        - advertised.host.name=sb-instanceid-kafka1
+        - --override
+        - broker.id=0
+        volumeMounts:
+        - mountPath: /tmp
+          name: kafka-logs
+        ports:
+        - containerPort: 9092
+      volumes:
+      - name: kafka-logs
+        persistentVolumeClaim:
+          claimName: "kafka-pvc-name-replace1"
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
+    imageChangeParams:
+      automatic: false
+      containerNames:
+      - kafka-1
+      from:
+        kind: ImageStream
+        name: http://kafka-image-place-holder/kafka-openshift-orchestration
 ---
 
 apiVersion: v1
-  kind: DeploymentConfig
-  metadata:
-    name: sb-instanceid-kafka2
-  spec:
-    replicas: 1
-    selector:
-      deploymentconfig: sb-instanceid-kafka2
-    template:
-      metadata:
-        labels:
-          app: sb-instanceid-kafka
-          deploymentconfig: sb-instanceid-kafka2
-      spec:
-        containers:
-        - name: kafka-2
-          image: http://kafka-image-place-holder/kafka-openshift-orchestration
-          command:
-          - bin/kafka-server-start.sh
-          args:
-          - config/server.properties
-          - --override
-          - zookeeper.connect=sb-instanceid-zk
-          - --override
-          - advertised.host.name=sb-instanceid-kafka2
-          - --override
-          - broker.id=1
-          volumeMounts:
-          - mountPath: /tmp
-            name: kafka-logs
-          ports:
-          - containerPort: 9092
-        volumes:
-        - name: kafka-logs
-          persistentVolumeClaim:
-            claimName: "kafka-pvc-name-replace2"
-    triggers:
-    - type: ConfigChange
-    - type: ImageChange
-      imageChangeParams:
-        automatic: false
-        containerNames:
-        - kafka-2
-        from:
-          kind: ImageStream
-          name: http://kafka-image-place-holder/kafka-openshift-orchestration
+kind: DeploymentConfig
+metadata:
+  name: sb-instanceid-kafka2
+spec:
+  replicas: 1
+  selector:
+    deploymentconfig: sb-instanceid-kafka2
+  template:
+    metadata:
+      labels:
+        app: sb-instanceid-kafka
+        deploymentconfig: sb-instanceid-kafka2
+    spec:
+      containers:
+      - name: kafka-2
+        image: http://kafka-image-place-holder/kafka-openshift-orchestration
+        command:
+        - bin/kafka-server-start.sh
+        args:
+        - config/server.properties
+        - --override
+        - zookeeper.connect=sb-instanceid-zk
+        - --override
+        - advertised.host.name=sb-instanceid-kafka2
+        - --override
+        - broker.id=1
+        volumeMounts:
+        - mountPath: /tmp
+          name: kafka-logs
+        ports:
+        - containerPort: 9092
+      volumes:
+      - name: kafka-logs
+        persistentVolumeClaim:
+          claimName: "kafka-pvc-name-replace2"
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
+    imageChangeParams:
+      automatic: false
+      containerNames:
+      - kafka-2
+      from:
+        kind: ImageStream
+        name: http://kafka-image-place-holder/kafka-openshift-orchestration
 ---
 
 apiVersion: v1
-  kind: Service
-  metadata:
-    name: sb-instanceid-kafka1
-  spec:
-    ports:
-    - port: 9092
-    selector:
-      deploymentconfig: sb-instanceid-kafka1
-
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: sb-instanceid-kafka2
-  spec:
-    ports:
-    - port: 9092
-    selector:
-      deploymentconfig: sb-instanceid-kafka2
+kind: Service
+metadata:
+  name: sb-instanceid-kafka1
+spec:
+  ports:
+  - port: 9092
+  selector:
+    deploymentconfig: sb-instanceid-kafka1
 ---
 
 apiVersion: v1
-  kind: Service
-  metadata:
-    name: sb-instanceid-kafka
-  spec:
-    ports:
-    - port: 9092
-    selector:
-      app: sb-instanceid-kafka
+kind: Service
+metadata:
+  name: sb-instanceid-kafka2
+spec:
+  ports:
+  - port: 9092
+  selector:
+    deploymentconfig: sb-instanceid-kafka2
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-kafka
+spec:
+  ports:
+  - port: 9092
+  selector:
+    app: sb-instanceid-kafka
 ---
 

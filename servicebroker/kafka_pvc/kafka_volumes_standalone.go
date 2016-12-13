@@ -214,9 +214,7 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	}
 
 	ok := func(dc *dcapi.DeploymentConfig) bool {
-		labels := make(map[string]string)
-		labels["run"] = dc.Name
-		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, labels)
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
 		if err != nil {
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
