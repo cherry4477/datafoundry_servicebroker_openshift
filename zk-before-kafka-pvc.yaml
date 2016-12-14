@@ -95,7 +95,7 @@ spec:
 apiVersion: v1
 kind: DeploymentConfig
 metadata:
-  name: sb-instanceid-zk3
+  name: sb-instanceid-kafka-zk3
 spec:
   replicas: 1
   selector:

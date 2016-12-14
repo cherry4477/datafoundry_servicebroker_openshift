@@ -113,8 +113,8 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	zookeeperUser := "super" // oshandler.NewElevenLengthID()
 	zookeeperPassword := oshandler.GenGUID()
 
-	volumeBaseName_zk := volumeBaseName_zk(instanceIdInTempalte)
 	volumeBaseName_kafka := volumeBaseName_kafka(instanceIdInTempalte)
+	volumeBaseName_zk := volumeBaseName_zk(instanceIdInTempalte)
 	volumes := []oshandler.Volume{
 		{
 			Volume_size: planInfo.Volume_size,
@@ -406,7 +406,22 @@ func (job *kafkaOrchestrationJob) run() {
 	println("-- kafkaOrchestrationJob done, succeeded:", succeeded)
 
 	if succeeded {
+		volumeBaseName_kafka := volumeBaseName_kafka(job.serviceInfo.Url)
+
 		println("to create kafka resources")
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName_kafka,
+			job.serviceInfo.Database,
+			job.serviceInfo.Volumes[3:5],
+		)
+		err := <-result
+		if err != nil {
+			logger.Error("kafka create volume err:", err)
+			return
+		}
+
+		fmt.Println("------>to create kafka resources...")
 
 		err = job.createKafkaResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Volumes) //, job.serviceInfo.User, job.serviceInfo.Password)
 		if err != nil {
@@ -515,15 +530,15 @@ func (job *kafkaOrchestrationJob) createKafkaResources_Master(instanceId, servic
 			return
 		}
 
-		if err := job.opost(serviceBrokerNamespace, "services", &input.svc1, &output.svc1); err != nil {
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc1, &output.svc1); err != nil {
 			logger.Error("createKafkaResources_Master.create service1 err:", err)
 			return
 		}
-		if err := job.opost(serviceBrokerNamespace, "services", &input.svc2, &output.svc2); err != nil {
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc2, &output.svc2); err != nil {
 			logger.Error("createKafkaResources_Master.create service2 err:", err)
 			return
 		}
-		if err := job.opost(serviceBrokerNamespace, "services", &input.svc3, &output.svc3); err != nil {
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc3, &output.svc3); err != nil {
 			logger.Error("createKafkaResources_Master.create service3 err:", err)
 			return
 		}
