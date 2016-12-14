@@ -444,7 +444,6 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 
 	go func() {
 		ok := func(dc *dcapi.DeploymentConfig) bool {
-			fmt.Println("----->dc.Labels:", dc.Labels)
 			podCount, err := statRunningPodsByLabels(serviceBrokerNamespace, dc.Spec.Template.Labels)
 			fmt.Println("podCount:", podCount)
 			if err != nil {
