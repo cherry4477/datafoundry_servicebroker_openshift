@@ -389,9 +389,9 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	fmt.Println("----->input.dc1.Name:", input.dc1.Name)
 	fmt.Println("----->input.dc2.Name:", input.dc2.Name)
 	fmt.Println("----->input.dc3.Name:", input.dc3.Name)
-	fmt.Println("----->input.dc3.Name:", input.dc1.Labels)
-	fmt.Println("----->input.dc3.Name:", input.dc2.Labels)
-	fmt.Println("----->input.dc3.Name:", input.dc3.Labels)
+	fmt.Println("----->input.dc3.Labels:", input.dc1.Spec.Template.Labels)
+	fmt.Println("----->input.dc3.Labels:", input.dc2.Spec.Template.Labels)
+	fmt.Println("----->input.dc3.Labels:", input.dc3.Spec.Template.Labels)
 
 	/*
 		rc1 := &input.rc1
@@ -433,11 +433,9 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	dc1 := &output.dc1
 	dc2 := &output.dc2
 	dc3 := &output.dc3
-	fmt.Println("output.dc1:", dc1.Labels)
-	fmt.Println("output.dc2:", dc2.Labels)
-	fmt.Println("output.dc3:", dc3.Labels)
-
-	return
+	fmt.Println("output.dc1:", dc1.Spec.Template.Labels)
+	fmt.Println("output.dc2:", dc2.Spec.Template.Labels)
+	fmt.Println("output.dc3:", dc3.Spec.Template.Labels)
 
 	theresult := make(chan bool)
 	result = theresult
@@ -447,7 +445,7 @@ func watchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 	go func() {
 		ok := func(dc *dcapi.DeploymentConfig) bool {
 			fmt.Println("----->dc.Labels:", dc.Labels)
-			podCount, err := statRunningPodsByLabels(serviceBrokerNamespace, dc.Labels)
+			podCount, err := statRunningPodsByLabels(serviceBrokerNamespace, dc.Spec.Template.Labels)
 			fmt.Println("podCount:", podCount)
 			if err != nil {
 				fmt.Println("statRunningPodsByLabels err:", err)
