@@ -152,7 +152,7 @@ spec:
   - name: 3888-tcp
     port: 3888
   selector:
-    deploymentconfig: sb-instanceid-zk1
+    run: sb-instanceid-zk1
 ---
 
 apiVersion: v1
@@ -168,7 +168,7 @@ spec:
   - name: 3888-tcp
     port: 3888
   selector:
-    deploymentconfig: sb-instanceid-zk2
+    run: sb-instanceid-zk2
 ---
 
 apiVersion: v1
@@ -184,7 +184,7 @@ spec:
   - name: 3888-tcp
     port: 3888
   selector:
-    deploymentconfig: sb-instanceid-zk3
+    run: sb-instanceid-zk3
 ---
 
 apiVersion: v1

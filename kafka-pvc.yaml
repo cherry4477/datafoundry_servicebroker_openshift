@@ -5,12 +5,12 @@ metadata:
 spec:
   replicas: 1
   selector:
-    deploymentconfig: sb-instanceid-kafka1
+    run: sb-instanceid-kafka1
   template:
     metadata:
       labels:
         app: sb-instanceid-kafka
-        deploymentconfig: sb-instanceid-kafka1
+        run: sb-instanceid-kafka1
     spec:
       containers:
       - name: kafka-1
@@ -53,12 +53,12 @@ metadata:
 spec:
   replicas: 1
   selector:
-    deploymentconfig: sb-instanceid-kafka2
+    run: sb-instanceid-kafka2
   template:
     metadata:
       labels:
         app: sb-instanceid-kafka
-        deploymentconfig: sb-instanceid-kafka2
+        run: sb-instanceid-kafka2
     spec:
       containers:
       - name: kafka-2
@@ -102,7 +102,7 @@ spec:
   ports:
   - port: 9092
   selector:
-    deploymentconfig: sb-instanceid-kafka1
+    run: sb-instanceid-kafka1
 ---
 
 apiVersion: v1
@@ -113,7 +113,7 @@ spec:
   ports:
   - port: 9092
   selector:
-    deploymentconfig: sb-instanceid-kafka2
+    run: sb-instanceid-kafka2
 ---
 
 apiVersion: v1

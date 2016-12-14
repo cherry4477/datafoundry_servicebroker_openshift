@@ -448,7 +448,7 @@ func loadKafkaResources_Master(instanceID, serviceBrokerNamespace /*, kafkaUser,
 		if err != nil {
 			return err
 		}
-		kafka_image := oshandler.KafkaImage()
+		kafka_image := oshandler.KafkaVolumeImage()
 		kafka_image = strings.TrimSpace(kafka_image)
 		if len(kafka_image) > 0 {
 			KafkaTemplateData_Master = bytes.Replace(
