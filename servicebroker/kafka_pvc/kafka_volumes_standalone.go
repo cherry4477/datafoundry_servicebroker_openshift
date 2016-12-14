@@ -179,7 +179,7 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 			volumes,
 		)
 		if err != nil {
-			println("create Zookeeper resources error: ", err)
+			fmt.Println("create Zookeeper resources error: ", err)
 			logger.Error("create Zookeeper resources error: ", err)
 
 			oshandler.DeleteVolumns(serviceInfo.Database, volumes[0:3])
