@@ -309,6 +309,9 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
+	fmt.Println(zookeeper_res.svc1.Name, zookeeper_res.svc1.Spec.Ports)
+	fmt.Println(zookeeper_res.svc2.Name, zookeeper_res.svc2.Spec.Ports)
+	fmt.Println(zookeeper_res.svc3.Name, zookeeper_res.svc3.Spec.Ports)
 	fmt.Println(zookeeper_res.svc4.Name, zookeeper_res.svc4.Spec.Ports)
 
 	//get big service ip port
