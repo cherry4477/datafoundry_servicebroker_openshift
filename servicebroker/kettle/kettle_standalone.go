@@ -55,8 +55,8 @@ var logger lager.Logger
 
 type Kettle_freeHandler struct{}
 
-func (handler *Kettle_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newKettleHandler().DoProvision(instanceID, details, asyncAllowed)
+func (handler *Kettle_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newKettleHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Kettle_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -86,7 +86,7 @@ func newKettleHandler() *Kettle_Handler {
 	return &Kettle_Handler{}
 }
 
-func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}

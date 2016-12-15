@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    servicebroker: sb-instanceid-redis
+  name: sb-instanceid-redis
+spec:
+  ports:
+    - port: 26379
+      targetPort: 26379
+  selector:
+    sb-instanceid-redis-sentinel-svc: sentinel
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-redis1
+spec:
+  replicas: 1
+  selector:
+    sb-instanceid-redis: redis1
+  template:
+    metadata:
+      labels:
+        sb-instanceid-redis: redis1
+        servicebroker: sb-instanceid-redis
+    spec:
+      containers:
+      - name: redis
+        image: http://redis-image-place-holder/redis-openshift-orchestration
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: CLUSTER_NAME
+            value: cluster-sb-instanceid-redis
+          - name: SENTINEL_HOST
+            value: sb-instanceid-redis
+          - name: SENTINEL_PORT
+            value: "26379"
+          - name: REDIS_PASSWORD
+            value: pass*****
+        ports:
+        - containerPort: 6379
+        resources:
+          limits:
+            cpu: "0.1"
+        volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "pvcname*****slave1"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-redis2
+spec:
+  replicas: 1
+  selector:
+    sb-instanceid-redis: redis2
+  template:
+    metadata:
+      labels:
+        sb-instanceid-redis: redis2
+        servicebroker: sb-instanceid-redis
+    spec:
+      containers:
+      - name: redis
+        image: http://redis-image-place-holder/redis-openshift-orchestration
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: CLUSTER_NAME
+            value: cluster-sb-instanceid-redis
+          - name: SENTINEL_HOST
+            value: sb-instanceid-redis
+          - name: SENTINEL_PORT
+            value: "26379"
+          - name: REDIS_PASSWORD
+            value: pass*****
+        ports:
+        - containerPort: 6379
+        resources:
+          limits:
+            cpu: "0.1"
+        volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "pvcname*****slave2"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: sb-instanceid-redis-sentinel
+spec:
+  replicas: 2
+  selector:
+    sb-instanceid-redis-sentinel: sentinel
+  template:
+    metadata:
+      labels:
+        sb-instanceid-redis-sentinel: sentinel
+        sb-instanceid-redis-sentinel-svc: sentinel
+        servicebroker: sb-instanceid-redis
+    spec:
+      containers:
+      - name: sentinel
+        image: http://redis-image-place-holder/redis-openshift-orchestration
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: CLUSTER_NAME
+            value: cluster-sb-instanceid-redis
+          - name: SENTINEL
+            value: "true"
+          - name: SENTINEL_HOST
+            value: sb-instanceid-redis
+          - name: SENTINEL_PORT
+            value: "26379"
+          - name: REDIS_PASSWORD
+            value: pass*****
+        ports:
+          - containerPort: 26379
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

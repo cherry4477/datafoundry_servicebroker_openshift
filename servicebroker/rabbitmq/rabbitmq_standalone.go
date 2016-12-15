@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type Rabbitmq_freeHandler struct{}
 
-func (handler *Rabbitmq_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newRabbitmqHandler().DoProvision(instanceID, details, asyncAllowed)
+func (handler *Rabbitmq_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRabbitmqHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Rabbitmq_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -85,7 +85,7 @@ func newRabbitmqHandler() *Rabbitmq_Handler {
 	return &Rabbitmq_Handler{}
 }
 
-func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}

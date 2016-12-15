@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type PySpider_freeHandler struct{}
 
-func (handler *PySpider_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newPySpiderHandler().DoProvision(instanceID, details, asyncAllowed)
+func (handler *PySpider_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newPySpiderHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *PySpider_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -85,7 +85,7 @@ func newPySpiderHandler() *PySpider_Handler {
 	return &PySpider_Handler{}
 }
 
-func (handler *PySpider_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *PySpider_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}

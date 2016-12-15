@@ -11,6 +11,11 @@ import (
 	"os"
 )
 
+const (
+	VolumeType_EmptyDir = ""    // DON'T change
+	VolumeType_PVC      = "pvc" // DON'T change
+)
+
 type ServiceInfo struct {
 	Service_name   string `json:"service_name"`
 	Plan_name      string `json:"plan_name"`
@@ -20,6 +25,25 @@ type ServiceInfo struct {
 	Database       string `json:"database,omitempty"`
 	User           string `json:"user"`
 	Password       string `json:"password"`
+
+	// following fileds 
+	//Volume_type    string   `json:"volume_type"` // "" | "pvc"
+	//Volume_size    int      `json:"volume_size"`
+	// 
+	// will be replaced by
+	Volumes []Volume `json:"volumes,omitempty"`
+}
+
+type Volume struct{
+	Volume_size int    `json:"volume_size"`
+	Volume_name string `json:"volume_name"`
+}
+
+//==================
+
+type PlanInfo struct {
+	Volume_size    int    `json:"volume_type"`
+	Connections    int    `json:"connections"`
 }
 
 type Credentials struct {
@@ -32,7 +56,7 @@ type Credentials struct {
 }
 
 type HandlerDriver interface {
-	DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
+	DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
 	DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error)
 	DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error)
 	DoBind(myServiceInfo *ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, Credentials, error)
@@ -63,8 +87,8 @@ func New(name string) (*Handler, error) {
 	return &Handler{driver: handler}, nil
 }
 
-func (handler *Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
-	return handler.driver.DoProvision(instanceID, details, asyncAllowed)
+func (handler *Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
+	return handler.driver.DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Handler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {
@@ -185,6 +209,10 @@ func PySpiderImage() string {
 	return pyspiderImage
 }
 
+func MongoVolumeImage() string {
+	return mongoVolumeImage
+}
+
 var theOC *OpenshiftClient
 var endpointSuffix string
 
@@ -205,6 +233,7 @@ var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
 var pyspiderImage string
+var mongoVolumeImage string
 
 func init() {
 	theOC = newOpenshiftClient (
@@ -232,5 +261,6 @@ func init() {
 	sparkImage = getenv("SPARKIMAGE")
 	zepplinImage = getenv("ZEPPLINIMAGE")
 	pyspiderImage = getenv("PYSPIDERIMAGE")
+	mongoVolumeImage = getenv("MONGOVOLUMEIMAGE")
 }
 

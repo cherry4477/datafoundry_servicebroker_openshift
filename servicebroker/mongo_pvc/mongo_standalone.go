@@ -1,4 +1,4 @@
-package zookeeper
+package mongo_pvc
 
 
 import (
@@ -16,8 +16,6 @@ import (
 	"strings"
 	"bytes"
 	"encoding/json"
-	"crypto/sha1"
-	"encoding/base64"
 	//"text/template"
 	//"io"
 	"io/ioutil"
@@ -28,7 +26,7 @@ import (
 	
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
-	routeapi "github.com/openshift/origin/route/api/v1"
+	//routeapi "github.com/openshift/origin/route/api/v1"
 	
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 )
@@ -37,12 +35,12 @@ import (
 // 
 //==============================================================
 
-const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_standalone"
+const MongoServcieBrokerName_Standalone = "Mongo_volumes_standalone"
 
 func init() {
-	oshandler.Register(ZookeeperServcieBrokerName_Standalone, &Zookeeper_freeHandler{})
+	oshandler.Register(MongoServcieBrokerName_Standalone, &Mongo_freeHandler{})
 	
-	logger = lager.NewLogger(ZookeeperServcieBrokerName_Standalone)
+	logger = lager.NewLogger(MongoServcieBrokerName_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 }
 
@@ -52,40 +50,70 @@ var logger lager.Logger
 // 
 //==============================================================
 
-type Zookeeper_freeHandler struct{}
+type Mongo_freeHandler struct{}
 
-func (handler *Zookeeper_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newZookeeperHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Mongo_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newMongoHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
-	return newZookeeperHandler().DoLastOperation(myServiceInfo)
+func (handler *Mongo_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+	return newMongoHandler().DoLastOperation(myServiceInfo)
 }
 
-func (handler *Zookeeper_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	return newZookeeperHandler().DoDeprovision(myServiceInfo, asyncAllowed)
+func (handler *Mongo_freeHandler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	return newMongoHandler().DoDeprovision(myServiceInfo, asyncAllowed)
 }
 
-func (handler *Zookeeper_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
-	return newZookeeperHandler().DoBind(myServiceInfo, bindingID, details)
+func (handler *Mongo_freeHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+	return newMongoHandler().DoBind(myServiceInfo, bindingID, details)
 }
 
-func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
-	return newZookeeperHandler().DoUnbind(myServiceInfo, mycredentials)
+func (handler *Mongo_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+	return newMongoHandler().DoUnbind(myServiceInfo, mycredentials)
 }
 
 //==============================================================
 // 
 //==============================================================
 
-type Zookeeper_Handler struct{
+func volumeBaseName(instanceId string) string {
+	return "mng-" + instanceId
 }
 
-func newZookeeperHandler() *Zookeeper_Handler {
-	return &Zookeeper_Handler{}
+func nodePvcName0(volumes []oshandler.Volume) string {
+	if len(volumes) > 0 {
+		return volumes[0].Volume_name
+	}
+	return ""
 }
 
-func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func nodePvcName1(volumes []oshandler.Volume) string {
+	if len(volumes) > 1 {
+		return volumes[1].Volume_name
+	}
+	return ""
+}
+
+func nodePvcName2(volumes []oshandler.Volume) string {
+	if len(volumes) > 2 {
+		return volumes[2].Volume_name
+	}
+	return ""
+}
+
+//==============================================================
+// 
+//==============================================================
+
+
+type Mongo_Handler struct{
+}
+
+func newMongoHandler() *Mongo_Handler {
+	return &Mongo_Handler{}
+}
+
+func (handler *Mongo_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -100,41 +128,146 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	zookeeperUser := "super" // oshandler.NewElevenLengthID()
-	zookeeperPassword := oshandler.GenGUID()
+	mongoUser := "admin" // oshandler.NewElevenLengthID()
+	mongoPassword := oshandler.GenGUID()
+	
+	volumeBaseName := volumeBaseName(instanceIdInTempalte)
+	volumes := []oshandler.Volume{
+		// one master volume
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-0",
+		},
+		// two slave volumes
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-2",
+		},
+	}
 	
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 	
-	// master zookeeper
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.User = mongoUser
+	serviceInfo.Password = mongoPassword
+
+	serviceInfo.Volumes = volumes
 	
-	output, err := CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+	// ...
+	go func() {
+		// create volume
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName,
+			serviceInfo.Database,
+			serviceInfo.Volumes,
+		)
+
+		err := <- result
+		if err != nil {
+			logger.Error("mongo create volume", err)
+			return
+		}
+
+		println("createMongoResources_Master ...")
+
+		// todo: consider if DoDeprovision is called now, ...
+
+		// create master res
+	
+		output, err := CreateMongoResources_Master(
+				serviceInfo.Url, 
+				serviceInfo.Database, 
+				serviceInfo.User, 
+				serviceInfo.Password,
+				volumes,
+		)
+
+		if err != nil {
+			println(" mongo createMongoResources_Master error: ", err)
+			logger.Error("mongo createMongoResources_Master error", err)
+
+			DestroyMongoResources_Master(output, serviceBrokerNamespace)
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
+			
+			return
+		}
+	}()
+
+	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	
+	return serviceSpec, serviceInfo, nil
+}
+
+/*
+func (handler *Mongo_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	//初始化到openshift的链接
+	
+	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
+	serviceInfo := oshandler.ServiceInfo{}
+	
+	//if asyncAllowed == false {
+	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
+	//}
+	serviceSpec.IsAsync = true
+	
+	//instanceIdInTempalte   := instanceID // todo: ok?
+	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
+	//serviceBrokerNamespace := ServiceBrokerNamespace
+	serviceBrokerNamespace := oshandler.OC().Namespace()
+	mongoUser := "super" // oshandler.NewElevenLengthID()
+	mongoPassword := oshandler.GenGUID()
+	
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
+	
+	// master mongo
+	
+	output, err := CreateMongoResources_Master(instanceIdInTempalte, serviceBrokerNamespace, mongoUser, mongoPassword)
 
 	if err != nil {
-		DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
+		DestroyMongoResources_Master(output, serviceBrokerNamespace)
 		
 		return serviceSpec, serviceInfo, err
 	}
 	
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = zookeeperUser
-	serviceInfo.Password = zookeeperPassword
+	serviceInfo.User = mongoUser
+	serviceInfo.Password = mongoPassword
 	
 	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 	
 	return serviceSpec, serviceInfo, nil
 }
+*/
 
-func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+func (handler *Mongo_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
 	// assume in provisioning
+
+
+	volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+	if volumeJob != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 	
-	// the job may be finished or interrupted or running in another instance.
+	// ...
 	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetMongoResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -165,25 +298,45 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 	}
 }
 
-func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (handler *Mongo_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// ...
+
+	go func() {
+		// ...
+		volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+		if volumeJob != nil {
+			volumeJob.Cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url)) {
+					break
+				}
+			}
+		}
 	
-	println("to destroy resources")
-	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	// under current frame, it is not a good idea to return here
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
-	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+		println("to destroy master resources")
+		
+		master_res, _ := GetMongoResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+		// under current frame, it is not a good idea to return here
+		//if err != nil {
+		//	return brokerapi.IsAsync(false), err
+		//}
+		DestroyMongoResources_Master (master_res, myServiceInfo.Database)
+
+		println("to destroy volumes:", myServiceInfo.Volumes)
+
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
 
-func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
+func (handler *Mongo_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetMongoResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 	
 	host, port, err := master_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
@@ -203,221 +356,90 @@ func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, b
 	return myBinding, mycredentials, nil
 }
 
-func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
+func (handler *Mongo_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	// do nothing
 	
 	return nil
 }
 
-//==============================================================
-// interfaces for other service brokers which depend on zk
-//==============================================================
-
-func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (result <-chan bool, cancel chan<- struct{}, err error) {
-	var input ZookeeperResources_Master
-	err = loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
-	if err != nil {
-		return
-	}
-	
-	/*
-	rc1 := &input.rc1
-	rc2 := &input.rc2
-	rc3 := &input.rc3
-	uri1 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc1.Name
-	uri2 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc2.Name
-	uri3 := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc3.Name
-	statuses1, cancel1, err := oshandler.OC().KWatch (uri1)
-	if err != nil {
-		return
-	}
-	statuses2, cancel2, err := oshandler.OC().KWatch (uri2)
-	if err != nil {
-		close(cancel1)
-		return
-	}
-	statuses3, cancel3, err := oshandler.OC().KWatch (uri3)
-	if err != nil {
-		close(cancel1)
-		close(cancel2)
-		return
-	}
-	
-	close_all := func() {
-		close(cancel1)
-		close(cancel2)
-		close(cancel3)
-	}
-	*/
-	
-	var output ZookeeperResources_Master
-	err = getZookeeperResources_Master(serviceBrokerNamespace, &input, &output)
-	if err != nil {
-		//close_all()
-		return
-	}
-	
-	rc1 := &output.rc1
-	rc2 := &output.rc2
-	rc3 := &output.rc3
-	rc1.Status.Replicas = 0
-	rc2.Status.Replicas = 0
-	rc3.Status.Replicas = 0
-	
-	theresult := make(chan bool)
-	result = theresult
-	cancelled := make(chan struct{})
-	cancel = cancelled
-	
-	go func() {
-		ok := func(rc *kapi.ReplicationController) bool {
-			if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil {
-				return false
-			}
-			
-			if rc.Status.Replicas < *rc.Spec.Replicas {
-				rc.Status.Replicas, _ = statRunningPodsByLabels (serviceBrokerNamespace, rc.Labels)
-			
-				println("rc = ", rc, ", rc.Status.Replicas = ", rc.Status.Replicas)
-			}
-			
-			return rc.Status.Replicas >= *rc.Spec.Replicas
-		}
-		
-		
-		for {
-			if ok (rc1) && ok (rc2) && ok (rc3) {
-				theresult <- true
-				
-				//close_all()
-				return
-			}
-			
-			//var status oshandler.WatchStatus
-			var valid bool
-			//var rc **kapi.ReplicationController
-			select {
-			case <- cancelled:
-				valid = false
-			//case status, valid = <- statuses1:
-			//	//rc = &rc1
-			//	break
-			//case status, valid = <- statuses2:
-			//	//rc = &rc2
-			//	break
-			//case status, valid = <- statuses3:
-			//	//rc = &rc3
-			//	break
-			case <- time.After(15 * time.Second):
-				// bug: pod phase change will not trigger rc status change.
-				// so need this case
-				continue
-			}
-			
-			/*
-			if valid {
-				if status.Err != nil {
-					valid = false
-					logger.Error("watch master rcs error", status.Err)
-				} else {
-					var wrcs watchReplicationControllerStatus
-					if err := json.Unmarshal(status.Info, &wrcs); err != nil {
-						valid = false
-						logger.Error("parse master rc status", err)
-					//} else {
-					//	*rc = &wrcs.Object
-					}
-				}
-			}
-			
-			println("> WatchZookeeperOrchestration valid:", valid)
-			*/
-			
-			if ! valid {
-				theresult <- false
-				
-				//close_all()
-				return
-			}
-		}
-	}()
-	
-	return
-}
-
 //=======================================================================
-// the zookeeper functions may be called by outer packages 
+// the mongo functions may be called by outer packages 
 //=======================================================================
 
-var ZookeeperTemplateData_Master []byte = nil
+var MongoTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
+func loadMongoResources_Master(instanceID, serviceBrokerNamespace, mongoUser, mongoPassword string, volumes []oshandler.Volume, res *MongoResources_Master) error {
 	/*
-	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper.yaml")
+	if MongoTemplateData_Master == nil {
+		f, err := os.Open("mongo.yaml")
 		if err != nil {
 			return err
 		}
-		ZookeeperTemplateData_Master, err = ioutil.ReadAll(f)
+		MongoTemplateData_Master, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
-		zookeeper_image := oshandler.ZookeeperImage()
-		zookeeper_image = strings.TrimSpace(zookeeper_image)
-		if len(zookeeper_image) > 0 {
-			ZookeeperTemplateData_Master = bytes.Replace(
-				ZookeeperTemplateData_Master, 
-				[]byte("http://zookeeper-image-place-holder/zookeeper-openshift-orchestration"), 
-				[]byte(zookeeper_image), 
+		mongo_image := oshandler.MongoImage()
+		mongo_image = strings.TrimSpace(mongo_image)
+		if len(mongo_image) > 0 {
+			MongoTemplateData_Master = bytes.Replace(
+				MongoTemplateData_Master, 
+				[]byte("http://mongo-image-place-holder/mongo-openshift-orchestration"), 
+				[]byte(mongo_image), 
 				-1)
 		}
 	}
 	*/
 	
-	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper-with-dashboard.yaml")
+	if MongoTemplateData_Master == nil {
+
+		f, err := os.Open("mongo-pvc.yaml")
 		if err != nil {
 			return err
 		}
-		ZookeeperTemplateData_Master, err = ioutil.ReadAll(f)
+		MongoTemplateData_Master, err = ioutil.ReadAll(f)
 		if err != nil {
 			return err
 		}
 		endpoint_postfix := oshandler.EndPointSuffix()
 		endpoint_postfix = strings.TrimSpace(endpoint_postfix)
 		if len(endpoint_postfix) > 0 {
-			ZookeeperTemplateData_Master = bytes.Replace(
-				ZookeeperTemplateData_Master, 
+			MongoTemplateData_Master = bytes.Replace(
+				MongoTemplateData_Master, 
 				[]byte("endpoint-postfix-place-holder"), 
 				[]byte(endpoint_postfix), 
 				-1)
 		}
-		//zookeeper_image := oshandler.ZookeeperExhibitorImage()
-		zookeeper_image := oshandler.ZookeeperImage()
-		zookeeper_image = strings.TrimSpace(zookeeper_image)
-		if len(zookeeper_image) > 0 {
-			ZookeeperTemplateData_Master = bytes.Replace(
-				ZookeeperTemplateData_Master, 
-				[]byte("http://zookeeper-exhibitor-image-place-holder/zookeeper-exhibitor-openshift-orchestration"), 
-				[]byte(zookeeper_image), 
+		//mongo_image := oshandler.MongoExhibitorImage()
+		mongo_image := oshandler.MongoVolumeImage()
+		mongo_image = strings.TrimSpace(mongo_image)
+		if len(mongo_image) > 0 {
+			MongoTemplateData_Master = bytes.Replace(
+				MongoTemplateData_Master, 
+				[]byte("http://mongo-image-place-holder/mongo-with-volumes-orchestration"), 
+				[]byte(mongo_image), 
 				-1)
 		}
 	}
 	
 	// ...
 	
-	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
-	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
-	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
+	// ...
+
+	nodePvcName0 := nodePvcName0(volumes)
+	nodePvcName1 := nodePvcName1(volumes)
+	nodePvcName2 := nodePvcName2(volumes)
 	
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%s", zookeeperUser, zookeeperPassword)))
-	zoo_password := fmt.Sprintf("%s:%s", zookeeperUser, base64.StdEncoding.EncodeToString (sum[:]))
-	
-	yamlTemplates := ZookeeperTemplateData_Master
+	yamlTemplates := MongoTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ADMINUSER#"), []byte(mongoUser), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ADMINPASSWORD#"), []byte(mongoPassword), -1)
+	//yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
+	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****node0"), []byte(nodePvcName0), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****node1"), []byte(nodePvcName1), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****node2"), []byte(nodePvcName2), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -426,120 +448,115 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.service).
 		Decode(&res.svc1).
 		Decode(&res.svc2).
 		Decode(&res.svc3).
 		Decode(&res.rc1).
 		Decode(&res.rc2).
-		Decode(&res.rc3).
-		Decode(&res.route)
+		Decode(&res.rc3)
 	
 	return decoder.Err
 }
 
-type ZookeeperResources_Master struct {
-	service kapi.Service
-	
+type MongoResources_Master struct {
 	svc1  kapi.Service
 	svc2  kapi.Service
 	svc3  kapi.Service
 	rc1   kapi.ReplicationController
 	rc2   kapi.ReplicationController
 	rc3   kapi.ReplicationController
-	
-	route   routeapi.Route
 }
 
-func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespace string) (string, string, error) {
+func (masterRes *MongoResources_Master) ServiceHostPort(serviceBrokerNamespace string) (string, string, error) {
 		
-	client_port := oshandler.GetServicePortByName(&masterRes.service, "client")
+	client_port := oshandler.GetServicePortByName(&masterRes.svc1, "mongo-svc-port")
 	if client_port == nil {
-		return "", "", errors.New("client port not found")
+		return "", "", errors.New("mongo-svc-port port not found")
 	}
-	
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", masterRes.service.Name, serviceBrokerNamespace)
+
+	// assusme client_port are the same for all nodes
+
 	port := strconv.Itoa(client_port.Port)
+	
+	postfix := fmt.Sprintf("%s.svc.cluster.local:%s", serviceBrokerNamespace, port)
+
+	host := fmt.Sprintf("%s.%s;%s.%s;%s.%s", 
+		masterRes.svc1.Name, postfix, 
+		masterRes.svc2.Name, postfix,
+		masterRes.svc3.Name, postfix)
 	
 	return host, port, nil
 }
 	
-func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
-	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
+func CreateMongoResources_Master (instanceId, serviceBrokerNamespace, mongoUser, mongoPassword string, volumes []oshandler.Volume) (*MongoResources_Master, error) {
+	var input MongoResources_Master
+	err := loadMongoResources_Master(instanceId, serviceBrokerNamespace, mongoUser, mongoPassword, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
 	
-	var output ZookeeperResources_Master
+	var output MongoResources_Master
 	
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	// here, not use job.post
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
 		KPost(prefix + "/services", &input.svc1, &output.svc1).
 		KPost(prefix + "/services", &input.svc2, &output.svc2).
 		KPost(prefix + "/services", &input.svc3, &output.svc3).
 		KPost(prefix + "/replicationcontrollers", &input.rc1, &output.rc1).
 		KPost(prefix + "/replicationcontrollers", &input.rc2, &output.rc2).
-		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3).
-		OPost(prefix + "/routes", &input.route, &output.route)
+		KPost(prefix + "/replicationcontrollers", &input.rc3, &output.rc3)
 	
 	if osr.Err != nil {
-		logger.Error("createZookeeperResources_Master", osr.Err)
+		logger.Error("createMongoResources_Master", osr.Err)
 	}
 	
 	return &output, osr.Err
 }
 	
-func GetZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
-	var output ZookeeperResources_Master
+func GetMongoResources_Master (instanceId, serviceBrokerNamespace, mongoUser, mongoPassword string, volumes []oshandler.Volume) (*MongoResources_Master, error) {
+	var output MongoResources_Master
 	
-	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
+	var input MongoResources_Master
+	err := loadMongoResources_Master(instanceId, serviceBrokerNamespace, mongoUser, mongoPassword, volumes, &input)
 	if err != nil {
 		return &output, err
 	}
 	
-	err = getZookeeperResources_Master(serviceBrokerNamespace, &input, &output)
+	err = getMongoResources_Master(serviceBrokerNamespace, &input, &output)
 	return &output, err
 }
 
-func getZookeeperResources_Master(serviceBrokerNamespace string, input, output *ZookeeperResources_Master) error {
+func getMongoResources_Master(serviceBrokerNamespace string, input, output *MongoResources_Master) error {
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
 	
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.service.Name, &output.service).
 		KGet(prefix + "/services/" + input.svc1.Name, &output.svc1).
 		KGet(prefix + "/services/" + input.svc2.Name, &output.svc2).
 		KGet(prefix + "/services/" + input.svc3.Name, &output.svc3).
 		KGet(prefix + "/replicationcontrollers/" + input.rc1.Name, &output.rc1).
 		KGet(prefix + "/replicationcontrollers/" + input.rc2.Name, &output.rc2).
-		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3).
-		// old bsi has no route, so get route may be error
-		OGet(prefix + "/routes/" + input.route.Name, &output.route) 
+		KGet(prefix + "/replicationcontrollers/" + input.rc3.Name, &output.rc3)
 	
 	if osr.Err != nil {
-		logger.Error("getZookeeperResources_Master", osr.Err)
+		logger.Error("getMongoResources_Master", osr.Err)
 	}
 	
 	return osr.Err
 }
 
-func DestroyZookeeperResources_Master (masterRes *ZookeeperResources_Master, serviceBrokerNamespace string) {
+func DestroyMongoResources_Master (masterRes *MongoResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc1.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc2.Name)}()
 	go func() {kdel (serviceBrokerNamespace, "services", masterRes.svc3.Name)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc1)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc2)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc3)}()
-	go func() {odel (serviceBrokerNamespace, "routes", masterRes.route.Name)}()
 }
 
 //===============================================================
@@ -688,11 +705,11 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 			status, _ := <- statuses
 			
 			if status.Err != nil {
-				logger.Error("watch HA zookeeper rc error", status.Err)
+				logger.Error("watch HA mongo rc error", status.Err)
 				close(cancel)
 				return
 			} else {
-				//logger.Debug("watch zookeeper HA rc, status.Info: " + string(status.Info))
+				//logger.Debug("watch mongo HA rc, status.Info: " + string(status.Info))
 			}
 			
 			var wrcs watchReplicationControllerStatus
@@ -750,12 +767,12 @@ func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]st
 	return nrunnings, nil
 }
 
-// https://hub.docker.com/r/mbabineau/zookeeper-exhibitor/
+// https://hub.docker.com/r/mbabineau/mongo-exhibitor/
 // https://hub.docker.com/r/netflixoss/exhibitor/
 
 // todo: 
-// set ACL: https://godoc.org/github.com/samuel/go-zookeeper/zk#Conn.SetACL
-// github.com/samuel/go-zookeeper/zk 
+// set ACL: https://godoc.org/github.com/samuel/go-mongo/zk#Conn.SetACL
+// github.com/samuel/go-mongo/zk 
 
 /*
 bin/zkCli.sh 127.0.0.1:2181
@@ -781,8 +798,8 @@ autopurge.purgeInterval=24
 autopurge.snapRetainCount=5
 
 The last two autopurge.* settings are very important for production systems. 
-They instruct ZooKeeper to regularly remove (old) data and transaction logs. 
-The default ZooKeeper configuration does not do this on its own, 
-and if you do not set up regular purging ZooKeeper will quickly run out of disk space.
+They instruct Mongo to regularly remove (old) data and transaction logs. 
+The default Mongo configuration does not do this on its own, 
+and if you do not set up regular purging Mongo will quickly run out of disk space.
 
 */

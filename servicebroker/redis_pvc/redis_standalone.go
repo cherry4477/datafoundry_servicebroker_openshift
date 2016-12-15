@@ -37,7 +37,7 @@ import (
 // 
 //==============================================================
 
-const RedisServcieBrokerName_Standalone = "Redis_standalone"
+const RedisServcieBrokerName_Standalone = "Redis_volumes_standalone"
 
 func init() {
 	oshandler.Register(RedisServcieBrokerName_Standalone, &Redis_freeHandler{})
@@ -78,6 +78,39 @@ func (handler *Redis_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 // 
 //==============================================================
 
+
+// version 1:
+//   one master volume, two slave volumes,  
+
+func volumeBaseName(instanceId string) string {
+	return "rds-" + instanceId
+}
+
+func masterPvcName(volumes []oshandler.Volume) string {
+	if len(volumes) > 0 {
+		return volumes[0].Volume_name
+	}
+	return ""
+}
+
+func slavePvcName1(volumes []oshandler.Volume) string {
+	if len(volumes) > 1 {
+		return volumes[1].Volume_name
+	}
+	return ""
+}
+
+func slavePvcName2(volumes []oshandler.Volume) string {
+	if len(volumes) > 2 {
+		return volumes[2].Volume_name
+	}
+	return ""
+}
+
+//==============================================================
+// 
+//==============================================================
+
 type Redis_Handler struct{
 }
 
@@ -85,6 +118,112 @@ func newRedisHandler() *Redis_Handler {
 	return &Redis_Handler{}
 }
 
+func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	//初始化到openshift的链接
+	
+	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
+	serviceInfo := oshandler.ServiceInfo{}
+	
+	//if asyncAllowed == false {
+	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
+	//}
+	serviceSpec.IsAsync = true
+	
+	//instanceIdInTempalte   := instanceID // todo: ok?
+	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
+	//serviceBrokerNamespace := ServiceBrokerNamespace
+	serviceBrokerNamespace := oshandler.OC().Namespace()
+	//redisUser := oshandler.NewElevenLengthID()
+	redisPassword := oshandler.GenGUID()
+	
+	volumeBaseName := volumeBaseName(instanceIdInTempalte)
+	volumes := []oshandler.Volume{
+		// one master volume
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-0",
+		},
+		// two slave volumes
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-2",
+		},
+	}
+	
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
+
+	// ...
+	
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	//serviceInfo.User = redisUser
+	serviceInfo.Password = redisPassword
+
+	serviceInfo.Volumes = volumes
+	
+	// ...
+	go func() {
+		// create volumes
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName,
+			serviceInfo.Database,
+			serviceInfo.Volumes,
+		)
+
+		err := <- result
+		if err != nil {
+			logger.Error("redis create volume", err)
+			return
+		}
+
+		println("createRedisResources_Master ...")
+
+		// create master res
+
+		output, err := createRedisResources_Master(
+				serviceInfo.Url, 
+				serviceInfo.Database, 
+				serviceInfo.Password, 
+				serviceInfo.Volumes,
+		)
+		if err != nil {
+			println(" redis createRedisResources_Master error: ", err)
+			logger.Error("redis createRedisResources_Master error", err)
+
+			destroyRedisResources_Master(output, serviceInfo.Database)
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
+			
+			return 
+		}
+
+		// create other resources ...
+
+		startRedisOrchestrationJob(&redisOrchestrationJob{
+			cancelled:  false,
+			cancelChan: make(chan struct{}),
+			
+			serviceInfo:     &serviceInfo,
+			masterResources: output,
+			//moreResources:   nil,
+		})
+	}()
+	
+	// ...
+
+	serviceSpec.DashboardURL = ""
+	
+	return serviceSpec, serviceInfo, nil
+}
+
+/*
 func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
@@ -132,18 +271,49 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 		
 		serviceInfo:     &serviceInfo,
 		masterResources: output,
-		moreResources:   nil,
+		//moreResources:   nil,
 	})
 	
 	serviceSpec.DashboardURL = ""
 	
 	return serviceSpec, serviceInfo, nil
 }
+*/
 
 func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
+
+	volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+	if volumeJob != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
+	
+	_, err := getRedisResources_Master (
+			myServiceInfo.Url, 
+			myServiceInfo.Database, 
+			myServiceInfo.Password,
+			myServiceInfo.Volumes,
+		)
+	//if err == oshandler.NotFound {
+	//	return brokerapi.LastOperation{
+	//		State:       brokerapi.InProgress,
+	//		Description: "In progress .",
+	//	}, nil
+	//} else if err != nil {
+	//	return return brokerapi.LastOperation{}, err
+	//}
+	if err != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: "In progress .",
+		}, err
+	}
+	
 	// try to get state from running job
-	job := getRedisOrchestrationJob (myServiceInfo.Url)
-	if job != nil {
+	orchJob := getRedisOrchestrationJob (myServiceInfo.Url)
+	if orchJob != nil {
 		return brokerapi.LastOperation{
 			State:       brokerapi.InProgress,
 			Description: "In progress .",
@@ -155,7 +325,12 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	// the job may be finished or interrupted or running in another instance.
 	
 	//master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
-	more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	more_res, _ := getRedisResources_More (
+			myServiceInfo.Url, 
+			myServiceInfo.Database, 
+			myServiceInfo.Password,
+			myServiceInfo.Volumes,
+		)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -175,7 +350,7 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 	
 	//println("num_ok_rcs = ", num_ok_rcs)
 	
-	if ok (&more_res.rc) && ok (&more_res.rcSentinel) {
+	if ok (&more_res.rc1) && ok (&more_res.rc2) && ok (&more_res.rcSentinel) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -190,6 +365,22 @@ func (handler *Redis_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 
 func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
+		// ...
+		volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+		if volumeJob != nil {
+			volumeJob.Cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url)) {
+					break
+				}
+			}
+		}
+
+		// ...
+
 		job := getRedisOrchestrationJob (myServiceInfo.Url)
 		if job != nil {
 			job.cancel()
@@ -205,13 +396,29 @@ func (handler *Redis_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		
 		// ...
 		
-		println("to destroy resources")
+		println("to destroy resources:", myServiceInfo.Url)
 		
-		more_res, _ := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		more_res, _ := getRedisResources_More (
+				myServiceInfo.Url, 
+				myServiceInfo.Database, 
+				myServiceInfo.Password,
+				myServiceInfo.Volumes,
+			)
 		destroyRedisResources_More (more_res, myServiceInfo.Database)
 		
-		master_res, _ := getRedisResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+		master_res, _ := getRedisResources_Master (
+				myServiceInfo.Url, 
+				myServiceInfo.Database, 
+				myServiceInfo.Password,
+				myServiceInfo.Volumes,
+			)
 		destroyRedisResources_Master (master_res, myServiceInfo.Database)
+
+		// ...
+
+		println("to destroy volumes:", myServiceInfo.Volumes)
+
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
 	}()
 	
 	return brokerapi.IsAsync(false), nil
@@ -222,7 +429,12 @@ func (handler *Redis_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	
 	// master_res may has been shutdown normally.
 	
-	more_res, err := getRedisResources_More (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Password)
+	more_res, err := getRedisResources_More (
+			myServiceInfo.Url, 
+			myServiceInfo.Database, 
+			myServiceInfo.Password,
+			myServiceInfo.Volumes,
+		)
 	if err != nil {
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
@@ -261,6 +473,116 @@ func (handler *Redis_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, myc
 //=======================================================================
 // 
 //=======================================================================
+
+// todo: it is best to save jobs in mysql firstly, ...
+// now, when the server instance is terminated, jobs are lost.
+/*
+var redisCreatePvcVolumnJobs = map[string]*redisCreatePvcVolumnJob{}
+var redisCreatePvcVolumnJobsMutex sync.Mutex
+
+func getCreatePvcVolumnJob (volumeName string) *redisCreatePvcVolumnJob {
+	redisCreatePvcVolumnJobsMutex.Lock()
+	job := redisCreatePvcVolumnJobs[volumeName]
+	redisCreatePvcVolumnJobsMutex.Unlock()
+	
+	return job
+}
+
+func startRedisCreatePvcVolumnJob (job *redisCreatePvcVolumnJob) {
+	redisCreatePvcVolumnJobsMutex.Lock()
+	defer redisCreatePvcVolumnJobsMutex.Unlock()
+	
+	if redisCreatePvcVolumnJobs[job.volumeName] == nil {
+		redisCreatePvcVolumnJobs[job.volumeName] = job
+		go func() {
+			job.run()
+			
+			redisCreatePvcVolumnJobsMutex.Lock()
+			delete(redisCreatePvcVolumnJobs, job.volumeName)
+			redisCreatePvcVolumnJobsMutex.Unlock()
+		}()
+	}
+}
+
+type redisCreatePvcVolumnJob struct {
+	cancelled bool
+	cancelChan chan struct{}
+	cancelMetex sync.Mutex
+	
+	volumeName  string
+	volumeSize  int
+	serviceInfo *oshandler.ServiceInfo
+}
+
+func (job *redisCreatePvcVolumnJob) cancel() {
+	job.cancelMetex.Lock()
+	defer job.cancelMetex.Unlock()
+	
+	if ! job.cancelled {
+		job.cancelled = true
+		close (job.cancelChan)
+	}
+}
+
+func (job *redisCreatePvcVolumnJob) run() {
+	println("startRedisCreatePvcVolumnJob ...")
+
+	println("CreateVolumn ...")
+
+	err := oshandler.CreateVolumn(job.volumeName, job.volumeSize)
+	if err != nil {
+		println(" redis oshandler.CreateVolumn error: ", err)
+		return
+	}
+
+	println("WaitUntilPvcIsBound ...")
+
+	// watch pvc until bound
+
+	err = oshandler.WaitUntilPvcIsBound(job.serviceInfo.Database, job.volumeName, job.cancelChan)
+	if err != nil {
+		println(" redis WaitUntilPvcIsBound error: ", err)
+
+		// todo: on error
+		oshandler.DeleteVolumn(job.volumeName)
+
+		return
+	}
+
+	println("volume created ...")
+
+	println("createRedisResources_Master ...")
+
+	// create master res
+
+	output, err := createRedisResources_Master(
+			job.serviceInfo.Url, 
+			job.serviceInfo.Database, 
+			job.serviceInfo.Password, 
+			job.serviceInfo.Volume_type == oshandler.VolumeType_PVC,
+	)
+	if err != nil {
+		println(" redis createRedisResources_Master error: ", err)
+
+		destroyRedisResources_Master(output, job.serviceInfo.Database)
+		oshandler.DeleteVolumn(job.volumeName)
+		
+		return 
+	}
+	
+	// todo: improve watch. Pod may be already running before watching!
+	startRedisOrchestrationJob(&redisOrchestrationJob{
+		cancelled:  false,
+		cancelChan: make(chan struct{}),
+		
+		serviceInfo:     job.serviceInfo,
+		masterResources: output,
+		//moreResources:   nil,
+	})
+}
+*/
+
+//==============
 	
 var redisOrchestrationJobs = map[string]*redisOrchestrationJob{}
 var redisOrchestrationJobsMutex sync.Mutex
@@ -299,7 +621,7 @@ type redisOrchestrationJob struct {
 	serviceInfo   *oshandler.ServiceInfo
 	
 	masterResources *redisResources_Master
-	moreResources   *redisResources_More
+	//moreResources   *redisResources_More
 }
 
 func (job *redisOrchestrationJob) cancel() {
@@ -319,73 +641,10 @@ type watchPodStatus struct {
 	Object kapi.Pod `json:"object"`
 }
 
-/*
 func (job *redisOrchestrationJob) run() {
-	serviceInfo := job.serviceInfo
-	pod := job.masterResources.pod
-	uri := "/namespaces/" + serviceInfo.Database + "/pods/" + pod.Name
-	statuses, cancel, err := oshandler.OC().KWatch (uri)
-	if err != nil {
-		logger.Error("start watching boot pod", err)
-		destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
-		return
-	}
-	
-	for {
-		var status oshandler.WatchStatus
-		select {
-		case <- job.cancelChan:
-			close(cancel)
-			return
-		case status, _ = <- statuses:
-			break
-		}
-		
-		if status.Err != nil {
-			close(cancel)
-			
-			logger.Error("watch boot pod error", status.Err)
-			destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
-			return
-		} else {
-			//logger.Debug("watch etcd pod, status.Info: " + string(status.Info))
-		}
-		
-		var wps watchPodStatus
-		if err := json.Unmarshal(status.Info, &wps); err != nil {
-			close(cancel)
-			
-			logger.Error("parse boot pod status", err)
-			destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
-			return
-		}
-		
-		if wps.Object.Status.Phase != kapi.PodPending {
-			println("watch pod phase: ", wps.Object.Status.Phase)
-			
-			if wps.Object.Status.Phase != kapi.PodRunning {
-				close(cancel)
-				
-				logger.Debug("pod phase is neither pending nor running")
-				destroyRedisResources_Master (job.masterResources, serviceInfo.Database)
-				return
-			}
-			
-			// running now, to create HA resources
-			close(cancel)
-			break
-		}
-	}
-	
-	time.Sleep(5 * time.Second)
-	
-	// create more resources
-	
-	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
-}
-*/
 
-func (job *redisOrchestrationJob) run() {
+	println("startRedisOrchestrationJob ...")
+
 	serviceInfo := job.serviceInfo
 	//pod := job.masterResources.pod
 	rc := &job.masterResources.rc
@@ -412,7 +671,14 @@ func (job *redisOrchestrationJob) run() {
 	
 	// create more resources
 	
-	job.createRedisResources_More (serviceInfo.Url, serviceInfo.Database, serviceInfo.Password)
+	println("createRedisResources_More ...")
+	
+	job.createRedisResources_More (
+			serviceInfo.Url, 
+			serviceInfo.Database, 
+			serviceInfo.Password, 
+			serviceInfo.Volumes,
+		)
 }
 
 //=======================================================================
@@ -421,9 +687,10 @@ func (job *redisOrchestrationJob) run() {
 
 var RedisTemplateData_Master []byte = nil
 
-func loadRedisResources_Master(instanceID, redisPassword string, res *redisResources_Master) error {
+func loadRedisResources_Master(instanceID, redisPassword string, volumes []oshandler.Volume, res *redisResources_Master) error {
 	if RedisTemplateData_Master == nil {
-		f, err := os.Open("redis-master.yaml")
+		
+		f, err := os.Open("redis-pvc-master.yaml")
 		if err != nil {
 			return err
 		}
@@ -443,12 +710,16 @@ func loadRedisResources_Master(instanceID, redisPassword string, res *redisResou
 	}
 	
 	// ...
+
+	masterPvcName := masterPvcName(volumes)
 	
 	yamlTemplates := RedisTemplateData_Master
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(redisPassword), -1)	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(redisPassword), -1)
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****master"), []byte(masterPvcName), -1)
+		
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
 	//println()
@@ -464,9 +735,11 @@ func loadRedisResources_Master(instanceID, redisPassword string, res *redisResou
 
 var RedisTemplateData_More []byte = nil
 
-func loadRedisResources_More(instanceID, redisPassword string, res *redisResources_More) error {
+func loadRedisResources_More(instanceID, redisPassword string, volumes []oshandler.Volume, res *redisResources_More) error {
+
 	if RedisTemplateData_More == nil {
-		f, err := os.Open("redis-more.yaml")
+
+		f, err := os.Open("redis-pvc-more.yaml")
 		if err != nil {
 			return err
 		}
@@ -486,21 +759,27 @@ func loadRedisResources_More(instanceID, redisPassword string, res *redisResourc
 	}
 	
 	// ...
+
+	slavePvcName1 := slavePvcName1(volumes)
+	slavePvcName2 := slavePvcName2(volumes)
 	
 	yamlTemplates := RedisTemplateData_More
 	
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pass*****"), []byte(redisPassword), -1)	
 	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****slave1"), []byte(slavePvcName1), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****slave2"), []byte(slavePvcName2), -1)
+	
 	//println("========= More yamlTemplates ===========")
 	//println(string(yamlTemplates))
 	//println()
-
 	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
 		Decode(&res.serviceSentinel).
-		Decode(&res.rc).
+		Decode(&res.rc1).
+		Decode(&res.rc2).
 		Decode(&res.rcSentinel)
 	
 	return decoder.Err
@@ -513,13 +792,14 @@ type redisResources_Master struct {
 
 type redisResources_More struct {
 	serviceSentinel kapi.Service
-	rc              kapi.ReplicationController
+	rc1             kapi.ReplicationController
+	rc2             kapi.ReplicationController
 	rcSentinel      kapi.ReplicationController
 }
 	
-func createRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_Master, error) {
+func createRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string, volumes []oshandler.Volume) (*redisResources_Master, error) {
 	var input redisResources_Master
-	err := loadRedisResources_Master(instanceId, redisPassword, &input)
+	err := loadRedisResources_Master(instanceId, redisPassword, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -541,11 +821,11 @@ func createRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassw
 	return &output, osr.Err
 }
 	
-func getRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_Master, error) {
+func getRedisResources_Master (instanceId, serviceBrokerNamespace, redisPassword string, volumes []oshandler.Volume,) (*redisResources_Master, error) {
 	var output redisResources_Master
 	
 	var input redisResources_Master
-	err := loadRedisResources_Master(instanceId, redisPassword, &input)
+	err := loadRedisResources_Master(instanceId, redisPassword, volumes, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -571,9 +851,9 @@ func destroyRedisResources_Master (masterRes *redisResources_Master, serviceBrok
 	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
 }
 	
-func (job *redisOrchestrationJob) createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) error {
+func (job *redisOrchestrationJob) createRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string, volumes []oshandler.Volume,) error {
 	var input redisResources_More
-	err := loadRedisResources_More(instanceId, redisPassword, &input)
+	err := loadRedisResources_More(instanceId, redisPassword, volumes, &input)
 	if err != nil {
 		return err
 	}
@@ -599,7 +879,10 @@ func (job *redisOrchestrationJob) createRedisResources_More (instanceId, service
 		if err := job.kpost (serviceBrokerNamespace, "services", &input.serviceSentinel, &output.serviceSentinel); err != nil {
 			return
 		}
-		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc1, &output.rc1); err != nil {
+			return
+		}
+		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc2, &output.rc2); err != nil {
 			return
 		}
 		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rcSentinel, &output.rcSentinel); err != nil {
@@ -610,11 +893,11 @@ func (job *redisOrchestrationJob) createRedisResources_More (instanceId, service
 	return nil
 }
 	
-func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string) (*redisResources_More, error) {
+func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword string, volumes []oshandler.Volume,) (*redisResources_More, error) {
 	var output redisResources_More
 	
 	var input redisResources_More
-	err := loadRedisResources_More(instanceId, redisPassword, &input)
+	err := loadRedisResources_More(instanceId, redisPassword, volumes, &input)
 	if err != nil {
 		return &output, err
 	}
@@ -624,7 +907,8 @@ func getRedisResources_More (instanceId, serviceBrokerNamespace, redisPassword s
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
 		KGet(prefix + "/services/" + input.serviceSentinel.Name, &output.serviceSentinel).
-		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc).
+		KGet(prefix + "/replicationcontrollers/" + input.rc1.Name, &output.rc1).
+		KGet(prefix + "/replicationcontrollers/" + input.rc2.Name, &output.rc2).
 		KGet(prefix + "/replicationcontrollers/" + input.rcSentinel.Name, &output.rcSentinel)
 	
 	if osr.Err != nil {
@@ -638,7 +922,8 @@ func destroyRedisResources_More (moreRes *redisResources_More, serviceBrokerName
 	// todo: add to retry queue on fail
 
 	go func() {kdel (serviceBrokerNamespace, "services", moreRes.serviceSentinel.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rc)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rc1)}()
+	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rc2)}()
 	go func() {kdel_rc (serviceBrokerNamespace, &moreRes.rcSentinel)}()
 }
 

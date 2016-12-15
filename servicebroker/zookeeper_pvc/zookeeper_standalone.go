@@ -1,4 +1,4 @@
-package zookeeper
+package zookeeper_pvc
 
 
 import (
@@ -37,7 +37,7 @@ import (
 // 
 //==============================================================
 
-const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_standalone"
+const ZookeeperServcieBrokerName_Standalone = "ZooKeeper_volumes_standalone"
 
 func init() {
 	oshandler.Register(ZookeeperServcieBrokerName_Standalone, &Zookeeper_freeHandler{})
@@ -78,6 +78,36 @@ func (handler *Zookeeper_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceI
 // 
 //==============================================================
 
+func volumeBaseName(instanceId string) string {
+	return "zkp-" + instanceId
+}
+
+func peerPvcName0(volumes []oshandler.Volume) string {
+	if len(volumes) > 0 {
+		return volumes[0].Volume_name
+	}
+	return ""
+}
+
+func peerPvcName1(volumes []oshandler.Volume) string {
+	if len(volumes) > 1 {
+		return volumes[1].Volume_name
+	}
+	return ""
+}
+
+func peerPvcName2(volumes []oshandler.Volume) string {
+	if len(volumes) > 2 {
+		return volumes[2].Volume_name
+	}
+	return ""
+}
+
+//==============================================================
+// 
+//==============================================================
+
+
 type Zookeeper_Handler struct{
 }
 
@@ -85,6 +115,101 @@ func newZookeeperHandler() *Zookeeper_Handler {
 	return &Zookeeper_Handler{}
 }
 
+func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	//初始化到openshift的链接
+	
+	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
+	serviceInfo := oshandler.ServiceInfo{}
+	
+	//if asyncAllowed == false {
+	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
+	//}
+	serviceSpec.IsAsync = true
+	
+	//instanceIdInTempalte   := instanceID // todo: ok?
+	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
+	//serviceBrokerNamespace := ServiceBrokerNamespace
+	serviceBrokerNamespace := oshandler.OC().Namespace()
+	zookeeperUser := "super" // oshandler.NewElevenLengthID()
+	zookeeperPassword := oshandler.GenGUID()
+	
+	volumeBaseName := volumeBaseName(instanceIdInTempalte)
+	volumes := []oshandler.Volume{
+		// one master volume
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-0",
+		},
+		// two slave volumes
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size, 
+			Volume_name: volumeBaseName + "-2",
+		},
+	}
+	
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
+	
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.User = zookeeperUser
+	serviceInfo.Password = zookeeperPassword
+
+	serviceInfo.Volumes = volumes
+	
+	// ...
+	go func() {
+		// create volume
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName,
+			serviceInfo.Database,
+			serviceInfo.Volumes,
+		)
+
+		err := <- result
+		if err != nil {
+			logger.Error("zookeeper create volume", err)
+			return
+		}
+
+		println("createZookeeperResources_Master ...")
+
+		// todo: consider if DoDeprovision is called now, ...
+
+		// create master res
+	
+		output, err := CreateZookeeperResources_Master(
+				serviceInfo.Url, 
+				serviceInfo.Database, 
+				serviceInfo.User, 
+				serviceInfo.Password,
+				volumes,
+		)
+
+		if err != nil {
+			println(" zookeeper createZookeeperResources_Master error: ", err)
+			logger.Error("zookeeper createZookeeperResources_Master error", err)
+
+			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes)
+			
+			return
+		}
+	}()
+
+	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	
+	return serviceSpec, serviceInfo, nil
+}
+
+/*
 func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 	
@@ -127,14 +252,24 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	
 	return serviceSpec, serviceInfo, nil
 }
+*/
 
 func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
 	
 	// assume in provisioning
+
+
+	volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+	if volumeJob != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 	
-	// the job may be finished or interrupted or running in another instance.
+	// ...
 	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 	
 	//ok := func(rc *kapi.ReplicationController) bool {
 	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
@@ -167,15 +302,35 @@ func (handler *Zookeeper_Handler) DoLastOperation(myServiceInfo *oshandler.Servi
 
 func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	// ...
+
+	go func() {
+		// ...
+		volumeJob := oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url))
+		if volumeJob != nil {
+			volumeJob.Cancel()
+			
+			// wait job to exit
+			for {
+				time.Sleep(7 * time.Second)
+				if nil == oshandler.GetCreatePvcVolumnJob (volumeBaseName(myServiceInfo.Url)) {
+					break
+				}
+			}
+		}
 	
-	println("to destroy resources")
-	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
-	// under current frame, it is not a good idea to return here
-	//if err != nil {
-	//	return brokerapi.IsAsync(false), err
-	//}
-	DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+		println("to destroy master resources")
+		
+		master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
+		// under current frame, it is not a good idea to return here
+		//if err != nil {
+		//	return brokerapi.IsAsync(false), err
+		//}
+		DestroyZookeeperResources_Master (master_res, myServiceInfo.Database)
+
+		println("to destroy volumes:", myServiceInfo.Volumes)
+
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes)
+	}()
 	
 	return brokerapi.IsAsync(false), nil
 }
@@ -183,7 +338,7 @@ func (handler *Zookeeper_Handler) DoDeprovision(myServiceInfo *oshandler.Service
 func (handler *Zookeeper_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
 	
-	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password)
+	master_res, _ := GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
 	
 	host, port, err := master_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
@@ -213,9 +368,9 @@ func (handler *Zookeeper_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 // interfaces for other service brokers which depend on zk
 //==============================================================
 
-func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (result <-chan bool, cancel chan<- struct{}, err error) {
+func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume) (result <-chan bool, cancel chan<- struct{}, err error) {
 	var input ZookeeperResources_Master
-	err = loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
+	err = loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, volumes, &input)
 	if err != nil {
 		return
 	}
@@ -351,7 +506,7 @@ func WatchZookeeperOrchestration(instanceId, serviceBrokerNamespace, zookeeperUs
 
 var ZookeeperTemplateData_Master []byte = nil
 
-func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, res *ZookeeperResources_Master) error {
+func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume, res *ZookeeperResources_Master) error {
 	/*
 	if ZookeeperTemplateData_Master == nil {
 		f, err := os.Open("zookeeper.yaml")
@@ -375,7 +530,8 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	*/
 	
 	if ZookeeperTemplateData_Master == nil {
-		f, err := os.Open("zookeeper-with-dashboard.yaml")
+
+		f, err := os.Open("zookeeper-pvc-with-dashboard.yaml")
 		if err != nil {
 			return err
 		}
@@ -406,6 +562,12 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	
 	// ...
 	
+	// ...
+
+	peerPvcName0 := peerPvcName0(volumes)
+	peerPvcName1 := peerPvcName1(volumes)
+	peerPvcName2 := peerPvcName2(volumes)
+	
 	// invalid operation sha1.Sum(([]byte)(zookeeperPassword))[:] (slice of unaddressable value)
 	//sum := (sha1.Sum([]byte(zookeeperPassword)))[:]
 	//zoo_password := zookeeperUser + ":" + base64.StdEncoding.EncodeToString (sum)
@@ -418,6 +580,10 @@ func loadZookeeperResources_Master(instanceID, serviceBrokerNamespace, zookeeper
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("super:password-place-holder"), []byte(zoo_password), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)
+	
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer1"), []byte(peerPvcName0), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer2"), []byte(peerPvcName1), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvcname*****peer3"), []byte(peerPvcName2), -1)
 	
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -464,9 +630,9 @@ func (masterRes *ZookeeperResources_Master) ServiceHostPort(serviceBrokerNamespa
 	return host, port, nil
 }
 	
-func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
+func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume) (*ZookeeperResources_Master, error) {
 	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
+	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -494,11 +660,11 @@ func CreateZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookee
 	return &output, osr.Err
 }
 	
-func GetZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string) (*ZookeeperResources_Master, error) {
+func GetZookeeperResources_Master (instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume) (*ZookeeperResources_Master, error) {
 	var output ZookeeperResources_Master
 	
 	var input ZookeeperResources_Master
-	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, &input)
+	err := loadZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, volumes, &input)
 	if err != nil {
 		return &output, err
 	}
