@@ -8,13 +8,13 @@ import (
 	//"golang.org/x/build/kubernetes"
 	//"golang.org/x/oauth2"
 	//"net/http"
-	"github.com/pivotal-cf/brokerapi"
-	"net"
-	"time"
 	"bytes"
 	"encoding/json"
+	"github.com/pivotal-cf/brokerapi"
+	"net"
 	"strconv"
 	"strings"
+	"time"
 	//"crypto/sha1"
 	//"encoding/base64"
 	//"text/template"
@@ -33,7 +33,7 @@ import (
 )
 
 //==============================================================
-// 
+//
 //==============================================================
 
 const RabbitmqServcieBrokerName_Standalone = "RabbitMQ_volumes_standalone"
@@ -48,7 +48,7 @@ func init() {
 var logger lager.Logger
 
 //==============================================================
-// 
+//
 //==============================================================
 
 type Rabbitmq_freeHandler struct{}
@@ -146,10 +146,10 @@ func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerap
 	//>> may be not optimized
 	var template rabbitmqResources_Master
 	err := loadRabbitmqResources_Master(
-		serviceInfo.Url, 
-		serviceInfo.User, 
-		serviceInfo.Password, 
-		serviceInfo.Volumes, 
+		serviceInfo.Url,
+		serviceInfo.User,
+		serviceInfo.Password,
+		serviceInfo.Volumes,
 		&template)
 	if err != nil {
 		return serviceSpec, oshandler.ServiceInfo{}, err
@@ -177,11 +177,11 @@ func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerap
 		// create master res
 
 		output, err := createRabbitmqResources_Master(
-			serviceInfo.Url, 
-			serviceInfo.Database, 
-			serviceInfo.User, 
-			serviceInfo.Password, 
-			serviceInfo.Volumes, 
+			serviceInfo.Url,
+			serviceInfo.Database,
+			serviceInfo.User,
+			serviceInfo.Password,
+			serviceInfo.Volumes,
 		)
 		if err != nil {
 			println(" rabbitmq createRabbitmqResources_Master error: ", err)
@@ -214,9 +214,9 @@ func (handler *Rabbitmq_Handler) DoLastOperation(myServiceInfo *oshandler.Servic
 	// the job may be finished or interrupted or running in another instance.
 
 	master_res, _ := getRabbitmqResources_Master(
-		myServiceInfo.Url, 
-		myServiceInfo.Database, 
-		myServiceInfo.User, 
+		myServiceInfo.Url,
+		myServiceInfo.Database,
+		myServiceInfo.User,
 		myServiceInfo.Password,
 		myServiceInfo.Volumes,
 	)
@@ -271,11 +271,11 @@ func (handler *Rabbitmq_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceI
 		println("to destroy resources:", myServiceInfo.Url)
 
 		master_res, _ := getRabbitmqResources_Master(
-			myServiceInfo.Url, 
-			myServiceInfo.Database, 
-			myServiceInfo.User, 
-			myServiceInfo.Password, 
-			myServiceInfo.Volumes, 
+			myServiceInfo.Url,
+			myServiceInfo.Database,
+			myServiceInfo.User,
+			myServiceInfo.Password,
+			myServiceInfo.Volumes,
 		)
 		destroyRabbitmqResources_Master(master_res, myServiceInfo.Database)
 
@@ -293,9 +293,9 @@ func (handler *Rabbitmq_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bi
 	// todo: handle errors
 
 	master_res, err := getRabbitmqResources_Master(
-		myServiceInfo.Url, 
-		myServiceInfo.Database, 
-		myServiceInfo.User, 
+		myServiceInfo.Url,
+		myServiceInfo.Database,
+		myServiceInfo.User,
 		myServiceInfo.Password,
 		myServiceInfo.Volumes,
 	)

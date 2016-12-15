@@ -106,7 +106,8 @@ metadata:
   name: sb-instanceid-kafka
 spec:
   ports:
-  - port: 9092
+  - name: 9092-tcp
+    port: 9092
   selector:
     app: sb-instanceid-kafka
 ---
