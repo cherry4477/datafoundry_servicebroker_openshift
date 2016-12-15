@@ -118,7 +118,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sb-instanceid-zk1
+  name: sb-instanceid-zk-1
 spec:
   ports:
   - name: 2181-tcp
@@ -134,7 +134,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sb-instanceid-zk2
+  name: sb-instanceid-zk-2
 spec:
   ports:
   - name: 2181-tcp
@@ -150,7 +150,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sb-instanceid-zk3
+  name: sb-instanceid-zk-3
 spec:
   ports:
   - name: 2181-tcp
