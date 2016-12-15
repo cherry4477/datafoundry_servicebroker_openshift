@@ -292,10 +292,10 @@ func getZookeeperResources_Master(serviceBrokerNamespace string, input, output *
 		OGet(prefix+"/deploymentconfigs/"+input.dc1.Name, &output.dc1).
 		OGet(prefix+"/deploymentconfigs/"+input.dc2.Name, &output.dc2).
 		OGet(prefix+"/deploymentconfigs/"+input.dc3.Name, &output.dc3).
-		KGet(prefix+"/services/"+input.svc1.Name, &output.svc3).
-		KGet(prefix+"/services/"+input.svc2.Name, &output.svc3).
+		KGet(prefix+"/services/"+input.svc1.Name, &output.svc1).
+		KGet(prefix+"/services/"+input.svc2.Name, &output.svc2).
 		KGet(prefix+"/services/"+input.svc3.Name, &output.svc3).
-		KGet(prefix+"/services/"+input.svc4.Name, &output.svc3)
+		KGet(prefix+"/services/"+input.svc4.Name, &output.svc4)
 
 	if osr.Err != nil {
 		logger.Error("getZookeeperResources_Master", osr.Err)
