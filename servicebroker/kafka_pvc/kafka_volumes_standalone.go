@@ -309,28 +309,23 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
-	fmt.Println(zookeeper_res.svc1.Name, zookeeper_res.svc1.Spec.Ports)
-	fmt.Println(zookeeper_res.svc2.Name, zookeeper_res.svc2.Spec.Ports)
-	fmt.Println(zookeeper_res.svc3.Name, zookeeper_res.svc3.Spec.Ports)
-	fmt.Println(zookeeper_res.svc4.Name, zookeeper_res.svc4.Spec.Ports)
-
 	//get big service ip port
 	zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
 		fmt.Println("get zk host and port err:", err)
-		return brokerapi.Binding{}, oshandler.Credentials{}, nil
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
 	fmt.Println("zk_host:", zk_host, "  zk_port:", zk_port)
 
 	//get kafka resources info
-	master_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+	kafka_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
 	if err != nil {
 		fmt.Println("get kafka resources info err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
-	kafka_port := oshandler.GetServicePortByName(&master_res.svc1, "9092-tcp")
+	kafka_port := oshandler.GetServicePortByName(&kafka_res.svc3, "9092-tcp")
 	if kafka_port == nil {
 		fmt.Println("kafka's port is nil")
 		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("kafka-port port not found")
@@ -338,7 +333,7 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 
 	fmt.Println("kafka_port:", kafka_port.Port)
 
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.svc3.Name, myServiceInfo.Database)
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", kafka_res.svc3.Name, myServiceInfo.Database)
 	port := strconv.Itoa(kafka_port.Port)
 
 	mycredentials := oshandler.Credentials{
