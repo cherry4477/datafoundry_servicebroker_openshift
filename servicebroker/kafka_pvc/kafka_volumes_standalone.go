@@ -309,6 +309,8 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
+	fmt.Println(zookeeper_res.svc4.Name, zookeeper_res.svc4.Spec.Ports)
+
 	//get big service ip port
 	zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
