@@ -21,14 +21,13 @@ import (
 	"os"
 	//"sync"
 
-
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	//routeapi "github.com/openshift/origin/route/api/v1"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 
+	"fmt"
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 	dcapi "github.com/openshift/origin/deploy/api/v1"
-	"fmt"
 )
 
 //==============================================================
@@ -102,15 +101,15 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 }
 
 func peerPvcName3(volumes []oshandler.Volume) string {
-	if len(volumes) > 0 {
-		return volumes[0].Volume_name
+	if len(volumes) > 3 {
+		return volumes[3].Volume_name
 	}
 	return ""
 }
 
 func peerPvcName4(volumes []oshandler.Volume) string {
-	if len(volumes) > 2 {
-		return volumes[2].Volume_name
+	if len(volumes) > 4 {
+		return volumes[4].Volume_name
 	}
 	return ""
 }

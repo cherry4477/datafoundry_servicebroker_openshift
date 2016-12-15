@@ -36,14 +36,6 @@ spec:
           claimName: "kafka-pvc-name-replace1"
   triggers:
   - type: ConfigChange
-  - type: ImageChange
-    imageChangeParams:
-      automatic: false
-      containerNames:
-      - kafka-1
-      from:
-        kind: ImageStream
-        name: http://kafka-image-place-holder/kafka-openshift-orchestration
 ---
 
 apiVersion: v1
@@ -84,14 +76,6 @@ spec:
           claimName: "kafka-pvc-name-replace2"
   triggers:
   - type: ConfigChange
-  - type: ImageChange
-    imageChangeParams:
-      automatic: false
-      containerNames:
-      - kafka-2
-      from:
-        kind: ImageStream
-        name: http://kafka-image-place-holder/kafka-openshift-orchestration
 ---
 
 apiVersion: v1

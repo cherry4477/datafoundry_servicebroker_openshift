@@ -204,17 +204,9 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 }
 
 func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
-	// try to get state from running job
-	volumeJob := oshandler.GetCreatePvcVolumnJob(volumeBaseName_kafka(myServiceInfo.Url))
-	if volumeJob != nil {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "in progress.",
-		}, nil
-	}
 
 	ok := func(dc *dcapi.DeploymentConfig) bool {
-		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Spec.Template.Labels)
 		if err != nil {
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
@@ -226,11 +218,47 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 		return n >= dc.Spec.Replicas
 	}
 
-	// assume in provisioning
+	//judge zookeeper resources
+	volumeJob_zk := oshandler.GetCreatePvcVolumnJob(volumeBaseName_zk(myServiceInfo.Url))
+	if volumeJob_zk != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 
-	// the job may be finished or interrupted or running in another instance.
+	zk_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, "", "", myServiceInfo.Volumes)
+	if err != nil {
+		fmt.Println("GetZookeeperResources_Master err:", err)
+		return brokerapi.LastOperation{}, err
+	}
+
+	if ok(&zk_res.dc1) && ok(&zk_res.dc2) && ok(&zk_res.dc3) {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Succeeded,
+			Description: "Succeeded!",
+		}, nil
+	} else {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
+		}, nil
+	}
+
+	//judge kafka resources
+	volumeJob_kafka := oshandler.GetCreatePvcVolumnJob(volumeBaseName_kafka(myServiceInfo.Url))
+	if volumeJob_kafka != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
 
 	master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		fmt.Println("getKafkaResources_Master err:", err)
+		return brokerapi.LastOperation{}, err
+	}
 
 	if ok(&master_res.dc1) && ok(&master_res.dc2) {
 		return brokerapi.LastOperation{
@@ -308,13 +336,13 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	////port := "80"
 	//
 	mycredentials := oshandler.Credentials{
-		//Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)",
-		//	host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
-		//Hostname: host,
-		//Port:     port,
-		//Username: myServiceInfo.User,
-		//Password: myServiceInfo.Password,
-		// todo: need return zookeeper password?
+	//Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)",
+	//	host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
+	//Hostname: host,
+	//Port:     port,
+	//Username: myServiceInfo.User,
+	//Password: myServiceInfo.Password,
+	// todo: need return zookeeper password?
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
