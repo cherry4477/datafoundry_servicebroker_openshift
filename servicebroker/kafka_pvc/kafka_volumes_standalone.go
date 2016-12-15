@@ -325,6 +325,10 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
+	fmt.Println(kafka_res.svc1.Name, kafka_res.svc1.Spec.Ports)
+	fmt.Println(kafka_res.svc2.Name, kafka_res.svc2.Spec.Ports)
+	fmt.Println(kafka_res.svc3.Name, kafka_res.svc3.Spec.Ports)
+
 	kafka_port := oshandler.GetServicePortByName(&kafka_res.svc3, "9092-tcp")
 	if kafka_port == nil {
 		fmt.Println("kafka's port is nil")
