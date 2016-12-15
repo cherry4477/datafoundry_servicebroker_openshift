@@ -212,7 +212,7 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 		}, nil
 	}
 
-	zk_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, "", "", myServiceInfo.Volumes)
+	zk_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
 	if err != nil {
 		fmt.Println("GetZookeeperResources_Master err:", err)
 		return brokerapi.LastOperation{}, err
@@ -277,7 +277,7 @@ func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo
 		// ...
 
 		fmt.Println("to destroy zookeeper resources")
-		zookeeper_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
+		zookeeper_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
 		destroyZookeeperResources_Master(zookeeper_res, myServiceInfo.Database)
 		fmt.Println("to destroy zookeeper resources done")
 
@@ -303,27 +303,35 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	// todo: handle errors
 
 	//get zk resources info
-	zookeeper_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
+	zookeeper_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
 	if err != nil {
+		fmt.Println("get zk resources info err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
 	//get big service ip port
 	zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
+		fmt.Println("get zk host and port err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, nil
 	}
+
+	fmt.Println("zk_host:", zk_host, "  zk_port:", zk_port)
 
 	//get kafka resources info
 	master_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
 	if err != nil {
+		fmt.Println("get kafka resources info err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
 	kafka_port := oshandler.GetServicePortByName(&master_res.svc1, "9092-tcp")
 	if kafka_port == nil {
+		fmt.Println("kafka's port is nil")
 		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("kafka-port port not found")
 	}
+
+	fmt.Println("kafka_port:", kafka_port.Port)
 
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.svc3.Name, myServiceInfo.Database)
 	port := strconv.Itoa(kafka_port.Port)
@@ -406,7 +414,7 @@ func (job *kafkaOrchestrationJob) run() {
 	result, cancel, err := watchZookeeperOrchestration(job.serviceInfo.Url, job.serviceInfo.Database, nil)
 	if err != nil {
 		//delete zookeeper resouces
-		zookeeper_res, _ := GetZookeeperResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
+		zookeeper_res, _ := GetZookeeperResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Volumes)
 		destroyZookeeperResources_Master(zookeeper_res, job.serviceInfo.Database)
 		//delete volumes of zookeeper
 		oshandler.DeleteVolumns(job.serviceInfo.Database, job.serviceInfo.Volumes[0:3])

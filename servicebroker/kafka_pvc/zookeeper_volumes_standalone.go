@@ -271,7 +271,7 @@ func createZookeeperResources_Master(instanceId, serviceBrokerNamespace string, 
 	return &output, osr.Err
 }
 
-func GetZookeeperResources_Master(instanceId, serviceBrokerNamespace, zookeeperUser, zookeeperPassword string, volumes []oshandler.Volume) (*ZookeeperResources_Master, error) {
+func GetZookeeperResources_Master(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) (*ZookeeperResources_Master, error) {
 	var output ZookeeperResources_Master
 
 	var input ZookeeperResources_Master
