@@ -252,7 +252,7 @@ spec:
     protocol: TCP
     targetPort: 2380
   selector:
-    run: sb-instanceid-etcd1
+    run: sb-instanceid-etcd2
   sessionAffinity: None
   type: ClusterIP
 ---
