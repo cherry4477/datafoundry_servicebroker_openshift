@@ -21,7 +21,7 @@ import (
 	"os"
 	//"sync"
 
-	etcd "github.com/coreos/etcd/client"
+	//etcd "github.com/coreos/etcd/client"
 	"github.com/pivotal-golang/lager"
 	//"golang.org/x/net/context"
 
@@ -31,6 +31,8 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
+	"sync"
+	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
 )
 
 //==============================================================
@@ -77,10 +79,6 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 //
 //==============================================================
 
-const EtcdBindRole = "binduser"
-
-const EtcdGeneralUser = "etcduser"
-
 //const ServiceBrokerNamespace = "default" // use oshandler.OC().Namespace instead
 
 type Etcd_sampleHandler struct{}
@@ -101,24 +99,24 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	//serviceBrokerNamespace := ServiceBrokerNamespace
 	serviceBrokerNamespace := oshandler.OC().Namespace()
 	rootPassword := oshandler.GenGUID()
-	etcduser := EtcdGeneralUser //oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
-	etcdPassword := oshandler.GenGUID()
+	//etcduser := EtcdGeneralUser //oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
+	//etcdPassword := oshandler.GenGUID()
 
 	volumeBaseName := volumeBaseName(instanceIdInTempalte)
 	volumes := []oshandler.Volume{
 		// one master volume
 		{
 			Volume_size: planInfo.Volume_size,
-			Volume_name: volumeBaseName + "-0",
+			Volume_name: volumeBaseName + "-1",
 		},
 		// two slave volumes
 		{
 			Volume_size: planInfo.Volume_size,
-			Volume_name: volumeBaseName + "-1",
+			Volume_name: volumeBaseName + "-2",
 		},
 		{
 			Volume_size: planInfo.Volume_size,
-			Volume_name: volumeBaseName + "-2",
+			Volume_name: volumeBaseName + "-3",
 		},
 	}
 
@@ -131,9 +129,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.Admin_user = "root"
 	serviceInfo.Admin_password = rootPassword
-	serviceInfo.User = etcduser
-	serviceInfo.Password = etcdPassword
+	//serviceInfo.User = etcduser
+	//serviceInfo.Password = etcdPassword
 
 	serviceInfo.Volumes = volumes
 
@@ -160,7 +159,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 		output, err := createEtcdResources_HA(
 			instanceIdInTempalte, serviceBrokerNamespace,
-			rootPassword, etcduser, etcdPassword, volumes)
+			rootPassword, volumes)
 
 		if err != nil {
 			println("etcd createEtcdResources_HA error: ", err)
@@ -192,9 +191,7 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 
 	// only check the statuses of 3 ReplicationControllers. The etcd pods may be not running well.
 	ok := func(dc *dcapi.DeploymentConfig) bool {
-		labels := make(map[string]string)
-		labels["run"] = dc.Name
-		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, labels)
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
 		if err != nil {
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
@@ -209,8 +206,6 @@ func (handler *Etcd_sampleHandler) DoLastOperation(myServiceInfo *oshandler.Serv
 	ha_res, _ := getEtcdResources_HA(
 		myServiceInfo.Url, myServiceInfo.Database,
 		myServiceInfo.Admin_password, myServiceInfo.User, myServiceInfo.Password, myServiceInfo.Volumes)
-
-	//println("num_ok_rcs = ", num_ok_rcs)
 
 	if ok(&ha_res.etcddc1) && ok(&ha_res.etcddc2) && ok(&ha_res.etcddc3) {
 		return brokerapi.LastOperation{
@@ -292,8 +287,8 @@ func (handler *Etcd_sampleHandler) DoBind(myServiceInfo *oshandler.ServiceInfo, 
 		Uri:      etcd_addr,
 		Hostname: host,
 		Port:     port,
-		Username: myServiceInfo.User,
-		Password: myServiceInfo.Password,
+		Username: myServiceInfo.Admin_user,
+		Password: myServiceInfo.Admin_password,
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
@@ -306,35 +301,70 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo
 	return nil
 }
 
-//=============================================================
-
-func newUnauthrizedEtcdClient(etcdEndPoints []string) (etcd.Client, error) {
-	cfg := etcd.Config{
-		Endpoints:               etcdEndPoints,
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-	}
-	return etcd.New(cfg)
-}
-
-func newAuthrizedEtcdClient(etcdEndPoints []string, etcdUser, etcdPassword string) (etcd.Client, error) {
-	cfg := etcd.Config{
-		Endpoints:               etcdEndPoints,
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 15 * time.Second,
-		Username:                etcdUser,
-		Password:                etcdPassword,
-	}
-	return etcd.New(cfg)
-}
-
 //===============================================================
 //
 //===============================================================
 
+//type initEtcdRootPasswordJob struct {
+//	//instanceId string // use serviceInfo.
+//
+//	cancelled   bool
+//	cancelChan  chan struct{}
+//	cancelMetex sync.Mutex
+//
+//	serviceInfo *oshandler.ServiceInfo
+//
+//	etcdResources *etcdResources_HA
+//}
+
+//func initEtcdRootPassword(job *initEtcdRootPasswordJob) {
+//	kafkaOrchestrationJobsMutex.Lock()
+//	defer kafkaOrchestrationJobsMutex.Unlock()
+//
+//	if kafkaOrchestrationJobs[job.serviceInfo.Url] == nil {
+//		kafkaOrchestrationJobs[job.serviceInfo.Url] = job
+//		go func() {
+//			job.run()
+//
+//			kafkaOrchestrationJobsMutex.Lock()
+//			delete(kafkaOrchestrationJobs, job.serviceInfo.Url)
+//			kafkaOrchestrationJobsMutex.Unlock()
+//		}()
+//	}
+//}
+
+func initEtcdRootPassword(namespasce string, input etcdResources_HA) bool {
+
+	ok := func(dc *dcapi.DeploymentConfig) bool {
+		podCount, err := statRunningPodsByLabels(namespasce, dc.Labels)
+		if err != nil {
+			fmt.Println("statRunningPodsByLabels err:", err)
+			return false
+		}
+		if dc == nil || dc.Name == "" || dc.Spec.Replicas == 0 || podCount < dc.Spec.Replicas {
+			return false
+		}
+		n, _ := statRunningPodsByLabels(namespasce, dc.Labels)
+		return n >= dc.Spec.Replicas
+	}
+
+	var output etcdResources_HA
+	for {
+		if ok(&input.etcddc1) && ok(&input.etcddc2) && ok(&input.etcddc3) {
+			err := kpost(namespasce, "pods", &input.pod, &output.pod)
+			if err != nil {
+				fmt.Println("cteate init password pod err:", err)
+				return false
+			}
+			break
+		}
+	}
+	return true
+}
+
 var EtcdTemplateData_HA []byte = nil
 
-func loadEtcdResources_HA(instanceID, rootPassword, user, password string, volumes []oshandler.Volume, res *etcdResources_HA) error {
+func loadEtcdResources_HA(instanceID, rootPassword string, volumes []oshandler.Volume, res *etcdResources_HA) error {
 	if EtcdTemplateData_HA == nil {
 		f, err := os.Open("etcd-pvc.yaml")
 		if err != nil {
@@ -365,20 +395,18 @@ func loadEtcdResources_HA(instanceID, rootPassword, user, password string, volum
 		}
 	}
 
-	peerPvcName0 := peerPvcName0(volumes)
-	peerPvcName1 := peerPvcName1(volumes)
-	peerPvcName2 := peerPvcName2(volumes)
+	peerPvcName1 := peerPvcName0(volumes)
+	peerPvcName2 := peerPvcName1(volumes)
+	peerPvcName3 := peerPvcName2(volumes)
 
 	yamlTemplates := EtcdTemplateData_HA
 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDROOTPASSWORD#"), []byte(rootPassword), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDUSERNAME#"), []byte(user), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDUSERPASSWORD#"), []byte(password), -1)
 
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace0"), []byte(peerPvcName0), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace1"), []byte(peerPvcName1), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace2"), []byte(peerPvcName2), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace3"), []byte(peerPvcName3), -1)
 
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))
@@ -409,6 +437,8 @@ type etcdResources_HA struct {
 	etcdsvc0 kapi.Service
 
 	route routeapi.Route
+
+	pod kapi.Pod
 }
 
 func (haRes *etcdResources_HA) endpoint() (string, string, string) {
@@ -417,9 +447,9 @@ func (haRes *etcdResources_HA) endpoint() (string, string, string) {
 	return "http://" + net.JoinHostPort(host, port), host, port
 }
 
-func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user, password string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
+func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword string, volumes []oshandler.Volume) (*etcdResources_HA, error) {
 	var input etcdResources_HA
-	err := loadEtcdResources_HA(instanceId, rootPassword, user, password, volumes, &input)
+	err := loadEtcdResources_HA(instanceId, rootPassword, volumes, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +473,11 @@ func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, us
 		logger.Error("createEtcdResources_HA", osr.Err)
 	}
 
+	ok := initEtcdRootPassword(serviceBrokerNamespace,input)
+	if !ok {
+		fmt.Println("init password faild")
+	}
+
 	return &output, nil
 }
 
@@ -450,7 +485,7 @@ func getEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword, user,
 	var output etcdResources_HA
 
 	var input etcdResources_HA
-	err := loadEtcdResources_HA(instanceId, rootPassword, user, password, volumes, &input)
+	err := loadEtcdResources_HA(instanceId, rootPassword, volumes, &input)
 	if err != nil {
 		return &output, err
 	}

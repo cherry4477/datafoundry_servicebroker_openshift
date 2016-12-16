@@ -63,7 +63,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: "pvc-name-replace0"
+          claimName: "pvc-name-replace1"
   test: false
   triggers:
   - type: ConfigChange
@@ -134,7 +134,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: "pvc-name-replace1"
+          claimName: "pvc-name-replace2"
   test: false
   triggers:
   - type: ConfigChange
@@ -205,7 +205,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: "pvc-name-replace2"
+          claimName: "pvc-name-replace3"
   test: false
   triggers:
   - type: ConfigChange
@@ -310,3 +310,31 @@ spec:
   to:
     kind: Service
     name: sb-instanceid-etcd0
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    servicebroker_etcd_node: instanceid-etcd0
+    servicebroker: instanceid-etcd
+  name: sb-instanceid-etcd0
+spec:
+  containers:
+  - command:
+    - bash
+    - /usr/bin/init-root-password.sh
+    - #ETCDROOTPASSWORD#
+    - sb-instanceid-etcd0
+    image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
+    imagePullPolicy: IfNotPresent
+    name: etcd0
+    ports:
+    - containerPort: 2379
+      name: client
+      protocol: TCP
+    - containerPort: 2380
+      name: server
+      protocol: TCP
+  restartPolicy: Never
+---
