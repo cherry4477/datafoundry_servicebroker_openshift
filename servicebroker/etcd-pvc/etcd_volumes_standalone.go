@@ -421,7 +421,8 @@ func loadEtcdResources_HA(instanceID, rootPassword string, volumes []oshandler.V
 		Decode(&res.etcdsvc2).
 		Decode(&res.etcdsvc3).
 		Decode(&res.etcdsvc0).
-		Decode(&res.route)
+		Decode(&res.route).
+		Decode(&res.pod)
 
 	return decoder.Err
 }
