@@ -31,8 +31,6 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
-	"sync"
-	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
 )
 
 //==============================================================
@@ -395,18 +393,18 @@ func loadEtcdResources_HA(instanceID, rootPassword string, volumes []oshandler.V
 		}
 	}
 
-	peerPvcName1 := peerPvcName0(volumes)
-	peerPvcName2 := peerPvcName1(volumes)
-	peerPvcName3 := peerPvcName2(volumes)
+	peerPvcName0 := peerPvcName0(volumes)
+	peerPvcName1 := peerPvcName1(volumes)
+	peerPvcName2 := peerPvcName2(volumes)
 
 	yamlTemplates := EtcdTemplateData_HA
 
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("#ETCDROOTPASSWORD#"), []byte(rootPassword), -1)
 
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace1"), []byte(peerPvcName1), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace2"), []byte(peerPvcName2), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace3"), []byte(peerPvcName3), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace1"), []byte(peerPvcName0), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace2"), []byte(peerPvcName1), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("pvc-name-replace3"), []byte(peerPvcName2), -1)
 
 	//println("========= HA yamlTemplates ===========")
 	//println(string(yamlTemplates))

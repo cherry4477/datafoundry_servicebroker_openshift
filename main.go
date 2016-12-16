@@ -41,6 +41,7 @@ import (
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd-pvc"
 )
 
 type myServiceBroker struct {
