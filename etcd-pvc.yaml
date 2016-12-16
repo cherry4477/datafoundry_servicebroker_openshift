@@ -318,7 +318,7 @@ metadata:
   labels:
     servicebroker_etcd_node: instanceid-etcd0
     servicebroker: instanceid-etcd
-  name: sb-instanceid-etcd0
+  name: sb-instanceid-init
 spec:
   containers:
   - command:
