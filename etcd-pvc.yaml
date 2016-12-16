@@ -5,7 +5,7 @@ metadata:
     openshift.io/deployment.cancelled: "4"
   creationTimestamp: null
   labels:
-    etcd: product
+    etcd: sb-instanceid-etcd
     run: sb-instanceid-etcd1
   name: sb-instanceid-etcd1
 spec:
@@ -76,7 +76,7 @@ metadata:
     openshift.io/deployment.cancelled: "3"
   creationTimestamp: null
   labels:
-    etcd: product
+    etcd: sb-instanceid-etcd
     run: sb-instanceid-etcd2
   name: sb-instanceid-etcd2
 spec:
@@ -147,7 +147,7 @@ metadata:
     openshift.io/deployment.cancelled: "1"
   creationTimestamp: null
   labels:
-    etcd: product
+    etcd: sb-instanceid-etcd
     run: sb-instanceid-etcd3
   name: sb-instanceid-etcd3
 spec:
@@ -285,7 +285,7 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    etcd: product
+    etcd: sb-instanceid-etcd
   name: sb-instanceid-etcd0
 spec:
   ports:
@@ -293,7 +293,7 @@ spec:
     protocol: TCP
     targetPort: 2379
   selector:
-    etcd: product
+    etcd: sb-instanceid-etcd
   sessionAffinity: None
   type: ClusterIP
 ---
@@ -318,7 +318,7 @@ metadata:
   labels:
     servicebroker_etcd_node: instanceid-etcd0
     servicebroker: instanceid-etcd
-  name: sb-instanceid-init
+  name: sb-instanceid-etcd-init
 spec:
   containers:
   - command:
