@@ -325,7 +325,7 @@ spec:
     - sh
     - /usr/bin/init-root-password.sh
     - #ETCDROOTPASSWORD#
-    - sb-instanceid-etcd0:2379
+    - http://sb-instanceid-etcd0:2379
     image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
     imagePullPolicy: IfNotPresent
     name: etcd0
