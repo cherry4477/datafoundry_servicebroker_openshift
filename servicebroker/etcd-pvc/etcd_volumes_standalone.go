@@ -335,6 +335,7 @@ func initEtcdRootPassword(namespasce string, input etcdResources_HA) bool {
 
 	ok := func(dc *dcapi.DeploymentConfig) bool {
 		podCount, err := statRunningPodsByLabels(namespasce, dc.Labels)
+		fmt.Println("running pod:", podCount)
 		if err != nil {
 			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
@@ -348,6 +349,7 @@ func initEtcdRootPassword(namespasce string, input etcdResources_HA) bool {
 
 	var output etcdResources_HA
 	for {
+		time.Sleep(7 * time.Second)
 		if ok(&input.etcddc1) && ok(&input.etcddc2) && ok(&input.etcddc3) {
 			err := kpost(namespasce, "pods", &input.pod, &output.pod)
 			if err != nil {
