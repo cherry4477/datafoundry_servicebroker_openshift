@@ -315,17 +315,20 @@ func destroyZookeeperResources_Master(masterRes *ZookeeperResources_Master, serv
 	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc3.Name) }()
 	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc4.Name) }()
 
-	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc1.Spec.Template.Labels)
+	fmt.Println("zookeeper dc1 lables:", masterRes.dc1.Labels)
+	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc1.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}
 
-	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc2.Spec.Template.Labels)
+	fmt.Println("zookeeper dc1 lables:", masterRes.dc2.Labels)
+	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc2.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}
 
-	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc3.Spec.Template.Labels)
+	fmt.Println("zookeeper dc1 lables:", masterRes.dc3.Labels)
+	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc3.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}

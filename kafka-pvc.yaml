@@ -2,6 +2,9 @@ apiVersion: v1
 kind: DeploymentConfig
 metadata:
   name: sb-instanceid-kafka1
+  labels:
+    app: sb-instanceid-kafka
+    run: sb-instanceid-kafka1
 spec:
   replicas: 1
   selector:
@@ -42,6 +45,9 @@ apiVersion: v1
 kind: DeploymentConfig
 metadata:
   name: sb-instanceid-kafka2
+  labels:
+    app: sb-instanceid-kafka
+    run: sb-instanceid-kafka2
 spec:
   replicas: 1
   selector:

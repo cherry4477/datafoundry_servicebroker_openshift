@@ -325,10 +325,6 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
 
-	fmt.Println(kafka_res.svc1.Name, kafka_res.svc1.Spec.Ports)
-	fmt.Println(kafka_res.svc2.Name, kafka_res.svc2.Spec.Ports)
-	fmt.Println(kafka_res.svc3.Name, kafka_res.svc3.Spec.Ports)
-
 	kafka_port := oshandler.GetServicePortByName(&kafka_res.svc3, "9092-tcp")
 	if kafka_port == nil {
 		fmt.Println("kafka's port is nil")
@@ -341,12 +337,10 @@ func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindi
 	port := strconv.Itoa(kafka_port.Port)
 
 	mycredentials := oshandler.Credentials{
-		Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)",
-			host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
+		Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s",
+			host, port, zk_host, zk_port),
 		Hostname: host,
 		Port:     port,
-		Username: "",
-		Password: "",
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
@@ -599,12 +593,14 @@ func destroyKafkaResources_Master(masterRes *kafkaResources_Master, serviceBroke
 	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc2.Name) }()
 	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc3.Name) }()
 
-	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc1.Spec.Template.Labels)
+	fmt.Println("kafka dc1 lables:", masterRes.dc1.Labels)
+	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc1.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}
 
-	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc2.Spec.Template.Labels)
+	fmt.Println("kafka dc2 lables:", masterRes.dc2.Labels)
+	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc2.Labels)
 	for _, rc := range rcs {
 		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
 	}
