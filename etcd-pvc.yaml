@@ -12,7 +12,7 @@ spec:
   replicas: 1
   selector:
     run: sb-instanceid-etcd1
-    etcd: product
+    etcd: sb-instanceid-etcd
   strategy:
     resources: {}
     rollingParams:
@@ -27,7 +27,7 @@ spec:
       creationTimestamp: null
       labels:
         run: sb-instanceid-etcd1
-        etcd: product
+        etcd: sb-instanceid-etcd
     spec:
       containers:
       - command:
@@ -83,7 +83,7 @@ spec:
   replicas: 1
   selector:
     run: sb-instanceid-etcd2
-    etcd: product
+    etcd: sb-instanceid-etcd
   strategy:
     resources: {}
     rollingParams:
@@ -98,7 +98,7 @@ spec:
       creationTimestamp: null
       labels:
         run: sb-instanceid-etcd2
-        etcd: product
+        etcd: sb-instanceid-etcd
     spec:
       containers:
       - command:
@@ -154,7 +154,7 @@ spec:
   replicas: 1
   selector:
     run: sb-instanceid-etcd3
-    etcd: product
+    etcd: sb-instanceid-etcd
   strategy:
     resources: {}
     rollingParams:
@@ -169,7 +169,7 @@ spec:
       creationTimestamp: null
       labels:
         run: sb-instanceid-etcd3
-        etcd: product
+        etcd: sb-instanceid-etcd
     spec:
       containers:
       - command:
