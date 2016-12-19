@@ -27,8 +27,9 @@ spec:
             value: user*****
           - name: RABBITMQ_DEFAULT_PASS
             value: pass*****
+          # consistent with /var/lib/rabbitmq
           - name: HOSTNAME
-            value: sb-instanceid-rbbtmq
+            value: rabbitmq
         ports:
         - containerPort: 5672
         - containerPort: 15672
