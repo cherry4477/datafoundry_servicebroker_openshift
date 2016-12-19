@@ -6,7 +6,6 @@ metadata:
   labels:
     name: sb-instanceid-mongo
 spec:
-  clusterIP: None
   ports:
   - port: 27017
     targetPort: 27017
@@ -22,7 +21,6 @@ metadata:
   labels:
     name: sb-instanceid-mongo
 spec:
-  clusterIP: None
   ports:
   - port: 27017
     targetPort: 27017
@@ -38,7 +36,6 @@ metadata:
   labels:
     name: sb-instanceid-mongo
 spec:
-  clusterIP: None
   ports:
   - port: 27017
     targetPort: 27017
