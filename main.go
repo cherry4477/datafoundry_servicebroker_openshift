@@ -14,32 +14,34 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	
+
 	"github.com/coreos/etcd/client"
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-golang/lager"
 	"golang.org/x/net/context"
-	
+
 	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
-	
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/rabbitmq"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka"
+
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/cassandra"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kettle"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/nifi"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/tensorflow"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/pyspider"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/rabbitmq"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/spark"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/tensorflow"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper"
 
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper_pvc"
-	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/kafka_pvc"
-	// _ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm_pvc"
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/mongo_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/rabbitmq_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/redis_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/storm_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper_pvc"
+	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/etcd-pvc"
 )
 
 type myServiceBroker struct {
@@ -67,48 +69,46 @@ type myCredentials struct {
 
 func (myBroker *myServiceBroker) Services() []brokerapi.Service {
 	/*
-	//free := true
-	paid := false
-	return []brokerapi.Service{
-		brokerapi.Service{
-			ID              : "5E397661-1385-464A-8DB7-9C4DF8CC0662",
-			Name            : "etcd_openshift",
-			Description     : "etcd service",
-			Bindable        : true,
-			Tags            : []string{"etcd"},
-			PlanUpdatable   : false,
-			Plans           : []brokerapi.ServicePlan{
-				brokerapi.ServicePlan{
-					ID          : "204F8288-F8D9-4806-8661-EB48D94504B3",
-					Name        : "standalone",
-					Description : "each user has a standalone etcd cluster",
-					Free        : &paid,
-					Metadata    : &brokerapi.ServicePlanMetadata{
-						DisplayName : "Big Bunny",
-						Bullets     : []string{"20 GB of Disk","20 connections"},
-						Costs       : []brokerapi.ServiceCost{
-							brokerapi.ServiceCost{
-								Amount : map[string]float64{"usd":99.0,"eur":49.0},
-								Unit   : "MONTHLY",
+		//free := true
+		paid := false
+		return []brokerapi.Service{
+			brokerapi.Service{
+				ID              : "5E397661-1385-464A-8DB7-9C4DF8CC0662",
+				Name            : "etcd_openshift",
+				Description     : "etcd service",
+				Bindable        : true,
+				Tags            : []string{"etcd"},
+				PlanUpdatable   : false,
+				Plans           : []brokerapi.ServicePlan{
+					brokerapi.ServicePlan{
+						ID          : "204F8288-F8D9-4806-8661-EB48D94504B3",
+						Name        : "standalone",
+						Description : "each user has a standalone etcd cluster",
+						Free        : &paid,
+						Metadata    : &brokerapi.ServicePlanMetadata{
+							DisplayName : "Big Bunny",
+							Bullets     : []string{"20 GB of Disk","20 connections"},
+							Costs       : []brokerapi.ServiceCost{
+								brokerapi.ServiceCost{
+									Amount : map[string]float64{"usd":99.0,"eur":49.0},
+									Unit   : "MONTHLY",
+								},
 							},
 						},
 					},
 				},
+				Metadata        : &brokerapi.ServiceMetadata{
+					DisplayName         : "etcd",
+					ImageUrl            : "https://coreos.com/assets/images/media/etcd2-0.png",
+					LongDescription     : "Managed, highly available etcd clusters in the cloud",
+					ProviderDisplayName : "Asiainfo BDX LDP",
+					DocumentationUrl    : "https://coreos.com/etcd/docs/latest",
+					SupportUrl          : "https://coreos.com/",
+				},
+				DashboardClient : &brokerapi.ServiceDashboardClient{},
 			},
-			Metadata        : &brokerapi.ServiceMetadata{
-				DisplayName         : "etcd",
-				ImageUrl            : "https://coreos.com/assets/images/media/etcd2-0.png",
-				LongDescription     : "Managed, highly available etcd clusters in the cloud",
-				ProviderDisplayName : "Asiainfo BDX LDP",
-				DocumentationUrl    : "https://coreos.com/etcd/docs/latest",
-				SupportUrl          : "https://coreos.com/",
-			},
-			DashboardClient : &brokerapi.ServiceDashboardClient{},
-		},
-	}
+		}
 	*/
-	
-
 
 	//初始化一系列所需要的结构体，好累啊
 	myServices := []brokerapi.Service{}
@@ -241,7 +241,7 @@ func (myBroker *myServiceBroker) Provision(
 		return brokerapi.ProvisionedServiceSpec{}, errors.New("Internal Error!!")
 	}
 
-	planInfo := handler.PlanInfo {
+	planInfo := handler.PlanInfo{
 		Volume_size: volumeSize,
 		Connections: connections,
 	}
@@ -595,16 +595,16 @@ func (myBroker *myServiceBroker) Update(instanceID string, details brokerapi.Upd
 //定义工具函数
 func etcdget(key string) (*client.Response, error) {
 	n := 5
-	
+
 RETRY:
 	resp, err := etcdapi.Get(context.Background(), key, nil)
 	if err != nil {
 		logger.Error("Can not get "+key+" from etcd", err)
-		n --
+		n--
 		if n > 0 {
 			goto RETRY
 		}
-		
+
 		return nil, err
 	} else {
 		logger.Debug("Successful get " + key + " from etcd. value is " + resp.Node.Value)
@@ -614,16 +614,16 @@ RETRY:
 
 func etcdset(key string, value string) (*client.Response, error) {
 	n := 5
-	
+
 RETRY:
 	resp, err := etcdapi.Set(context.Background(), key, value, nil)
 	if err != nil {
 		logger.Error("Can not set "+key+" from etcd", err)
-		n --
+		n--
 		if n > 0 {
 			goto RETRY
 		}
-		
+
 		return nil, err
 	} else {
 		logger.Debug("Successful set " + key + " from etcd. value is " + value)
@@ -710,7 +710,7 @@ func getenv(env string) string {
 //定义日志和etcd的全局变量，以及其他变量
 var logger lager.Logger
 var etcdapi client.KeysAPI
-var servcieBrokerName string = "openshift" // also used in init-etcd.sh 
+var servcieBrokerName string = "openshift" // also used in init-etcd.sh
 var etcdEndPoint, etcdUser, etcdPassword string
 var serviceBrokerPort string
 

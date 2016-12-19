@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    servicebroker: sb-instanceid-rabbitmq
+  name: sb-instanceid-rbbtmq
+spec:
+  replicas: 1
+  selector:
+    servicebroker: sb-instanceid-rabbitmq
+  template:
+    metadata:
+      labels:
+        servicebroker: sb-instanceid-rabbitmq
+    spec:
+      containers:
+      - image: http://rabbitmq-image-place-holder/rabbitmq-openshift-orchestration
+        imagePullPolicy: IfNotPresent
+        name: sb-instanceid-rbbtmq
+        resources:
+          limits:
+            cpu: 0.1
+        env:
+          - name: RABBITMQ_ERLANG_COOKIE
+            value: 3B694385-9169-42FF-8667-21E4F808F3AD
+          - name: RABBITMQ_DEFAULT_USER
+            value: user*****
+          - name: RABBITMQ_DEFAULT_PASS
+            value: pass*****
+          # HOSTNAME is a random string?
+          - name: HOSTNAME
+            value: sb-instanceid-rabbitmq
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+        - containerPort: 25672
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - name: rabbitmq-volume
+          mountPath: /var/lib/rabbitmq
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: rabbitmq-volume
+        persistentVolumeClaim:
+          claimName: "pvcname*****node"
+---
+#Route for admin
+apiVersion: v1
+kind: Route
+metadata:
+  name: sb-instanceid-rbbtmqa
+  labels:
+    servicebroker: sb-instanceid-rabbitmq-admin
+spec:
+  host: sb-instanceid-rabbitmq-admin.endpoint-postfix-place-holder
+  port:
+    targetPort: admin
+  to:
+    kind: Service
+    name: sb-instanceid-rbbtmq
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    servicebroker: sb-instanceid-rabbitmq
+  name: sb-instanceid-rbbtmq
+spec:
+  ports:
+  - port: 5672
+    name: mq
+  - port: 15672
+    name: admin
+  - port: 25672
+    name: cluster
+  selector:
+    servicebroker: sb-instanceid-rabbitmq

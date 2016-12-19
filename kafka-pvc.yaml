@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: sb-instanceid-kafka1
+  labels:
+    app: sb-instanceid-kafka
+    run: sb-instanceid-kafka1
+spec:
+  replicas: 1
+  selector:
+    run: sb-instanceid-kafka1
+  template:
+    metadata:
+      labels:
+        app: sb-instanceid-kafka
+        run: sb-instanceid-kafka1
+    spec:
+      containers:
+      - name: kafka-1
+        image: http://kafka-image-place-holder/kafka-openshift-orchestration
+        command:
+        - bin/kafka-server-start.sh
+        args:
+        - config/server.properties
+        - --override
+        - zookeeper.connect=sb-instanceid-zk
+        - --override
+        - advertised.host.name=sb-instanceid-kafka1
+        - --override
+        - broker.id=0
+        volumeMounts:
+        - mountPath: /tmp
+          name: kafka-logs
+        ports:
+        - containerPort: 9092
+      volumes:
+      - name: kafka-logs
+        persistentVolumeClaim:
+          claimName: "kafka-pvc-name-replace1"
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: sb-instanceid-kafka2
+  labels:
+    app: sb-instanceid-kafka
+    run: sb-instanceid-kafka2
+spec:
+  replicas: 1
+  selector:
+    run: sb-instanceid-kafka2
+  template:
+    metadata:
+      labels:
+        app: sb-instanceid-kafka
+        run: sb-instanceid-kafka2
+    spec:
+      containers:
+      - name: kafka-2
+        image: http://kafka-image-place-holder/kafka-openshift-orchestration
+        command:
+        - bin/kafka-server-start.sh
+        args:
+        - config/server.properties
+        - --override
+        - zookeeper.connect=sb-instanceid-zk
+        - --override
+        - advertised.host.name=sb-instanceid-kafka2
+        - --override
+        - broker.id=1
+        volumeMounts:
+        - mountPath: /tmp
+          name: kafka-logs
+        ports:
+        - containerPort: 9092
+      volumes:
+      - name: kafka-logs
+        persistentVolumeClaim:
+          claimName: "kafka-pvc-name-replace2"
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-kafka1
+spec:
+  ports:
+  - port: 9092
+  selector:
+    run: sb-instanceid-kafka1
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-kafka2
+spec:
+  ports:
+  - port: 9092
+  selector:
+    run: sb-instanceid-kafka2
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sb-instanceid-kafka
+spec:
+  ports:
+  - name: 9092-tcp
+    port: 9092
+  selector:
+    app: sb-instanceid-kafka
+---
+

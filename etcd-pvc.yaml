@@ -1,0 +1,340 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "4"
+  creationTimestamp: null
+  labels:
+    etcd: sb-instanceid-etcd
+    run: sb-instanceid-etcd1
+  name: sb-instanceid-etcd1
+spec:
+  replicas: 1
+  selector:
+    run: sb-instanceid-etcd1
+    etcd: sb-instanceid-etcd
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: sb-instanceid-etcd1
+        etcd: sb-instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - etcd
+        - -name
+        - etcd1
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd1:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - -initial-cluster-token
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd2=http://sb-instanceid-etcd2:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd3=http://sb-instanceid-etcd3:2380
+        - -initial-cluster-state
+        - new
+        image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
+        imagePullPolicy: Always
+        name: etcd-1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /etcd1.etcd/
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: "pvc-name-replace1"
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "3"
+  creationTimestamp: null
+  labels:
+    etcd: sb-instanceid-etcd
+    run: sb-instanceid-etcd2
+  name: sb-instanceid-etcd2
+spec:
+  replicas: 1
+  selector:
+    run: sb-instanceid-etcd2
+    etcd: sb-instanceid-etcd
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: sb-instanceid-etcd2
+        etcd: sb-instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - etcd
+        - -name
+        - etcd2
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd2:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - -initial-cluster-token
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd2=http://sb-instanceid-etcd2:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd3=http://sb-instanceid-etcd3:2380
+        - -initial-cluster-state
+        - new
+        image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
+        imagePullPolicy: Always
+        name: sb-instanceid-etcd2
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /etcd2.etcd/
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: "pvc-name-replace2"
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/deployment.cancelled: "1"
+  creationTimestamp: null
+  labels:
+    etcd: sb-instanceid-etcd
+    run: sb-instanceid-etcd3
+  name: sb-instanceid-etcd3
+spec:
+  replicas: 1
+  selector:
+    run: sb-instanceid-etcd3
+    etcd: sb-instanceid-etcd
+  strategy:
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: sb-instanceid-etcd3
+        etcd: sb-instanceid-etcd
+    spec:
+      containers:
+      - command:
+        - etcd
+        - -name
+        - etcd3
+        - -initial-advertise-peer-urls
+        - http://sb-instanceid-etcd3:2380
+        - -listen-peer-urls
+        - http://0.0.0.0:2380
+        - -listen-client-urls
+        - http://0.0.0.0:2379
+        - -advertise-client-urls
+        - http://sb-instanceid-etcd.endpoint-postfix-place-holder:80
+        - -initial-cluster-token
+        - sb-instanceid-etcd
+        - -initial-cluster
+        - etcd2=http://sb-instanceid-etcd2:2380,etcd1=http://sb-instanceid-etcd1:2380,etcd3=http://sb-instanceid-etcd3:2380
+        - -initial-cluster-state
+        - new
+        image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
+        imagePullPolicy: Always
+        name: etcd-instanceid-3
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /etcd3.etcd/
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: "pvc-name-replace3"
+  test: false
+  triggers:
+  - type: ConfigChange
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sb-instanceid-etcd1
+  name: sb-instanceid-etcd1
+spec:
+  ports:
+  - name: port-1
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: port-2
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    run: sb-instanceid-etcd1
+  sessionAffinity: None
+  type: ClusterIP
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sb-instanceid-etcd2
+  name: sb-instanceid-etcd2
+spec:
+  ports:
+  - name: port-1
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: port-2
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    run: sb-instanceid-etcd2
+  sessionAffinity: None
+  type: ClusterIP
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sb-instanceid-etcd3
+  name: sb-instanceid-etcd3
+spec:
+  ports:
+  - name: port-1
+    port: 2379
+    protocol: TCP
+    targetPort: 2379
+  - name: port-2
+    port: 2380
+    protocol: TCP
+    targetPort: 2380
+  selector:
+    run: sb-instanceid-etcd3
+  sessionAffinity: None
+  type: ClusterIP
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    etcd: sb-instanceid-etcd
+  name: sb-instanceid-etcd0
+spec:
+  ports:
+  - port: 2379
+    protocol: TCP
+    targetPort: 2379
+  selector:
+    etcd: sb-instanceid-etcd
+  sessionAffinity: None
+  type: ClusterIP
+---
+
+apiVersion: v1
+kind: Route
+metadata:
+  creationTimestamp: null
+  labels:
+    etcd: product
+  name: sb-instanceid-etcd
+spec:
+  host: sb-instanceid-etcd.endpoint-postfix-place-holder
+  to:
+    kind: Service
+    name: sb-instanceid-etcd0
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    servicebroker_etcd_node: instanceid-etcd0
+    servicebroker: instanceid-etcd
+  name: sb-instanceid-etcd-init
+spec:
+  containers:
+  - command:
+    - sh
+    - /usr/bin/init-root-password.sh
+    - #ETCDROOTPASSWORD#
+    - http://sb-instanceid-etcd0:2379
+    image: http://etcd-image-place-holder/etcd-product-openshift-orchestration
+    imagePullPolicy: IfNotPresent
+    name: etcd0
+    ports:
+    - containerPort: 2379
+      name: client
+      protocol: TCP
+    - containerPort: 2380
+      name: server
+      protocol: TCP
+  restartPolicy: Never
+---

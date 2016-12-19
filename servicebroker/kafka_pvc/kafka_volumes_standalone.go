@@ -1,9 +1,7 @@
 package kafka_pvc
 
-
 import (
 	"fmt"
-	"errors"
 	//marathon "github.com/gambol99/go-marathon"
 	//kapi "golang.org/x/build/kubernetes/api"
 	//"golang.org/x/build/kubernetes"
@@ -11,38 +9,39 @@ import (
 	//"net/http"
 	//"net"
 	"github.com/pivotal-cf/brokerapi"
-	"time"
-	"strconv"
 	"strings"
-	"bytes"
-	"encoding/json"
 	//"crypto/sha1"
 	//"encoding/base64"
 	//"text/template"
 	//"io"
-	"io/ioutil"
 	"os"
-	"sync"
-	
+
 	"github.com/pivotal-golang/lager"
-	
+
 	//"k8s.io/kubernetes/pkg/util/yaml"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	//routeapi "github.com/openshift/origin/route/api/v1"
-	
+
+	"bytes"
+	"encoding/json"
+	"errors"
 	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
-	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/zookeeper_pvc"
+	dcapi "github.com/openshift/origin/deploy/api/v1"
+	"io/ioutil"
+	"strconv"
+	"sync"
+	"time"
 )
 
 //==============================================================
-// 
+//
 //==============================================================
 
 const KafkaServcieBrokerName_Standalone = "Kafka_volumes_standalone"
 
 func init() {
 	oshandler.Register(KafkaServcieBrokerName_Standalone, &Kafka_freeHandler{})
-	
+
 	logger = lager.NewLogger(KafkaServcieBrokerName_Standalone)
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 }
@@ -50,7 +49,7 @@ func init() {
 var logger lager.Logger
 
 //==============================================================
-// 
+//
 //==============================================================
 
 type Kafka_freeHandler struct{}
@@ -76,108 +75,150 @@ func (handler *Kafka_freeHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo,
 }
 
 //==============================================================
-// 
+//
 //==============================================================
 
-type Kafka_Handler struct{
+type Kafka_Handler struct {
 }
 
 func newKafkaHandler() *Kafka_Handler {
 	return &Kafka_Handler{}
 }
 
+func volumeBaseName_zk(instanceId string) string {
+	return "kafka-zk-" + instanceId
+}
+
+func volumeBaseName_kafka(instanceId string) string {
+	return "kafka-" + instanceId
+}
+
 func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
-	
+
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
 	serviceInfo := oshandler.ServiceInfo{}
-	
-	//if asyncAllowed == false {
-	//	return serviceSpec, serviceInfo, errors.New("Sync mode is not supported")
-	//}
+
 	serviceSpec.IsAsync = true
-	
-	//instanceIdInTempalte   := instanceID // todo: ok?
-	instanceIdInTempalte   := strings.ToLower(oshandler.NewThirteenLengthID())
-	//serviceBrokerNamespace := ServiceBrokerNamespace
+
+	instanceIdInTempalte := strings.ToLower(oshandler.NewThirteenLengthID())
 	serviceBrokerNamespace := oshandler.OC().Namespace()
-	//kafkaUser := oshandler.NewElevenLengthID()
-	//kafkaPassword := oshandler.GenGUID()
-	zookeeperUser := "super" // oshandler.NewElevenLengthID()
-	zookeeperPassword := oshandler.GenGUID()
-	
+
+	volumeBaseName_kafka := volumeBaseName_kafka(instanceIdInTempalte)
+	volumeBaseName_zk := volumeBaseName_zk(instanceIdInTempalte)
+	volumes := []oshandler.Volume{
+		{
+			Volume_size: planInfo.Volume_size,
+			Volume_name: volumeBaseName_zk + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size,
+			Volume_name: volumeBaseName_zk + "-2",
+		},
+		{
+			Volume_size: planInfo.Volume_size,
+			Volume_name: volumeBaseName_zk + "-3",
+		},
+		{
+			Volume_size: planInfo.Volume_size,
+			Volume_name: volumeBaseName_kafka + "-1",
+		},
+		{
+			Volume_size: planInfo.Volume_size,
+			Volume_name: volumeBaseName_kafka + "-2",
+		},
+	}
+
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
-	
-	// master kafka
-	//output, err := createKafkaResources_Master(instanceIdInTempalte, serviceBrokerNamespace, kafkaUser, kafkaPassword)
-	//if err != nil {
-	//	destroyKafkaResources_Master(output, serviceBrokerNamespace)
-	//	return serviceSpec, serviceInfo, err
-	//}
-	// master zookeeper
-	output, err := zookeeper_pvc.CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword, nil)
-	if err != nil {
-		zookeeper_pvc.DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
-		
-		return serviceSpec, serviceInfo, err
-	}
-	
+
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	//serviceInfo.User = kafkaUser
-	//serviceInfo.Password = kafkaPassword
-	serviceInfo.Admin_user = zookeeperUser
-	serviceInfo.Admin_password = zookeeperPassword
-	
-	startKafkaOrchestrationJob(&kafkaOrchestrationJob{
-		cancelled:  false,
-		cancelChan: make(chan struct{}),
-		
-		serviceInfo:        &serviceInfo,
-		zookeeperResources: output,
-	})
-	
+
+	serviceInfo.Volumes = volumes
+
+	go func() {
+		// create zk's volume
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName_zk,
+			serviceInfo.Database,
+			serviceInfo.Volumes[0:3],
+		)
+
+		err := <-result
+		if err != nil {
+			logger.Error("zookeeper create volume err:", err)
+			return
+		}
+
+		println("create zookeeper resources ...")
+
+		// todo: consider if DoDeprovision is called now, ...
+
+		// create master zookeeper
+		output, err := createZookeeperResources_Master(
+			instanceIdInTempalte,
+			serviceBrokerNamespace,
+			volumes,
+		)
+		if err != nil {
+			fmt.Println("create Zookeeper resources error: ", err)
+			logger.Error("create Zookeeper resources error: ", err)
+
+			oshandler.DeleteVolumns(serviceInfo.Database, volumes[0:3])
+
+			return
+		}
+
+		//start create kafka after zookeeper ok
+		startKafkaOrchestrationJob(&kafkaOrchestrationJob{
+			cancelled:  false,
+			cancelChan: make(chan struct{}),
+
+			serviceInfo:        &serviceInfo,
+			zookeeperResources: output,
+		})
+
+	}()
+
 	serviceSpec.DashboardURL = ""
-	
+
 	return serviceSpec, serviceInfo, nil
 }
 
 func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
-	// try to get state from running job
-	job := getKafkaOrchestrationJob (myServiceInfo.Url)
-	if job != nil {
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "In progress .",
-		}, nil
-	}
-	
-	// assume in provisioning
-	
-	// the job may be finished or interrupted or running in another instance.
-	
-	master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
-	
-	//ok := func(rc *kapi.ReplicationController) bool {
-	//	if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
-	//		return false
-	//	}
-	//	return true
-	//}
-	ok := func(rc *kapi.ReplicationController) bool {
-		if rc == nil || rc.Name == "" || rc.Spec.Replicas == nil || rc.Status.Replicas < *rc.Spec.Replicas {
+
+	ok := func(dc *dcapi.DeploymentConfig) bool {
+		podCount, err := statRunningPodsByLabels(myServiceInfo.Database, dc.Spec.Template.Labels)
+		if err != nil {
+			fmt.Println("statRunningPodsByLabels err:", err)
 			return false
 		}
-		n, _ := statRunningPodsByLabels (myServiceInfo.Database, rc.Labels)
-		return n >= *rc.Spec.Replicas
+		if dc == nil || dc.Name == "" || dc.Spec.Replicas == 0 || podCount < dc.Spec.Replicas {
+			return false
+		}
+		n, _ := statRunningPodsByLabels(myServiceInfo.Database, dc.Labels)
+		return n >= dc.Spec.Replicas
 	}
-	
-	//println("num_ok_rcs = ", num_ok_rcs)
-	
-	if ok (&master_res.rc) {
+
+	//judge zookeeper resources
+	volumeJob_zk := oshandler.GetCreatePvcVolumnJob(volumeBaseName_zk(myServiceInfo.Url))
+	if volumeJob_zk != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
+
+	zk_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
+	if err != nil {
+		fmt.Println("GetZookeeperResources_Master err:", err)
+		return brokerapi.LastOperation{}, err
+	}
+
+	if ok(&zk_res.dc1) && ok(&zk_res.dc2) && ok(&zk_res.dc3) {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
 			Description: "Succeeded!",
@@ -188,113 +229,154 @@ func (handler *Kafka_Handler) DoLastOperation(myServiceInfo *oshandler.ServiceIn
 			Description: "In progress.",
 		}, nil
 	}
+
+	//judge kafka resources
+	volumeJob_kafka := oshandler.GetCreatePvcVolumnJob(volumeBaseName_kafka(myServiceInfo.Url))
+	if volumeJob_kafka != nil {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "in progress.",
+		}, nil
+	}
+
+	master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		fmt.Println("getKafkaResources_Master err:", err)
+		return brokerapi.LastOperation{}, err
+	}
+
+	if ok(&master_res.dc1) && ok(&master_res.dc2) {
+		return brokerapi.LastOperation{
+			State:       brokerapi.Succeeded,
+			Description: "Succeeded!",
+		}, nil
+	} else {
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "In progress.",
+		}, nil
+	}
+
 }
 
 func (handler *Kafka_Handler) DoDeprovision(myServiceInfo *oshandler.ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	go func() {
-		job := getKafkaOrchestrationJob (myServiceInfo.Url)
+		job := getKafkaOrchestrationJob(myServiceInfo.Url)
 		if job != nil {
 			job.cancel()
-			
+
 			// wait job to exit
 			for {
 				time.Sleep(7 * time.Second)
-				if nil == getKafkaOrchestrationJob (myServiceInfo.Url) {
+				if nil == getKafkaOrchestrationJob(myServiceInfo.Url) {
 					break
 				}
 			}
 		}
-		
+
 		// ...
-		
-		println("to destroy zookeeper resources")
-		
-		zookeeper_res, _ := zookeeper_pvc.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
-		zookeeper_pvc.DestroyZookeeperResources_Master (zookeeper_res, myServiceInfo.Database)
-		
+
+		fmt.Println("to destroy zookeeper resources")
+		zookeeper_res, _ := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
+		destroyZookeeperResources_Master(zookeeper_res, myServiceInfo.Database)
+		fmt.Println("to destroy zookeeper resources done")
+
+		fmt.Println("to destroy zookeeper's volumes")
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes[0:3])
+		fmt.Println("to destroy zookeeper's volumes done")
 		// ...
-		
-		println("to destroy kafka resources")
-		
-		master_res, _ := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
-		destroyKafkaResources_Master (master_res, myServiceInfo.Database)
+
+		fmt.Println("to destroy kafka resources")
+		master_res, _ := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+		destroyKafkaResources_Master(master_res, myServiceInfo.Database)
+		fmt.Println("to destroy kafka resources done")
+
+		fmt.Println("to destroy kafka's volumes")
+		oshandler.DeleteVolumns(myServiceInfo.Database, myServiceInfo.Volumes[3:5])
+		fmt.Println("to destroy kafka's volumes done")
 	}()
-	
+
 	return brokerapi.IsAsync(false), nil
 }
 
 func (handler *Kafka_Handler) DoBind(myServiceInfo *oshandler.ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, oshandler.Credentials, error) {
 	// todo: handle errors
-	
-	zookeeper_res, err := zookeeper_pvc.GetZookeeperResources_Master (myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Admin_user, myServiceInfo.Admin_password, nil)
+
+	//get zk resources info
+	zookeeper_res, err := GetZookeeperResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes)
 	if err != nil {
+		fmt.Println("get zk resources info err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
-	
+
+	//get big service ip port
 	zk_host, zk_port, err := zookeeper_res.ServiceHostPort(myServiceInfo.Database)
 	if err != nil {
-		return brokerapi.Binding{}, oshandler.Credentials{}, nil
-	}
-	
-	master_res, err := getKafkaResources_Master (myServiceInfo.Url, myServiceInfo.Database) //, myServiceInfo.User, myServiceInfo.Password)
-	if err != nil {
+		fmt.Println("get zk host and port err:", err)
 		return brokerapi.Binding{}, oshandler.Credentials{}, err
 	}
-	
-	kafka_port := oshandler.GetServicePortByName(&master_res.service, "kafka-port")
+
+	fmt.Println("zk_host:", zk_host, "  zk_port:", zk_port)
+
+	//get kafka resources info
+	kafka_res, err := getKafkaResources_Master(myServiceInfo.Url, myServiceInfo.Database, myServiceInfo.Volumes) //, myServiceInfo.User, myServiceInfo.Password)
+	if err != nil {
+		fmt.Println("get kafka resources info err:", err)
+		return brokerapi.Binding{}, oshandler.Credentials{}, err
+	}
+
+	kafka_port := oshandler.GetServicePortByName(&kafka_res.svc3, "9092-tcp")
 	if kafka_port == nil {
+		fmt.Println("kafka's port is nil")
 		return brokerapi.Binding{}, oshandler.Credentials{}, errors.New("kafka-port port not found")
 	}
-	
-	host := fmt.Sprintf("%s.%s.svc.cluster.local", master_res.service.Name, myServiceInfo.Database)
+
+	fmt.Println("kafka_port:", kafka_port.Port)
+
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", kafka_res.svc3.Name, myServiceInfo.Database)
 	port := strconv.Itoa(kafka_port.Port)
-	//host := master_res.routeMQ.Spec.Host
-	//port := "80"
-	
+
 	mycredentials := oshandler.Credentials{
-		Uri:      fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s (SuperUser: %s, Password: %s)", 
-					host, port, zk_host, zk_port, myServiceInfo.Admin_user, myServiceInfo.Admin_password),
+		Uri: fmt.Sprintf("kafka: %s:%s zookeeper: %s:%s",
+			host, port, zk_host, zk_port),
 		Hostname: host,
 		Port:     port,
-		//Username: myServiceInfo.User,
-		//Password: myServiceInfo.Password,
-		// todo: need return zookeeper password?
 	}
 
 	myBinding := brokerapi.Binding{Credentials: mycredentials}
-
+	//
 	return myBinding, mycredentials, nil
 }
 
 func (handler *Kafka_Handler) DoUnbind(myServiceInfo *oshandler.ServiceInfo, mycredentials *oshandler.Credentials) error {
 	// do nothing
-	
+
 	return nil
 }
 
 //===============================================================
-// 
+//
 //===============================================================
 
 var kafkaOrchestrationJobs = map[string]*kafkaOrchestrationJob{}
 var kafkaOrchestrationJobsMutex sync.Mutex
 
-func getKafkaOrchestrationJob (instanceId string) *kafkaOrchestrationJob {
+func getKafkaOrchestrationJob(instanceId string) *kafkaOrchestrationJob {
 	kafkaOrchestrationJobsMutex.Lock()
 	defer kafkaOrchestrationJobsMutex.Unlock()
-	
+
 	return kafkaOrchestrationJobs[instanceId]
 }
 
-func startKafkaOrchestrationJob (job *kafkaOrchestrationJob) {
+func startKafkaOrchestrationJob(job *kafkaOrchestrationJob) {
 	kafkaOrchestrationJobsMutex.Lock()
 	defer kafkaOrchestrationJobsMutex.Unlock()
-	
+
 	if kafkaOrchestrationJobs[job.serviceInfo.Url] == nil {
 		kafkaOrchestrationJobs[job.serviceInfo.Url] = job
 		go func() {
 			job.run()
-			
+
 			kafkaOrchestrationJobsMutex.Lock()
 			delete(kafkaOrchestrationJobs, job.serviceInfo.Url)
 			kafkaOrchestrationJobsMutex.Unlock()
@@ -304,52 +386,70 @@ func startKafkaOrchestrationJob (job *kafkaOrchestrationJob) {
 
 type kafkaOrchestrationJob struct {
 	//instanceId string // use serviceInfo.
-	
-	cancelled bool
-	cancelChan chan struct{}
+
+	cancelled   bool
+	cancelChan  chan struct{}
 	cancelMetex sync.Mutex
-	
-	serviceInfo    *oshandler.ServiceInfo
-	
-	zookeeperResources *zookeeper_pvc.ZookeeperResources_Master
+
+	serviceInfo *oshandler.ServiceInfo
+
+	zookeeperResources *ZookeeperResources_Master
 }
 
 func (job *kafkaOrchestrationJob) cancel() {
 	job.cancelMetex.Lock()
 	defer job.cancelMetex.Unlock()
-	
-	if ! job.cancelled {
+
+	if !job.cancelled {
 		job.cancelled = true
-		close (job.cancelChan)
+		close(job.cancelChan)
 	}
 }
 
 func (job *kafkaOrchestrationJob) run() {
 	println("-- kafkaOrchestrationJob start --")
-	
-	result, cancel, err := zookeeper_pvc.WatchZookeeperOrchestration (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
+
+	result, cancel, err := watchZookeeperOrchestration(job.serviceInfo.Url, job.serviceInfo.Database, nil)
 	if err != nil {
-		zookeeper_res, _ := zookeeper_pvc.GetZookeeperResources_Master (job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Admin_user, job.serviceInfo.Admin_password, nil)
-		zookeeper_pvc.DestroyZookeeperResources_Master (zookeeper_res, job.serviceInfo.Database)
+		//delete zookeeper resouces
+		zookeeper_res, _ := GetZookeeperResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Volumes)
+		destroyZookeeperResources_Master(zookeeper_res, job.serviceInfo.Database)
+		//delete volumes of zookeeper
+		oshandler.DeleteVolumns(job.serviceInfo.Database, job.serviceInfo.Volumes[0:3])
 		return
 	}
 
 	var succeeded bool
 	select {
-	case <- job.cancelChan:
+	case <-job.cancelChan:
 		close(cancel)
 		return
-	case succeeded = <- result:
+	case succeeded = <-result:
 		close(cancel)
 		break
 	}
-	
+
 	println("-- kafkaOrchestrationJob done, succeeded:", succeeded)
-	
+
 	if succeeded {
-		println("  to create kafka resources")
-		
-		err = job.createKafkaResources_Master (job.serviceInfo.Url, job.serviceInfo.Database) //, job.serviceInfo.User, job.serviceInfo.Password)
+		volumeBaseName_kafka := volumeBaseName_kafka(job.serviceInfo.Url)
+
+		println("to create kafka resources")
+
+		result := oshandler.StartCreatePvcVolumnJob(
+			volumeBaseName_kafka,
+			job.serviceInfo.Database,
+			job.serviceInfo.Volumes[3:5],
+		)
+		err := <-result
+		if err != nil {
+			logger.Error("kafka create volume err:", err)
+			return
+		}
+
+		fmt.Println("------>to create kafka resources...")
+
+		err = job.createKafkaResources_Master(job.serviceInfo.Url, job.serviceInfo.Database, job.serviceInfo.Volumes) //, job.serviceInfo.User, job.serviceInfo.Password)
 		if err != nil {
 			logger.Error("createKafkaResources_Master", err)
 		} else {
@@ -359,14 +459,14 @@ func (job *kafkaOrchestrationJob) run() {
 }
 
 //=======================================================================
-// 
+//
 //=======================================================================
 
 var KafkaTemplateData_Master []byte = nil
 
-func loadKafkaResources_Master(instanceID, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string, res *kafkaResources_Master) error {
+func loadKafkaResources_Master(instanceID, serviceBrokerNamespace /*, kafkaUser, kafkaPassword*/ string, res *kafkaResources_Master, volumes []oshandler.Volume) error {
 	if KafkaTemplateData_Master == nil {
-		f, err := os.Open("kafka.yaml")
+		f, err := os.Open("kafka-pvc.yaml")
 		if err != nil {
 			return err
 		}
@@ -374,124 +474,152 @@ func loadKafkaResources_Master(instanceID, serviceBrokerNamespace/*, kafkaUser, 
 		if err != nil {
 			return err
 		}
-		kafka_image := oshandler.KafkaImage()
+		kafka_image := oshandler.KafkaVolumeImage()
 		kafka_image = strings.TrimSpace(kafka_image)
 		if len(kafka_image) > 0 {
 			KafkaTemplateData_Master = bytes.Replace(
-				KafkaTemplateData_Master, 
-				[]byte("http://kafka-image-place-holder/kafka-openshift-orchestration"), 
-				[]byte(kafka_image), 
+				KafkaTemplateData_Master,
+				[]byte("http://kafka-image-place-holder/kafka-openshift-orchestration"),
+				[]byte(kafka_image),
 				-1)
 		}
 	}
-	
+
+	peerPvcName0 := peerPvcName3(volumes)
+	peerPvcName1 := peerPvcName4(volumes)
+
 	// ...
-	
-	yamlTemplates := KafkaTemplateData_Master	
-	
+
+	yamlTemplates := KafkaTemplateData_Master
+
 	yamlTemplates = bytes.Replace(yamlTemplates, []byte("instanceid"), []byte(instanceID), -1)
-	yamlTemplates = bytes.Replace(yamlTemplates, []byte("local-service-postfix-place-holder"), []byte(serviceBrokerNamespace + ".svc.cluster.local"), -1)	
-	
+
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("kafka-pvc-name-replace1"), []byte(peerPvcName0), -1)
+	yamlTemplates = bytes.Replace(yamlTemplates, []byte("kafka-pvc-name-replace2"), []byte(peerPvcName1), -1)
+
 	//println("========= Boot yamlTemplates ===========")
 	//println(string(yamlTemplates))
 	//println()
 
-	
 	decoder := oshandler.NewYamlDecoder(yamlTemplates)
 	decoder.
-		Decode(&res.service).
-		Decode(&res.rc)
-	
+		Decode(&res.dc1).
+		Decode(&res.dc2).
+		Decode(&res.svc1).
+		Decode(&res.svc2).
+		Decode(&res.svc3)
+
 	return decoder.Err
 }
 
 type kafkaResources_Master struct {
-	service kapi.Service
-	rc      kapi.ReplicationController
+	dc1 dcapi.DeploymentConfig
+	dc2 dcapi.DeploymentConfig
+
+	svc1 kapi.Service
+	svc2 kapi.Service
+	svc3 kapi.Service
 }
-	
-func (job *kafkaOrchestrationJob) createKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string) error {
+
+func (job *kafkaOrchestrationJob) createKafkaResources_Master(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) error {
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/, &input)
+	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace, &input, volumes)
 	if err != nil {
 		//return nil, err
 		return err
 	}
-	
+
 	var output kafkaResources_Master
-	/*
-	osr := oshandler.NewOpenshiftREST(oshandler.OC())
-	
-	// here, not use job.post
-	prefix := "/namespaces/" + serviceBrokerNamespace
-	osr.
-		KPost(prefix + "/services", &input.service, &output.service).
-		KPost(prefix + "/replicationcontrollers", &input.rc, &output.rc)
-	
-	if osr.Err != nil {
-		logger.Error("createKafkaResources_Master", osr.Err)
-	}
-	
-	return &output, osr.Err
-	*/
+
 	go func() {
-		if err := job.kpost (serviceBrokerNamespace, "services", &input.service, &output.service); err != nil {
-			logger.Error("createKafkaResources_Master.create service", err)
+		if err := job.opost(serviceBrokerNamespace, "deploymentconfigs", &input.dc1, &output.dc1); err != nil {
+			logger.Error("createKafkaResources_Master.create dc1 err:", err)
 			return
 		}
-		if err := job.kpost (serviceBrokerNamespace, "replicationcontrollers", &input.rc, &output.rc); err != nil {
-			logger.Error("createKafkaResources_Master.create rc", err)
+		if err := job.opost(serviceBrokerNamespace, "deploymentconfigs", &input.dc2, &output.dc2); err != nil {
+			logger.Error("createKafkaResources_Master.create dc1 err:", err)
+			return
+		}
+
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc1, &output.svc1); err != nil {
+			logger.Error("createKafkaResources_Master.create service1 err:", err)
+			return
+		}
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc2, &output.svc2); err != nil {
+			logger.Error("createKafkaResources_Master.create service2 err:", err)
+			return
+		}
+		if err := job.kpost(serviceBrokerNamespace, "services", &input.svc3, &output.svc3); err != nil {
+			logger.Error("createKafkaResources_Master.create service3 err:", err)
 			return
 		}
 	}()
-	
+
 	return nil
 }
-	
-func getKafkaResources_Master (instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/ string) (*kafkaResources_Master, error) {
+
+func getKafkaResources_Master(instanceId, serviceBrokerNamespace string, volumes []oshandler.Volume) (*kafkaResources_Master, error) {
 	var output kafkaResources_Master
-	
+
 	var input kafkaResources_Master
-	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace/*, kafkaUser, kafkaPassword*/, &input)
+	err := loadKafkaResources_Master(instanceId, serviceBrokerNamespace, &input, volumes)
 	if err != nil {
 		return &output, err
 	}
-	
+
 	osr := oshandler.NewOpenshiftREST(oshandler.OC())
-	
+
 	prefix := "/namespaces/" + serviceBrokerNamespace
 	osr.
-		KGet(prefix + "/services/" + input.service.Name, &output.service).
-		KGet(prefix + "/replicationcontrollers/" + input.rc.Name, &output.rc)
-	
+		OGet(prefix+"/deploymentconfigs/"+input.dc1.Name, &output.dc1).
+		OGet(prefix+"/deploymentconfigs/"+input.dc2.Name, &output.dc2).
+		KGet(prefix+"/services/"+input.svc1.Name, &output.svc1).
+		KGet(prefix+"/services/"+input.svc2.Name, &output.svc2).
+		KGet(prefix+"/services/"+input.svc3.Name, &output.svc3)
+
 	if osr.Err != nil {
 		logger.Error("getKafkaResources_Master", osr.Err)
 	}
-	
+
 	return &output, osr.Err
 }
 
-func destroyKafkaResources_Master (masterRes *kafkaResources_Master, serviceBrokerNamespace string) {
+func destroyKafkaResources_Master(masterRes *kafkaResources_Master, serviceBrokerNamespace string) {
 	// todo: add to retry queue on fail
 
-	go func() {kdel (serviceBrokerNamespace, "services", masterRes.service.Name)}()
-	go func() {kdel_rc (serviceBrokerNamespace, &masterRes.rc)}()
+	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", masterRes.dc1.Name) }()
+	go func() { odel(serviceBrokerNamespace, "deploymentconfigs", masterRes.dc2.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc1.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc2.Name) }()
+	go func() { kdel(serviceBrokerNamespace, "services", masterRes.svc3.Name) }()
+
+	fmt.Println("kafka dc1 lables:", masterRes.dc1.Labels)
+	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc1.Labels)
+	for _, rc := range rcs {
+		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
+	}
+
+	fmt.Println("kafka dc2 lables:", masterRes.dc2.Labels)
+	rcs, _ = statRunningRCByLabels(serviceBrokerNamespace, masterRes.dc2.Labels)
+	for _, rc := range rcs {
+		go func() { kdel_rc(serviceBrokerNamespace, &rc) }()
+	}
 }
 
 //===============================================================
-// 
+//
 //===============================================================
 
-func (job *kafkaOrchestrationJob) kpost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *kafkaOrchestrationJob) kpost(serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
-	
+
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
 	if job.cancelled {
 		return nil
 	}
-	
+
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
@@ -505,20 +633,20 @@ RETRY:
 			return osr.Err
 		}
 	}
-	
+
 	return nil
 }
 
-func (job *kafkaOrchestrationJob) opost (serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
+func (job *kafkaOrchestrationJob) opost(serviceBrokerNamespace, typeName string, body interface{}, into interface{}) error {
 	println("to create ", typeName)
-	
+
 	uri := fmt.Sprintf("/namespaces/%s/%s", serviceBrokerNamespace, typeName)
 	i, n := 0, 5
 RETRY:
 	if job.cancelled {
 		return nil
 	}
-	
+
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).OPost(uri, body, into)
 	if osr.Err == nil {
 		logger.Info("create " + typeName + " succeeded")
@@ -532,17 +660,17 @@ RETRY:
 			return osr.Err
 		}
 	}
-	
+
 	return nil
 }
-	
-func kdel (serviceBrokerNamespace, typeName, resName string) error {
+
+func kdel(serviceBrokerNamespace, typeName, resName string) error {
 	if resName == "" {
 		return nil
 	}
-	
+
 	println("to delete ", typeName, "/", resName)
-	
+
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
 RETRY:
@@ -559,16 +687,16 @@ RETRY:
 			return osr.Err
 		}
 	}
-	
+
 	return nil
 }
 
-func odel (serviceBrokerNamespace, typeName, resName string) error {
+func odel(serviceBrokerNamespace, typeName, resName string) error {
 	if resName == "" {
 		return nil
 	}
-	
-	println("to delete ", typeName, "/", resName)	
+
+	println("to delete ", typeName, "/", resName)
 
 	uri := fmt.Sprintf("/namespaces/%s/%s/%s", serviceBrokerNamespace, typeName, resName)
 	i, n := 0, 5
@@ -586,7 +714,7 @@ RETRY:
 			return osr.Err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -596,19 +724,19 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 }
 */
 
-func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
+func kdel_rc(serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 	// looks pods will be auto deleted when rc is deleted.
-	
+
 	if rc == nil || rc.Name == "" {
 		return
 	}
-	
+
 	println("to delete pods on replicationcontroller", rc.Name)
-	
+
 	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers/" + rc.Name
-	
+
 	// modfiy rc replicas to 0
-	
+
 	zero := 0
 	rc.Spec.Replicas = &zero
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KPut(uri, rc, nil)
@@ -616,19 +744,19 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 		logger.Error("modify HA rc", osr.Err)
 		return
 	}
-	
+
 	// start watching rc status
-	
-	statuses, cancel, err := oshandler.OC().KWatch (uri)
+
+	statuses, cancel, err := oshandler.OC().KWatch(uri)
 	if err != nil {
 		logger.Error("start watching HA rc", err)
 		return
 	}
-	
+
 	go func() {
 		for {
-			status, _ := <- statuses
-			
+			status, _ := <-statuses
+
 			if status.Err != nil {
 				logger.Error("watch HA kafka rc error", status.Err)
 				close(cancel)
@@ -636,24 +764,24 @@ func kdel_rc (serviceBrokerNamespace string, rc *kapi.ReplicationController) {
 			} else {
 				//logger.Debug("watch kafka HA rc, status.Info: " + string(status.Info))
 			}
-			
+
 			var wrcs watchReplicationControllerStatus
 			if err := json.Unmarshal(status.Info, &wrcs); err != nil {
 				logger.Error("parse master HA rc status", err)
 				close(cancel)
 				return
 			}
-			
+
 			if wrcs.Object.Status.Replicas <= 0 {
 				break
 			}
 		}
-		
+
 		// ...
-		
+
 		kdel(serviceBrokerNamespace, "replicationcontrollers", rc.Name)
 	}()
-	
+
 	return
 }
 
@@ -665,29 +793,52 @@ type watchReplicationControllerStatus struct {
 }
 
 func statRunningPodsByLabels(serviceBrokerNamespace string, labels map[string]string) (int, error) {
-	
+
 	println("to list pods in", serviceBrokerNamespace)
-	
+
 	uri := "/namespaces/" + serviceBrokerNamespace + "/pods"
-	
+
 	pods := kapi.PodList{}
-	
+
 	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &pods)
 	if osr.Err != nil {
 		return 0, osr.Err
 	}
-	
+
 	nrunnings := 0
-	
+
 	for i := range pods.Items {
 		pod := &pods.Items[i]
-		
+
 		println("\n pods.Items[", i, "].Status.Phase =", pod.Status.Phase, "\n")
-		
+
 		if pod.Status.Phase == kapi.PodRunning {
-			nrunnings ++
+			nrunnings++
 		}
 	}
-	
+
 	return nrunnings, nil
+}
+
+func statRunningRCByLabels(serviceBrokerNamespace string, labels map[string]string) ([]kapi.ReplicationController, error) {
+	println("to list RC in", serviceBrokerNamespace)
+
+	uri := "/namespaces/" + serviceBrokerNamespace + "/replicationcontrollers"
+
+	rcs := kapi.ReplicationControllerList{}
+
+	osr := oshandler.NewOpenshiftREST(oshandler.OC()).KList(uri, labels, &rcs)
+	if osr.Err != nil {
+		fmt.Println("get rc list err:", osr.Err)
+		return nil, osr.Err
+	}
+
+	rcNames := make([]string, 0)
+	for _, rc := range rcs.Items {
+		rcNames = append(rcNames, rc.Name)
+
+	}
+
+	fmt.Println("-------->rcnames:", rcNames)
+	return rcs.Items, nil
 }

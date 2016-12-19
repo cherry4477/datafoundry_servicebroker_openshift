@@ -26,15 +26,15 @@ type ServiceInfo struct {
 	User           string `json:"user"`
 	Password       string `json:"password"`
 
-	// following fileds 
+	// following fileds
 	//Volume_type    string   `json:"volume_type"` // "" | "pvc"
 	//Volume_size    int      `json:"volume_size"`
-	// 
+	//
 	// will be replaced by
 	Volumes []Volume `json:"volumes,omitempty"`
 }
 
-type Volume struct{
+type Volume struct {
 	Volume_size int    `json:"volume_size"`
 	Volume_name string `json:"volume_name"`
 }
@@ -42,8 +42,8 @@ type Volume struct{
 //==================
 
 type PlanInfo struct {
-	Volume_size    int    `json:"volume_type"`
-	Connections    int    `json:"connections"`
+	Volume_size int `json:"volume_type"`
+	Connections int `json:"connections"`
 }
 
 type Credentials struct {
@@ -145,6 +145,10 @@ func EtcdImage() string {
 	return etcdImage
 }
 
+func EtcdVolumeImage() string {
+	return etcdVolumeImage
+}
+
 func EtcdbootImage() string {
 	return etcdbootImage
 }
@@ -209,14 +213,23 @@ func PySpiderImage() string {
 	return pyspiderImage
 }
 
+func ElasticsearchVolumeImage() string {
+	return elasticsearchVolumeImage
+}
+
 func MongoVolumeImage() string {
 	return mongoVolumeImage
+}
+
+func KafkaVolumeImage() string {
+	return kafkaVolumeImage
 }
 
 var theOC *OpenshiftClient
 var endpointSuffix string
 
 var etcdImage string
+var etcdVolumeImage string
 var etcdbootImage string
 var zookeeperImage string
 var zookeeperexhibitorImage string
@@ -233,16 +246,18 @@ var rabbitmqImage string
 var sparkImage string
 var zepplinImage string
 var pyspiderImage string
+var elasticsearchVolumeImage string
 var mongoVolumeImage string
+var kafkaVolumeImage string
 
 func init() {
-	theOC = newOpenshiftClient (
-		getenv("OPENSHIFTADDR"), 
-		getenv("OPENSHIFTUSER"), 
+	theOC = newOpenshiftClient(
+		getenv("OPENSHIFTADDR"),
+		getenv("OPENSHIFTUSER"),
 		getenv("OPENSHIFTPASS"),
 		getenv("SBNAMESPACE"),
 	)
-	
+
 	endpointSuffix = getenv("ENDPOINTSUFFIX")
 	etcdImage = getenv("ETCDIMAGE")
 	etcdbootImage = getenv("ETCDBOOTIMAGE")
@@ -261,6 +276,8 @@ func init() {
 	sparkImage = getenv("SPARKIMAGE")
 	zepplinImage = getenv("ZEPPLINIMAGE")
 	pyspiderImage = getenv("PYSPIDERIMAGE")
+	etcdVolumeImage = getenv("ETCDVOLUMEIMAGE")
+	elasticsearchVolumeImage = getenv("ELASTICSEARCHVOLUMEIMAGE")
 	mongoVolumeImage = getenv("MONGOVOLUMEIMAGE")
+	kafkaVolumeImage = getenv("KAFKAVOLUMEIMAGE")
 }
-
