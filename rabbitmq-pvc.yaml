@@ -27,9 +27,8 @@ spec:
             value: user*****
           - name: RABBITMQ_DEFAULT_PASS
             value: pass*****
-          # HOSTNAME is a random string?
           - name: HOSTNAME
-            value: sb-instanceid-rabbitmq
+            value: sb-instanceid-rbbtmq
         ports:
         - containerPort: 5672
         - containerPort: 15672
