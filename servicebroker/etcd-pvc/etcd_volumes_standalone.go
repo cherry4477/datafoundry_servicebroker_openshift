@@ -474,7 +474,7 @@ func createEtcdResources_HA(instanceId, serviceBrokerNamespace, rootPassword str
 		logger.Error("createEtcdResources_HA", osr.Err)
 	}
 
-	ok := initEtcdRootPassword(serviceBrokerNamespace,input)
+	ok := initEtcdRootPassword(serviceBrokerNamespace, input)
 	if !ok {
 		fmt.Println("init password faild")
 	}
@@ -525,7 +525,7 @@ func destroyEtcdResources_HA(haRes *etcdResources_HA, serviceBrokerNamespace str
 
 	go func() { odel(serviceBrokerNamespace, "routes", haRes.route.Name) }()
 
-	go func() {kdel(serviceBrokerNamespace, "pods", haRes.pod.Name)}()
+	go func() { kdel(serviceBrokerNamespace, "pods", haRes.pod.Name) }()
 
 	rcs, _ := statRunningRCByLabels(serviceBrokerNamespace, haRes.etcddc1.Labels)
 	for _, rc := range rcs {
