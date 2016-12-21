@@ -676,7 +676,7 @@ func getStormResources_UiSuperviser (instanceId, serviceBrokerNamespace/*, storm
 	osr.
 		KGet(prefix + "/replicationcontrollers/" + input.superviserrc.Name, &output.superviserrc).
 		KGet(prefix + "/services/" + input.uiservice.Name, &output.uiservice).
-		OGet(prefix + "/routes" + input.uiroute.Name, &output.uiroute).
+		OGet(prefix + "/routes/" + input.uiroute.Name, &output.uiroute).
 		KGet(prefix + "/replicationcontrollers/" + input.uirc.Name, &output.uirc)
 	
 	if osr.Err != nil {
