@@ -81,7 +81,7 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 
 type Elasticsearch_handler struct{}
 
-func (handler *Elasticsearch_handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Elasticsearch_handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -126,6 +126,12 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 	serviceInfo.Volumes = volumes
 
 	go func() {
+
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
 		// create volume
 
 		result := oshandler.StartCreatePvcVolumnJob(
@@ -134,7 +140,7 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("elasticsearch create volume", err)
 			return
@@ -160,6 +166,7 @@ func (handler *Elasticsearch_handler) DoProvision(instanceID string, details bro
 		}
 
 		println("create etcd Resources done")
+
 	}()
 
 	serviceSpec.DashboardURL = ""

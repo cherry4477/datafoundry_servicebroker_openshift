@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type Redis_freeHandler struct{}
 
-func (handler *Redis_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newRedisHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Redis_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRedisHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Redis_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -84,7 +84,7 @@ func newRedisHandler() *Redis_Handler {
 	return &Redis_Handler{}
 }
 
-func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Redis_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -102,37 +102,44 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 	//redisUser := oshandler.NewElevenLengthID()
 	redisPassword := oshandler.GenGUID()
 
-	println()
-	println("instanceIdInTempalte = ", instanceIdInTempalte)
-	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
-	println()
-
-	// master redis
-
-	output, err := createRedisResources_Master(instanceIdInTempalte, serviceBrokerNamespace, redisPassword)
-
-	if err != nil {
-		destroyRedisResources_Master(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
-	// todo: maybe it is better to create a new job
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	//serviceInfo.User = redisUser
 	serviceInfo.Password = redisPassword
 
-	// todo: improve watch. Pod may be already running before watching!
-	startRedisOrchestrationJob(&redisOrchestrationJob{
-		cancelled:  false,
-		cancelChan: make(chan struct{}),
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
 
-		serviceInfo:     &serviceInfo,
-		masterResources: output,
-		moreResources:   nil,
-	})
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
+		// master redis
+		output, err := createRedisResources_Master(instanceIdInTempalte, serviceBrokerNamespace, redisPassword)
+
+		if err != nil {
+			destroyRedisResources_Master(output, serviceBrokerNamespace)
+
+			return
+		}
+
+		// todo: maybe it is better to create a new job
+
+		// todo: improve watch. Pod may be already running before watching!
+		startRedisOrchestrationJob(&redisOrchestrationJob{
+			cancelled:  false,
+			cancelChan: make(chan struct{}),
+
+			serviceInfo:     &serviceInfo,
+			masterResources: output,
+			moreResources:   nil,
+		})
+
+	}()
 
 	serviceSpec.DashboardURL = ""
 

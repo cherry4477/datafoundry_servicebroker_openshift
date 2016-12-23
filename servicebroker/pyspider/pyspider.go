@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type PySpider_freeHandler struct{}
 
-func (handler *PySpider_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newPySpiderHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *PySpider_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newPySpiderHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *PySpider_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -84,7 +84,7 @@ func newPySpiderHandler() *PySpider_Handler {
 	return &PySpider_Handler{}
 }
 
-func (handler *PySpider_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *PySpider_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -102,27 +102,39 @@ func (handler *PySpider_Handler) DoProvision(instanceID string, details brokerap
 	pyspiderUser := oshandler.NewElevenLengthID()
 	pyspiderPassword := oshandler.GenGUID()
 
-	println()
-	println("instanceIdInTempalte = ", instanceIdInTempalte)
-	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
-	println()
-
-	// master pyspider
-
-	output, err := createPySpiderResources_Master(instanceIdInTempalte, serviceBrokerNamespace, pyspiderUser, pyspiderPassword)
-
-	if err != nil {
-		destroyPySpiderResources_Master(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	serviceInfo.User = pyspiderUser
 	serviceInfo.Password = pyspiderPassword
 
-	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
+	println()
+	println("instanceIdInTempalte = ", instanceIdInTempalte)
+	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
+	println()
+
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
+		// master pyspider
+		output, err := createPySpiderResources_Master(instanceIdInTempalte, serviceBrokerNamespace, pyspiderUser, pyspiderPassword)
+		if err != nil {
+			destroyPySpiderResources_Master(output, serviceBrokerNamespace)
+
+			return
+		}
+
+	}()
+
+	var input pyspiderResources_Master
+	err := loadPySpiderResources_Master(instanceIdInTempalte, pyspiderUser, pyspiderPassword, &input)
+	if err != nil {
+		return serviceSpec, serviceInfo, err
+	}
+
+	serviceSpec.DashboardURL = "http://" + net.JoinHostPort(input.route.Spec.Host, "80")
 
 	return serviceSpec, serviceInfo, nil
 }

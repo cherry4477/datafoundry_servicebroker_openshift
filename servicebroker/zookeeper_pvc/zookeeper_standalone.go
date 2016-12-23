@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type Zookeeper_freeHandler struct{}
 
-func (handler *Zookeeper_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newZookeeperHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Zookeeper_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newZookeeperHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Zookeeper_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -113,7 +113,7 @@ func newZookeeperHandler() *Zookeeper_Handler {
 	return &Zookeeper_Handler{}
 }
 
-func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Zookeeper_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -163,15 +163,19 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 
 	// ...
 	go func() {
-		// create volume
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 
+		// create volume
 		result := oshandler.StartCreatePvcVolumnJob(
 			volumeBaseName,
 			serviceInfo.Database,
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("zookeeper create volume", err)
 			return

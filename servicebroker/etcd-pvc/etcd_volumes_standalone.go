@@ -81,7 +81,7 @@ func peerPvcName2(volumes []oshandler.Volume) string {
 
 type Etcd_sampleHandler struct{}
 
-func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Etcd_sampleHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -135,6 +135,10 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	serviceInfo.Volumes = volumes
 
 	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 		// create volume
 
 		result := oshandler.StartCreatePvcVolumnJob(
@@ -143,7 +147,7 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("etcd create volume", err)
 			return

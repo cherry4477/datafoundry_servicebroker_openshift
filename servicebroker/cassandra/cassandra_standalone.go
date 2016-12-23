@@ -74,16 +74,6 @@ func (handler *Cassandra_sampleHandler) DoProvision(etcdSaveResult chan error, i
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// boot cassandra
-
-	output, err := createCassandraResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
-
-	if err != nil {
-		destroyCassandraResources_Boot(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace      // may be not needed
 	serviceInfo.User = oshandler.NewThirteenLengthID() // NewElevenLengthID()
@@ -91,8 +81,18 @@ func (handler *Cassandra_sampleHandler) DoProvision(etcdSaveResult chan error, i
 
 	// todo: improve watch. Pod may be already running before watching!
 	go func() {
-		err := <- etcdSaveResult
+		// boot cassandra
+
+		err := <-etcdSaveResult
 		if err != nil {
+			return
+		}
+
+		output, err := createCassandraResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
+
+		if err != nil {
+			destroyCassandraResources_Boot(output, serviceBrokerNamespace)
+
 			return
 		}
 
@@ -105,6 +105,7 @@ func (handler *Cassandra_sampleHandler) DoProvision(etcdSaveResult chan error, i
 			bootResources:  output,
 			//haResources:    nil,
 		})
+
 	}()
 
 	serviceSpec.DashboardURL = ""

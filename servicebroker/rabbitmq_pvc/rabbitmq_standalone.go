@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type Rabbitmq_freeHandler struct{}
 
-func (handler *Rabbitmq_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newRabbitmqHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Rabbitmq_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRabbitmqHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Rabbitmq_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -102,7 +102,7 @@ func newRabbitmqHandler() *Rabbitmq_Handler {
 	return &Rabbitmq_Handler{}
 }
 
-func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Rabbitmq_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -158,6 +158,11 @@ func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerap
 
 	// ...
 	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
 		// create volumes
 
 		result := oshandler.StartCreatePvcVolumnJob(
@@ -166,7 +171,7 @@ func (handler *Rabbitmq_Handler) DoProvision(instanceID string, details brokerap
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("rabbitmq create volume", err)
 			return
