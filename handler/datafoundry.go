@@ -327,7 +327,7 @@ func WaitUntilPvcIsBound(namespace, pvcName string, stopWatching <-chan struct{}
 	for {
 		var pvc *kapi.PersistentVolumeClaim
 		select {
-		case <- timer.C:
+		case <-timer.C:
 			return errors.New("create volume" + pvcName + "expired")
 		case <-stopWatching:
 			return errors.New("cancelled by calleer")

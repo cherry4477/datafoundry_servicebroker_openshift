@@ -303,33 +303,6 @@ func (handler *Etcd_sampleHandler) DoUnbind(myServiceInfo *oshandler.ServiceInfo
 //
 //===============================================================
 
-//type initEtcdRootPasswordJob struct {
-//	//instanceId string // use serviceInfo.
-//
-//	cancelled   bool
-//	cancelChan  chan struct{}
-//	cancelMetex sync.Mutex
-//
-//	serviceInfo *oshandler.ServiceInfo
-//
-//	etcdResources *etcdResources_HA
-//}
-
-//func initEtcdRootPassword(job *initEtcdRootPasswordJob) {
-//	kafkaOrchestrationJobsMutex.Lock()
-//	defer kafkaOrchestrationJobsMutex.Unlock()
-//
-//	if kafkaOrchestrationJobs[job.serviceInfo.Url] == nil {
-//		kafkaOrchestrationJobs[job.serviceInfo.Url] = job
-//		go func() {
-//			job.run()
-//
-//			kafkaOrchestrationJobsMutex.Lock()
-//			delete(kafkaOrchestrationJobs, job.serviceInfo.Url)
-//			kafkaOrchestrationJobsMutex.Unlock()
-//		}()
-//	}
-//}
 
 func initEtcdRootPassword(namespasce string, input etcdResources_HA) bool {
 
