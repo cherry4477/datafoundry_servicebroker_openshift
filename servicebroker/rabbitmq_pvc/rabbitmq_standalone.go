@@ -340,7 +340,7 @@ var RabbitmqTemplateData_Master []byte = nil
 
 func loadRabbitmqResources_Master(instanceID, rabbitmqUser, rabbitmqPassword string, volumes []oshandler.Volume, res *rabbitmqResources_Master) error {
 	if RabbitmqTemplateData_Master == nil {
-		f, err := os.Open("rabbitmq.yaml")
+		f, err := os.Open("rabbitmq-pvc.yaml")
 		if err != nil {
 			return err
 		}
