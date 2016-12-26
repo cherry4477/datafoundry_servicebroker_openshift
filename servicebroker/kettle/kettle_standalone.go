@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type Kettle_freeHandler struct{}
 
-func (handler *Kettle_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newKettleHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Kettle_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newKettleHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Kettle_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -85,7 +85,7 @@ func newKettleHandler() *Kettle_Handler {
 	return &Kettle_Handler{}
 }
 
-func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Kettle_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -108,22 +108,33 @@ func (handler *Kettle_Handler) DoProvision(instanceID string, details brokerapi.
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// master kettle
-
-	output, err := createKettleResources_Master(instanceIdInTempalte, serviceBrokerNamespace, kettleUser, kettlePassword)
-
-	if err != nil {
-		destroyKettleResources_Master(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	serviceInfo.User = kettleUser
 	serviceInfo.Password = kettlePassword
 
-	serviceSpec.DashboardURL = fmt.Sprintf("http://%s:%s@%s", kettleUser, kettlePassword, output.route.Spec.Host)
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
+		// master kettle
+		output, err := createKettleResources_Master(instanceIdInTempalte, serviceBrokerNamespace, kettleUser, kettlePassword)
+		if err != nil {
+			destroyKettleResources_Master(output, serviceBrokerNamespace)
+
+			return
+		}
+
+	}()
+
+	var input kettleResources_Master
+	err := loadKettleResources_Master(instanceIdInTempalte, kettleUser, kettlePassword, &input)
+	if err != nil {
+		return serviceSpec, serviceInfo, err
+	}
+	serviceSpec.DashboardURL = fmt.Sprintf("http://%s:%s@%s", kettleUser, kettlePassword, input.route.Spec.Host)
 
 	return serviceSpec, serviceInfo, nil
 }

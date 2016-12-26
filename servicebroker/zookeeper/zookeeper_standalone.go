@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type Zookeeper_freeHandler struct{}
 
-func (handler *Zookeeper_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newZookeeperHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Zookeeper_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newZookeeperHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Zookeeper_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -84,7 +84,7 @@ func newZookeeperHandler() *Zookeeper_Handler {
 	return &Zookeeper_Handler{}
 }
 
-func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Zookeeper_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -107,20 +107,27 @@ func (handler *Zookeeper_Handler) DoProvision(instanceID string, details brokera
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// master zookeeper
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 
-	output, err := CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+		// master zookeeper
+		output, err := CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
 
-	if err != nil {
-		DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
+		if err != nil {
+			DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
 
-		return serviceSpec, serviceInfo, err
-	}
+			return
+		}
 
-	serviceInfo.Url = instanceIdInTempalte
-	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.User = zookeeperUser
-	serviceInfo.Password = zookeeperPassword
+		serviceInfo.Url = instanceIdInTempalte
+		serviceInfo.Database = serviceBrokerNamespace // may be not needed
+		serviceInfo.User = zookeeperUser
+		serviceInfo.Password = zookeeperPassword
+
+	}()
 
 	serviceSpec.DashboardURL = "" // "http://" + net.JoinHostPort(output.route.Spec.Host, "80")
 

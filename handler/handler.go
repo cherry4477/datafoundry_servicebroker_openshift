@@ -56,7 +56,7 @@ type Credentials struct {
 }
 
 type HandlerDriver interface {
-	DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
+	DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error)
 	DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error)
 	DoDeprovision(myServiceInfo *ServiceInfo, asyncAllowed bool) (brokerapi.IsAsync, error)
 	DoBind(myServiceInfo *ServiceInfo, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, Credentials, error)
@@ -87,8 +87,8 @@ func New(name string) (*Handler, error) {
 	return &Handler{driver: handler}, nil
 }
 
-func (handler *Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
-	return handler.driver.DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, ServiceInfo, error) {
+	return handler.driver.DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Handler) DoLastOperation(myServiceInfo *ServiceInfo) (brokerapi.LastOperation, error) {

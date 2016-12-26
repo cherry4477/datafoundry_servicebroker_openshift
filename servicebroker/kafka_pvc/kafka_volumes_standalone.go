@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type Kafka_freeHandler struct{}
 
-func (handler *Kafka_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newKafkaHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Kafka_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newKafkaHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Kafka_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -93,7 +93,7 @@ func volumeBaseName_kafka(instanceId string) string {
 	return "kafka-" + instanceId
 }
 
-func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Kafka_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -140,6 +140,11 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	serviceInfo.Volumes = volumes
 
 	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
 		// create zk's volume
 		result := oshandler.StartCreatePvcVolumnJob(
 			volumeBaseName_zk,
@@ -147,7 +152,7 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 			serviceInfo.Volumes[0:3],
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("zookeeper create volume err:", err)
 			return

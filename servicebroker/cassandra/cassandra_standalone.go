@@ -53,7 +53,7 @@ var logger lager.Logger
 
 type Cassandra_sampleHandler struct{}
 
-func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Cassandra_sampleHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -74,31 +74,39 @@ func (handler *Cassandra_sampleHandler) DoProvision(instanceID string, details b
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// boot cassandra
-
-	output, err := createCassandraResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
-
-	if err != nil {
-		destroyCassandraResources_Boot(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace      // may be not needed
 	serviceInfo.User = oshandler.NewThirteenLengthID() // NewElevenLengthID()
 	serviceInfo.Password = oshandler.GenGUID()
 
 	// todo: improve watch. Pod may be already running before watching!
-	startCassandraOrchestrationJob(&cassandraOrchestrationJob{
-		cancelled:  false,
-		cancelChan: make(chan struct{}),
+	go func() {
+		// boot cassandra
 
-		isProvisioning: true,
-		serviceInfo:    &serviceInfo,
-		bootResources:  output,
-		//haResources:    nil,
-	})
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
+		output, err := createCassandraResources_Boot(instanceIdInTempalte, serviceBrokerNamespace)
+
+		if err != nil {
+			destroyCassandraResources_Boot(output, serviceBrokerNamespace)
+
+			return
+		}
+
+		startCassandraOrchestrationJob(&cassandraOrchestrationJob{
+			cancelled:  false,
+			cancelChan: make(chan struct{}),
+
+			isProvisioning: true,
+			serviceInfo:    &serviceInfo,
+			bootResources:  output,
+			//haResources:    nil,
+		})
+
+	}()
 
 	serviceSpec.DashboardURL = ""
 

@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type Redis_freeHandler struct{}
 
-func (handler *Redis_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newRedisHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Redis_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newRedisHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Redis_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -116,7 +116,7 @@ func newRedisHandler() *Redis_Handler {
 	return &Redis_Handler{}
 }
 
-func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Redis_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -168,6 +168,11 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 
 	// ...
 	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
 		// create volumes
 
 		result := oshandler.StartCreatePvcVolumnJob(
@@ -176,7 +181,7 @@ func (handler *Redis_Handler) DoProvision(instanceID string, details brokerapi.P
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("redis create volume", err)
 			return

@@ -54,8 +54,8 @@ var logger lager.Logger
 
 type Kafka_freeHandler struct{}
 
-func (handler *Kafka_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newKafkaHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Kafka_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newKafkaHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Kafka_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -85,7 +85,7 @@ func newKafkaHandler() *Kafka_Handler {
 	return &Kafka_Handler{}
 }
 
-func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Kafka_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -110,20 +110,6 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// master kafka
-	//output, err := createKafkaResources_Master(instanceIdInTempalte, serviceBrokerNamespace, kafkaUser, kafkaPassword)
-	//if err != nil {
-	//	destroyKafkaResources_Master(output, serviceBrokerNamespace)
-	//	return serviceSpec, serviceInfo, err
-	//}
-	// master zookeeper
-	output, err := zookeeper.CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
-	if err != nil {
-		zookeeper.DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	//serviceInfo.User = kafkaUser
@@ -131,13 +117,35 @@ func (handler *Kafka_Handler) DoProvision(instanceID string, details brokerapi.P
 	serviceInfo.Admin_user = zookeeperUser
 	serviceInfo.Admin_password = zookeeperPassword
 
-	startKafkaOrchestrationJob(&kafkaOrchestrationJob{
-		cancelled:  false,
-		cancelChan: make(chan struct{}),
+	// master kafka
+	//output, err := createKafkaResources_Master(instanceIdInTempalte, serviceBrokerNamespace, kafkaUser, kafkaPassword)
+	//if err != nil {
+	//	destroyKafkaResources_Master(output, serviceBrokerNamespace)
+	//	return serviceSpec, serviceInfo, err
+	//}
+	// master zookeeper
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 
-		serviceInfo:        &serviceInfo,
-		zookeeperResources: output,
-	})
+		output, err := zookeeper.CreateZookeeperResources_Master(instanceIdInTempalte, serviceBrokerNamespace, zookeeperUser, zookeeperPassword)
+		if err != nil {
+			zookeeper.DestroyZookeeperResources_Master(output, serviceBrokerNamespace)
+
+			return
+		}
+
+		startKafkaOrchestrationJob(&kafkaOrchestrationJob{
+			cancelled:  false,
+			cancelChan: make(chan struct{}),
+
+			serviceInfo:        &serviceInfo,
+			zookeeperResources: output,
+		})
+
+	}()
 
 	serviceSpec.DashboardURL = ""
 

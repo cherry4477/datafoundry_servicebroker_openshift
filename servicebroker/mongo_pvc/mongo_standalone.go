@@ -51,8 +51,8 @@ var logger lager.Logger
 
 type Mongo_freeHandler struct{}
 
-func (handler *Mongo_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newMongoHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *Mongo_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newMongoHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *Mongo_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -111,7 +111,7 @@ func newMongoHandler() *Mongo_Handler {
 	return &Mongo_Handler{}
 }
 
-func (handler *Mongo_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Mongo_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -161,15 +161,19 @@ func (handler *Mongo_Handler) DoProvision(instanceID string, details brokerapi.P
 
 	// ...
 	go func() {
-		// create volume
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 
+		// create volume
 		result := oshandler.StartCreatePvcVolumnJob(
 			volumeBaseName,
 			serviceInfo.Database,
 			serviceInfo.Volumes,
 		)
 
-		err := <-result
+		err = <-result
 		if err != nil {
 			logger.Error("mongo create volume", err)
 			return

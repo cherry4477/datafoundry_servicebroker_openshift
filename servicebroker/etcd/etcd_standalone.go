@@ -59,7 +59,7 @@ const EtcdGeneralUser = "etcduser"
 
 type Etcd_sampleHandler struct{}
 
-func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *Etcd_sampleHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -78,6 +78,12 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 	etcduser := EtcdGeneralUser //oshandler.NewElevenLengthID() // oshandler.GenGUID()[:16]
 	etcdPassword := oshandler.GenGUID()
 
+	serviceInfo.Url = instanceIdInTempalte
+	serviceInfo.Database = serviceBrokerNamespace // may be not needed
+	serviceInfo.Admin_password = rootPassword
+	serviceInfo.User = etcduser
+	serviceInfo.Password = etcdPassword
+
 	println()
 	println("instanceIdInTempalte = ", instanceIdInTempalte)
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
@@ -85,21 +91,23 @@ func (handler *Etcd_sampleHandler) DoProvision(instanceID string, details broker
 
 	// boot etcd
 
-	output, err := createEtcdResources_HA(
-		instanceIdInTempalte, serviceBrokerNamespace,
-		rootPassword, etcduser, etcdPassword)
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
 
-	if err != nil {
-		destroyEtcdResources_HA(output, serviceBrokerNamespace)
+		output, err := createEtcdResources_HA(
+			instanceIdInTempalte, serviceBrokerNamespace,
+			rootPassword, etcduser, etcdPassword)
 
-		return serviceSpec, serviceInfo, err
-	}
+		if err != nil {
+			destroyEtcdResources_HA(output, serviceBrokerNamespace)
 
-	serviceInfo.Url = instanceIdInTempalte
-	serviceInfo.Database = serviceBrokerNamespace // may be not needed
-	serviceInfo.Admin_password = rootPassword
-	serviceInfo.User = etcduser
-	serviceInfo.Password = etcdPassword
+			return
+		}
+
+	}()
 
 	serviceSpec.DashboardURL = ""
 

@@ -53,8 +53,8 @@ var logger lager.Logger
 
 type NiFi_freeHandler struct{}
 
-func (handler *NiFi_freeHandler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
-	return newNiFiHandler().DoProvision(instanceID, details, planInfo, asyncAllowed)
+func (handler *NiFi_freeHandler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+	return newNiFiHandler().DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 }
 
 func (handler *NiFi_freeHandler) DoLastOperation(myServiceInfo *oshandler.ServiceInfo) (brokerapi.LastOperation, error) {
@@ -84,7 +84,7 @@ func newNiFiHandler() *NiFi_Handler {
 	return &NiFi_Handler{}
 }
 
-func (handler *NiFi_Handler) DoProvision(instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
+func (handler *NiFi_Handler) DoProvision(etcdSaveResult chan error, instanceID string, details brokerapi.ProvisionDetails, planInfo oshandler.PlanInfo, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, oshandler.ServiceInfo, error) {
 	//初始化到openshift的链接
 
 	serviceSpec := brokerapi.ProvisionedServiceSpec{IsAsync: asyncAllowed}
@@ -107,22 +107,35 @@ func (handler *NiFi_Handler) DoProvision(instanceID string, details brokerapi.Pr
 	println("serviceBrokerNamespace = ", serviceBrokerNamespace)
 	println()
 
-	// master nifi
-
-	output, err := createNiFiResources_Master(instanceIdInTempalte, serviceBrokerNamespace, nifiUser, nifiPassword)
-
-	if err != nil {
-		destroyNiFiResources_Master(output, serviceBrokerNamespace)
-
-		return serviceSpec, serviceInfo, err
-	}
-
 	serviceInfo.Url = instanceIdInTempalte
 	serviceInfo.Database = serviceBrokerNamespace // may be not needed
 	serviceInfo.User = nifiUser
 	serviceInfo.Password = nifiPassword
 
-	serviceSpec.DashboardURL = fmt.Sprintf("http://%s/nifi/", output.route.Spec.Host)
+	go func() {
+		err := <-etcdSaveResult
+		if err != nil {
+			return
+		}
+
+		// master nifi
+		output, err := createNiFiResources_Master(instanceIdInTempalte, serviceBrokerNamespace, nifiUser, nifiPassword)
+
+		if err != nil {
+			destroyNiFiResources_Master(output, serviceBrokerNamespace)
+
+			return
+		}
+
+	}()
+
+	var input nifiResources_Master
+	err := loadNiFiResources_Master(instanceIdInTempalte, nifiUser, nifiPassword, &input)
+	if err != nil {
+		return serviceSpec, serviceInfo, err
+	}
+
+	serviceSpec.DashboardURL = fmt.Sprintf("http://%s/nifi/", input.route.Spec.Host)
 
 	return serviceSpec, serviceInfo, nil
 }

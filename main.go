@@ -247,11 +247,14 @@ func (myBroker *myServiceBroker) Provision(
 		Connections: connections,
 	}
 
+	etcdSaveResult := make(chan error)
+
 	//执行handler中的命令
-	provsiondetail, myServiceInfo, err = myHandler.DoProvision(instanceID, details, planInfo, asyncAllowed)
+	provsiondetail, myServiceInfo, err = myHandler.DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
 
 	//如果出错
 	if err != nil {
+		etcdSaveResult <- errors.New("DoProvision Error!")
 		logger.Error("Error do handler for service "+service_name+" plan "+plan_name, err)
 		return brokerapi.ProvisionedServiceSpec{}, errors.New("Internal Error!!")
 	}
@@ -264,6 +267,7 @@ func (myBroker *myServiceBroker) Provision(
 	//先创建instanceid目录
 	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID, "", &client.SetOptions{Dir: true}) //todo这些要么是常量，要么应该用环境变量
 	if err != nil {
+		etcdSaveResult <- errors.New("etcdapi.Set instance Error!")
 		logger.Error("Can not create instance "+instanceID+" in etcd", err) //todo都应该改为日志key
 		return brokerapi.ProvisionedServiceSpec{}, err
 	} else {
@@ -284,6 +288,7 @@ func (myBroker *myServiceBroker) Provision(
 	//创建绑定目录
 	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/binding", "", &client.SetOptions{Dir: true})
 	if err != nil {
+		etcdSaveResult <- errors.New("etcdapi.Set binding Error!")
 		logger.Error("Can not create banding directory of  "+instanceID+" in etcd", err) //todo都应该改为日志key
 		return brokerapi.ProvisionedServiceSpec{}, err
 	} else {
@@ -291,6 +296,7 @@ func (myBroker *myServiceBroker) Provision(
 	}
 	//完成所有操作后，返回DashboardURL和是否异步的标志
 	logger.Info("Successful create instance " + instanceID)
+	etcdSaveResult <- nil
 	return provsiondetail, nil
 }
 
