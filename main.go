@@ -247,7 +247,7 @@ func (myBroker *myServiceBroker) Provision(
 		Connections: connections,
 	}
 
-	etcdSaveResult := make(chan error)
+	etcdSaveResult := make(chan error, 1)
 
 	//执行handler中的命令
 	provsiondetail, myServiceInfo, err = myHandler.DoProvision(etcdSaveResult, instanceID, details, planInfo, asyncAllowed)
