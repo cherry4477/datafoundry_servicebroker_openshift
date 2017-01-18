@@ -5,7 +5,8 @@ kind: ReplicationController
 metadata:
   name: sb-instanceid-stormsv
 spec:
-  replicas: 2
+  # replicas: 2
+  replicas: 1
   selector:
     sb-instanceid-storm: supervisor
   template:
