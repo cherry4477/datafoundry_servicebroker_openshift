@@ -20,6 +20,10 @@ import (
 	"github.com/pivotal-golang/lager"
 	"golang.org/x/net/context"
 
+
+	oshandler "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
+	bsiapi "github.com/openshift/origin/backingserviceinstance/api/v1"
+
 	"github.com/asiainfoLDP/datafoundry_servicebroker_openshift/handler"
 
 	_ "github.com/asiainfoLDP/datafoundry_servicebroker_openshift/servicebroker/cassandra"
@@ -720,6 +724,7 @@ var etcdapi client.KeysAPI
 var servcieBrokerName string = "openshift" // also used in init-etcd.sh
 var etcdEndPoint, etcdUser, etcdPassword string
 var serviceBrokerPort string
+var brokerCredentials brokerapi.BrokerCredentials
 
 func main() {
 	//初始化参数，参数应该从环境变量中获取
@@ -771,13 +776,178 @@ func main() {
 	}
 
 	//装配用户名和密码
-	credentials := brokerapi.BrokerCredentials{
+	brokerCredentials := brokerapi.BrokerCredentials{
 		Username: username,
 		Password: password,
 	}
 
 	fmt.Println("START SERVICE BROKER", servcieBrokerName)
-	brokerAPI := brokerapi.New(serviceBroker, logger, credentials)
+	brokerAPI := brokerapi.New(serviceBroker, logger, brokerCredentials)
+	http.HandleFunc("/bsiinfo", getBsiInfo)
 	http.Handle("/", brokerAPI)
 	fmt.Println(http.ListenAndServe(":"+serviceBrokerPort, nil))
 }
+
+//============================
+
+// infos
+//    wild bsi pods/svcs/... which have no bsis related.
+func getBsiInfo(w http.ResponseWriter, r *http.Request) {
+	if user, pass, ok := r.BasicAuth(); !ok {
+		w.Write([]byte("need auth"))
+		return
+	} else if user != etcdUser || pass != etcdPassword {
+		w.Write([]byte("wrong auth, " + user + ", " + pass + ", " + etcdUser + ", " + etcdPassword))
+		return
+	}
+
+	// steps:
+	// 1. list all registed bsi under "/servicebroker/"+servcieBrokerName+"/instance/"
+	// 2. list all bsi in df clusters (north1, north2, ...)
+	// 3. list unregistered BSIs (expected none)
+	// 4. list registered but no real BSI corresponded (expected many)
+	// 5. create curl command list to release above resources
+	//    create 
+
+	// ...
+
+	println("========================== get BSIs in all namesapces")
+
+	{
+		bsis := bsiapi.BackingServiceInstanceList{}
+
+		uri := "/backingserviceinstances"
+		osr := oshandler.NewOpenshiftREST(oshandler.OC()).OGet(uri, &bsis)
+		if osr.Err != nil {
+			w.Write([]byte("get bsi list error: " + osr.Err.Error()))
+			return
+		}
+
+		for i := range bsis.Items {
+			bsi := &bsis.Items[i]
+			println(bsi.Namespace, bsi.Name, bsi.Spec.InstanceID)
+		}
+	}
+
+	// ...
+
+	println("========================== get all registered instances")
+
+	{
+		instancesPrefix := "/servicebroker/"+servcieBrokerName+"/instance/"
+
+		resp, err := etcdapi.Get(context.Background(), instancesPrefix[:len(instancesPrefix)-1], &client.GetOptions{Recursive: true}) //改为环境变量
+		if err != nil {
+			w.Write([]byte("list instanceid error: " + err.Error()))
+			return
+		}
+
+		for i := range resp.Node.Nodes {
+			node := resp.Node.Nodes[i]
+			instanceID := strings.TrimPrefix(node.Key, instancesPrefix)
+			println(instanceID)
+		}
+	}
+}
+
+
+/*
+
+	//写入etcd 话说如果这个时候写入失败，那不就出现数据不一致的情况了么！todo
+	//先创建instanceid目录
+	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID, "", &client.SetOptions{Dir: true}) //todo这些要么是常量，要么应该用环境变量
+	if err != nil {
+		etcdSaveResult <- errors.New("etcdapi.Set instance Error!")
+		logger.Error("Can not create instance "+instanceID+" in etcd", err) //todo都应该改为日志key
+		return brokerapi.ProvisionedServiceSpec{}, err
+	} else {
+		logger.Debug("Successful create instance "+instanceID+" in etcd", nil)
+	}
+	//然后创建一系列属性
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/organization_guid", details.OrganizationGUID)
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/space_guid", details.SpaceGUID)
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/service_id", details.ServiceID)
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/plan_id", details.PlanID)
+	tmpval, _ := json.Marshal(details.Parameters)
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/parameters", string(tmpval))
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/dashboardurl", provsiondetail.DashboardURL)
+	//存储隐藏信息_info
+	tmpval, _ = json.Marshal(myServiceInfo)
+	etcdset("/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/_info", string(tmpval))
+
+	//创建绑定目录
+	_, err = etcdapi.Set(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID+"/binding", "", &client.SetOptions{Dir: true})
+	if err != nil {
+		etcdSaveResult <- errors.New("etcdapi.Set binding Error!")
+		logger.Error("Can not create banding directory of  "+instanceID+" in etcd", err) //todo都应该改为日志key
+		return brokerapi.ProvisionedServiceSpec{}, err
+	} else {
+		logger.Debug("Successful create banding directory of  "+instanceID+" in etcd", nil)
+	}
+
+
+
+	for j := 0; j < len(resp.Node.Nodes[i].Nodes); j++ {
+			if !resp.Node.Nodes[i].Nodes[j].Dir {
+				switch strings.ToLower(resp.Node.Nodes[i].Nodes[j].Key) {
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/name":
+					myService.Name = resp.Node.Nodes[i].Nodes[j].Value
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/description":
+					myService.Description = resp.Node.Nodes[i].Nodes[j].Value
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/bindable":
+					myService.Bindable, _ = strconv.ParseBool(resp.Node.Nodes[i].Nodes[j].Value)
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/tags":
+					myService.Tags = strings.Split(resp.Node.Nodes[i].Nodes[j].Value, ",")
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/planupdatable":
+					myService.PlanUpdatable, _ = strconv.ParseBool(resp.Node.Nodes[i].Nodes[j].Value)
+				case strings.ToLower(resp.Node.Nodes[i].Key) + "/metadata":
+					json.Unmarshal([]byte(resp.Node.Nodes[i].Nodes[j].Value), &myService.Metadata)
+				}
+			} else if strings.HasSuffix(strings.ToLower(resp.Node.Nodes[i].Nodes[j].Key), "plan") {
+				//开始解析套餐目录中的套餐计划plan。上述判断也不是太严谨，比如有目录如果是xxxxplan怎么办？
+				for k := 0; k < len(resp.Node.Nodes[i].Nodes[j].Nodes); k++ {
+					logger.Debug("Start to Parse Plan " + resp.Node.Nodes[i].Nodes[j].Nodes[k].Key)
+					myPlan.ID = strings.Split(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key, "/")[len(strings.Split(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key, "/"))-1]
+					for n := 0; n < len(resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes); n++ {
+						switch strings.ToLower(resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes[n].Key) {
+						case strings.ToLower(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key) + "/name":
+							myPlan.Name = resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes[n].Value
+						case strings.ToLower(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key) + "/description":
+							myPlan.Description = resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes[n].Value
+						case strings.ToLower(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key) + "/free":
+							//这里没有搞懂为什么brokerapi里面的这个bool要定义为传指针的模式
+							myPlanfree, _ = strconv.ParseBool(resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes[n].Value)
+							myPlan.Free = brokerapi.FreeValue(myPlanfree)
+						case strings.ToLower(resp.Node.Nodes[i].Nodes[j].Nodes[k].Key) + "/metadata":
+							json.Unmarshal([]byte(resp.Node.Nodes[i].Nodes[j].Nodes[k].Nodes[n].Value), &myPlan.Metadata)
+						}
+					}
+					//装配plan需要返回的值，按照有多少个plan往里面装
+					myPlans = append(myPlans, myPlan)
+					//重置myPlan
+					myPlan = brokerapi.ServicePlan{}
+				}
+				//将装配好的Plan对象赋值给Service
+				myService.Plans = myPlans
+				//重置myPlans
+				myPlans = []brokerapi.ServicePlan{}
+
+			}
+		}
+
+
+	resp, err := etcdapi.Get(context.Background(), "/servicebroker/"+servcieBrokerName+"/instance/"+instanceID, &client.GetOptions{Recursive: true}) //改为环境变量
+
+	if err != nil || !resp.Node.Dir {
+		logger.Error("Can not get instance information from etcd", err)
+		return brokerapi.LastOperation{}, brokerapi.ErrInstanceDoesNotExist
+	} else {
+		logger.Debug("Successful get instance information from etcd. NodeInfo is " + resp.Node.Key)
+	}
+
+	//隐藏属性不得不单独获取
+	resp, err = etcdget("/servicebroker/" + servcieBrokerName + "/instance/" + instanceID + "/_info")
+	json.Unmarshal([]byte(resp.Node.Value), &myServiceInfo)
+
+*/
+
