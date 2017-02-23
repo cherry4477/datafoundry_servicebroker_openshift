@@ -18,7 +18,7 @@ spec:
             - /run.sh
           resources:
             limits:
-              cpu: 0.5
+              cpu: 2
           env:
             - name: cluster_name
               value: cluster-instanceid
