@@ -27,7 +27,8 @@ spec:
             - name: HEAP_NEWSIZE
               value: 100M
             - name: CASSANDRA_SERVICE
-              value: sb-instanceid-cssndr.local-service-postfix-place-holder
+              value: sb-instanceid-cssndr
+              # value: sb-instanceid-cssndr.local-service-postfix-place-holder
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:

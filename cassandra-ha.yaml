@@ -28,6 +28,7 @@ spec:
               value: 100M
             - name: CASSANDRA_SERVICE
               value: sb-instanceid-cssndr0.local-service-postfix-place-holder
+              # value: sb-instanceid-cssndr0.local-service-postfix-place-holder
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
