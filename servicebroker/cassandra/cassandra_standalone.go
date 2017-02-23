@@ -572,7 +572,8 @@ CHECK_POD_STATE_3:
 
 	// create users
 
-	time.Sleep(5 * time.Minute) // wait cluster fully formed.
+	// time.Sleep(5 * time.Minute) // wait cluster fully formed.
+	time.Sleep(30 * time.Second)
 
 RETRY_CREATE_NEW_USER:
 
@@ -605,6 +606,8 @@ RETRY_CREATE_NEW_USER:
 			logger.Error("create new cassandra super user ("+serviceInfo.User+","+serviceInfo.Password+")", err)
 			return false
 		}
+
+		println("new super user created: ", host, port, serviceInfo.User, serviceInfo.Password)
 
 		return true
 	}
