@@ -18,8 +18,11 @@ var instanceIdsInDF = map[string]bool{}
 var getInstanceInfoCommands_Openshift = make([]string, 0, 1000)
 var getInstanceInfoCommands_DatabaseShare = make([]string, 0, 1000)
 
-var instanceIdsInDF_NotFound = make([]string, 0, 1000)
-var instancePodRandomIdsInDF = make([]string, 0, 1000)
+var instanceIdsInETCD_ButNotFoundInDF = make([]string, 0, 1000)
+var instancePodRandomIdsInDF_NoRelatedBSIs = make([]string, 0, 1000)
+
+var instancePodRandomIdsInETCD = map[string]bool{}
+var instancePodRandomIdsInDF_ButNotInETCD = map[string]bool{}
 
 func collectInstanceIdsInETCD() {
 	collect := func(m map[string]bool, filename string, prefix []byte) {
@@ -55,7 +58,7 @@ func collectInstanceIdsInDF() {
 	collect := func(filename string, allowNotExist bool) {
 		f, err := os.Open(filename)
 		if err != nil {
-			if err == os.ErrNotExist && allowNotExist {
+			if os.IsNotExist(err) && allowNotExist {
 				return
 			}
 			
@@ -107,7 +110,7 @@ func collectInstancePodRandomIdsInDF() {
 						end += start
 						instanceId := string(line[start:end])
 						if len(instanceId) > 0 {
-							instanceIdsInDF_NotFound = append(instanceIdsInDF_NotFound, instanceId)
+							instanceIdsInETCD_ButNotFoundInDF = append(instanceIdsInETCD_ButNotFoundInDF, instanceId)
 						}
 					}
 				}
@@ -123,7 +126,7 @@ func collectInstancePodRandomIdsInDF() {
 					end += start
 					randomId := string(line[start:end])
 					if len(randomId) > 0 {
-						instancePodRandomIdsInDF = append(instancePodRandomIdsInDF, randomId)
+						instancePodRandomIdsInDF_NoRelatedBSIs = append(instancePodRandomIdsInDF_NoRelatedBSIs, randomId)
 					}
 				}
 			}
@@ -132,6 +135,81 @@ func collectInstancePodRandomIdsInDF() {
 
 	collect("wild-bsi-info-openshift")
 }
+
+func collectUnrecordedBsiRandomIds() {
+	collect := func(filename string) {
+		f, err := os.Open(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		reader := bufio.NewReader(f)
+		for {
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Fatal(err)
+			}
+
+			const substr = `","url":"`
+			start := bytes.Index(line, []byte(substr))
+			if start >= 0 {
+				start += len(substr)
+				end := bytes.Index(line[start:], []byte(`","`))
+				if end >= 0 {
+					end += start
+					randomId := string(line[start:end])
+					if len(randomId) > 0 {
+						instancePodRandomIdsInETCD[randomId] = true
+					}
+				}
+			}
+		}
+	}
+	
+	collect2 := func(filename string, allowNotExist bool) {
+		f, err := os.Open(filename)
+		if err != nil {
+			if os.IsNotExist(err) && allowNotExist {
+				return
+			}
+			
+			log.Fatal(err)
+		}
+		reader := bufio.NewReader(f)
+		for {
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Fatal(err)
+			}
+
+			const substr = `sb-`
+			start := bytes.Index(line, []byte(substr))
+			if start >= 0 {
+				start += len(substr)
+				end := bytes.Index(line[start:], []byte(`-`))
+				if end >= 0 {
+					end += start
+					randomId := string(line[start:end])
+					if len(randomId) > 0 && instancePodRandomIdsInETCD[randomId] == false {
+						instancePodRandomIdsInDF_ButNotInETCD[randomId] = true
+					}
+				}
+			}
+		}
+	}
+
+	collect("bsi-databaseshare-instances-info-in-etcd")
+	collect("bsi-openshift-instances-info-in-etcd")
+	collect2("bsi-pods-region-north1", false)
+	collect2("bsi-pods-region-north2", true)
+}
+
+
 
 func createCommand_GetWildInstanceInfo(instanceId, bsiGroup string) string {
 	return "$ETCDCTL get /servicebroker/" +
@@ -229,7 +307,14 @@ func main() {
 	case "wild-bsi-random-ids":
 		fmt.Println()
 		collectInstancePodRandomIdsInDF()
-		for _, randomId := range instancePodRandomIdsInDF {
+		for _, randomId := range instancePodRandomIdsInDF_NoRelatedBSIs {
+			fmt.Println(randomId)
+		}
+		fmt.Println()
+	case "unrecorded-bsi-random-ids":
+		fmt.Println()
+		collectUnrecordedBsiRandomIds()
+		for randomId, _ := range instancePodRandomIdsInDF_ButNotInETCD {
 			fmt.Println(randomId)
 		}
 		fmt.Println()
@@ -255,14 +340,14 @@ func main() {
 	log.Println()
 
 	log.Println("===== bsi instances not found:")
-	for _, instanceId := range instanceIdsInDF_NotFound {
+	for _, instanceId := range instanceIdsInETCD_ButNotFoundInDF {
 		log.Println(instanceId)
 	}
 	
 	log.Println()
 
 	log.Println("===== Wild openshift BSI random IDs (please save them into: wild-bsi-random-ids)")
-	for _, randomId := range instancePodRandomIdsInDF {
+	for _, randomId := range instancePodRandomIdsInDF_NoRelatedBSIs {
 		log.Println(randomId)
 	}
 	*/
