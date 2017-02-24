@@ -1,9 +1,20 @@
-1. 将etcd中的bsi的instance列表存到bsi-databaseshare-instances-in-etcd和bsi-openshift-instances-in-etcd中:
+
+0. 设置环境变量
 
 export ETCDCTL="etcdctl --timeout 15s --total-timeout 30s --endpoints http://xxx.yyy.zzz:2379 --username user:password"
 
+1. 将etcd中的bsi的instance列表存到bsi-databaseshare-instances-in-etcd和bsi-openshift-instances-in-etcd中:
+
 $ETCDCTL ls /servicebroker/databaseshare/instance/ > bsi-databaseshare-instances-in-etcd
+
 $ETCDCTL ls /servicebroker/openshift/instance/ > bsi-openshift-instances-in-etcd
+
+  将所有存在etcd中的instance info存入bsi-databaseshare-instances-info-in-etcd和bsi-openshift-instances-info-in-etcd中:
+
+cat bsi-databaseshare-instances-in-etcd | while read line; do if [[ -n "${line// }" ]]; then echo $ETCDCTL get $line/_info; fi; done > bsi-databaseshare-instances-info-in-etcd
+
+cat bsi-openshift-instances-in-etcd | while read line; do if [[ -n "${line// }" ]]; then echo $ETCDCTL get $line/_info; fi; done > bsi-openshift-instances-info-in-etcd
+
 
 2. 将openshift中每个区所有bsi的yaml格式信息存到region-north1-bsis等文件中
 
